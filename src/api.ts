@@ -3,6 +3,7 @@ import type { ProjectPayload, SectionPayload } from "./domain/toolbox";
 const configuredBase = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const apiBase = configuredBase.replace(/\/$/, "");
 let csrfReady = false;
+let csrfToken = "";
 
 export interface ApiEnvelope<T = unknown> {
   ok: boolean;
@@ -37,9 +38,12 @@ function cookie(name: string): string {
 
 /** Django 写请求必须先获取 CSRF Cookie。 */
 async function ensureCsrf(): Promise<void> {
-  if (csrfReady && cookie("csrftoken")) return;
+  if (csrfReady && csrfToken) return;
   const response = await fetch(url("/api/csrf/"), { credentials: "include" });
   if (!response.ok) throw new ApiError("无法获取 CSRF Cookie", response.status);
+  const payload = await response.json() as { csrf_token?: string };
+  csrfToken = payload.csrf_token || "";
+  if (!csrfToken) throw new ApiError("Backend did not return a CSRF token", response.status, payload);
   csrfReady = true;
 }
 
@@ -51,7 +55,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   const headers = new Headers(options.headers || {});
   if (options.body !== undefined) headers.set("Content-Type", "application/json");
-  const token = cookie("csrftoken");
+  const token = csrfToken || cookie("csrftoken");
   if (token) headers.set("X-CSRFToken", token);
 
   const response = await fetch(url(path), {
