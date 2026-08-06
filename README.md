@@ -1,6 +1,6 @@
-# ToolBox 前端
+# ToolBox Web FrontEnd
 
-Vite 驱动的本地前端，通过 Django REST API 读写工作项目、机型模板和工具车数据。
+Vue 3 + Vite 驱动的 Web 管理端，通过 Django REST API 读写工作项目、机型模板和工具车数据。
 
 ## 本地联调
 
@@ -14,7 +14,7 @@ cd ..\ToolBoxBackEnd
 另开一个终端启动前端：
 
 ```powershell
-cd ..\ToolBoxFrontEnd
+cd ..\ToolBoxWebFrontEnd
 npm install
 npm run dev
 ```

@@ -1,0 +1,90 @@
+<script setup>
+import { ref } from "vue";
+import { AIRCRAFT_TYPES, TEAMS } from "../domain/toolbox";
+import { formatDate } from "../utils/format";
+
+const props = defineProps({ store: { type: Object, required: true } });
+const emit = defineEmits(["export-all", "import-all", "share"]);
+const newType = ref("A320");
+const newName = ref("");
+
+async function createProject() {
+  const name = newName.value.trim();
+  if (!name) {
+    props.store.notify("请先输入工作项目名称");
+    return;
+  }
+  await props.store.createProject(name, newType.value);
+  newName.value = "";
+}
+
+function rename(project) {
+  const name = window.prompt("请输入新的项目名称：", project.name);
+  if (name?.trim()) props.store.updateProject(project, { name: name.trim() });
+}
+
+function remove(project) {
+  if (window.confirm(`确认删除“${project.name}”？`)) props.store.deleteProject(project);
+}
+
+function chooseFile(event) {
+  const file = event.target.files?.[0];
+  if (file) emit("import-all", file);
+  event.target.value = "";
+}
+</script>
+
+<template>
+  <section>
+    <nav class="tabs">
+      <button class="tab" :class="{ active: store.listTab.value === 'tools' }" @click="store.listTab.value = 'tools'">工具清单</button>
+      <button class="tab" :class="{ active: store.listTab.value === 'db' }" @click="store.listTab.value = 'db'">数据库</button>
+    </nav>
+
+    <template v-if="store.listTab.value === 'tools'">
+      <div class="toolbar list-toolbar">
+        <input v-model="newName" class="project-name-input" placeholder="输入工作项目名称" @keydown.enter="createProject" />
+        <button class="primary" @click="createProject">+ 新建工作项目</button>
+        <select v-model="newType" aria-label="新项目机型"><option v-for="type in AIRCRAFT_TYPES" :key="type">{{ type }}</option></select>
+        <button @click="emit('export-all')">导出全部</button>
+        <label class="button">导入全部<input hidden type="file" accept="application/json" @change="chooseFile" /></label>
+        <button @click="emit('share')">分享本页</button>
+        <span class="spacer" />
+        <select v-model="store.teamFilter.value" aria-label="按班组筛选">
+          <option value="">班组：全部</option>
+          <option v-for="team in TEAMS" :key="team">{{ team }}</option>
+        </select>
+        <input v-model="store.searchDay.value" class="date-search" placeholder="日期 ±5 天，如 2026-08-06" />
+        <button @click="store.searchDay.value = ''; store.teamFilter.value = ''">清除</button>
+      </div>
+
+      <p class="list-status">共 {{ store.filteredProjects.value.length }} 个工作项目</p>
+      <div v-if="!store.filteredProjects.value.length" class="empty-state">尚无符合条件的工作项目。</div>
+      <article v-for="project in store.filteredProjects.value" :key="project.id" class="project-card">
+        <button class="project-main" @click="store.openProject(project.id)">
+          <strong>{{ project.name }}</strong>
+          <span>{{ project.aircraftType }} · {{ formatDate(project.createdAt) }}</span>
+        </button>
+        <select :value="project.team" aria-label="项目班组" @change="store.updateProject(project, { team: $event.target.value })">
+          <option value="">未分配班组</option>
+          <option v-for="team in TEAMS" :key="team">{{ team }}</option>
+        </select>
+        <div class="actions">
+          <button @click="rename(project)">改名</button>
+          <button class="danger" @click="remove(project)">删除</button>
+        </div>
+      </article>
+    </template>
+
+    <div v-else class="database-grid">
+      <article v-for="type in AIRCRAFT_TYPES" :key="type" class="library-card">
+        <div><strong>{{ type }} 标准库</strong><span>{{ store.app.value.libraries[type].items.length }} 项物品</span></div>
+        <button class="primary" @click="store.openLibrary(type)">编辑标准库</button>
+      </article>
+      <article class="library-card cart-card">
+        <div><strong>工具车数据库</strong><span>{{ store.app.value.toolCart.length }} 项物品</span></div>
+        <button class="primary" @click="store.openCart">编辑工具车</button>
+      </article>
+    </div>
+  </section>
+</template>

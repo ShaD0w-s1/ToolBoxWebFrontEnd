@@ -1,5 +1,5 @@
 {
-  "name": "toolbox-frontend",
+  "name": "toolbox-web-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "html2canvas": "^1.4.1",
+    "vue": "^3.5.41",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
     "vite": "^7.0.0"
   }
 }
