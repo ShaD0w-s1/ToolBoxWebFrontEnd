@@ -54,7 +54,7 @@ function importStandard(sub: string, event: Event): void {
       <button class="danger" @click="deleteCategory">删除</button>
     </header>
     <div v-if="!collapsed" class="category-body">
-      <textarea v-model="categoryNote" class="notes" rows="2" placeholder="部位备注" @change="store.persist" />
+      <textarea v-model="categoryNote" class="notes" rows="2" placeholder="部位备注" @input="store.persist" />
       <div class="sub-grid">
         <section v-for="sub in subNames" :key="`${category}-${sub}`" class="sub-card">
           <header class="sub-head">

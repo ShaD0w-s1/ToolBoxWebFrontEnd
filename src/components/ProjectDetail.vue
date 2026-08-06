@@ -80,9 +80,9 @@ function clear() {
         <tbody>
           <tr v-for="item in store.active.value.items" :key="item.id" :class="{ duplicate: store.isCartDuplicate(item.name) }">
             <td><select v-model="item.cat" @change="store.persist"><option v-for="category in store.active.value.categories" :key="category">{{ category }}</option></select></td>
-            <td><input v-model="item.sub" @change="store.persist" /></td>
-            <td><input v-model="item.name" @change="store.persist" /></td>
-            <td><input v-model.number="item.qty" type="number" min="0" @change="store.persist" /></td>
+            <td><input v-model="item.sub" @input="store.persist" /></td>
+            <td><input v-model="item.name" @input="store.persist" /></td>
+            <td><input v-model.number="item.qty" type="number" min="0" @input="store.persist" /></td>
             <td><button class="danger" @click="store.deleteItem(item.id)">删除</button></td>
           </tr>
         </tbody>
