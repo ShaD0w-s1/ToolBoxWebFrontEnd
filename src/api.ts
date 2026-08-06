@@ -10,6 +10,7 @@ export interface ApiEnvelope<T = unknown> {
   data?: T;
   documents?: T[];
   items?: T[];
+  list?: T[];
   error?: string;
   configured?: boolean;
   [key: string]: unknown;

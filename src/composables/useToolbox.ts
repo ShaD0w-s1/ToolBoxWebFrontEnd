@@ -40,7 +40,7 @@ function loadCache(): ToolboxApp {
 }
 
 function listDocuments(payload: ApiEnvelope<unknown>): unknown[] {
-  const value = payload?.data ?? payload?.documents ?? payload?.items ?? [];
+  const value = payload?.data ?? payload?.list ?? payload?.documents ?? payload?.items ?? [];
   if (Array.isArray(value)) return value;
   if (value && typeof value === "object" && Array.isArray((value as { data?: unknown[] }).data)) return (value as { data: unknown[] }).data;
   return [];
@@ -62,6 +62,9 @@ export function useToolbox() {
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let remoteSaving = false;
   let remotePending = false;
+  const dirtyProjects = new Set<string>();
+  const dirtyTemplates = new Set<AircraftType>();
+  let dirtyToolCart = false;
   let nextId = 1;
 
   const currentProject = computed(() => app.value.projects.find((item) => item.id === currentProjectId.value) || null);
@@ -93,8 +96,31 @@ export function useToolbox() {
     toastTimer = setTimeout(() => { toast.visible = false; }, 2200);
   }
 
+  function markCurrentDirty(): void {
+    if (editingLibrary.value) {
+      dirtyTemplates.add(editingLibrary.value);
+    } else if (currentProject.value?.id) {
+      dirtyProjects.add(currentProject.value.id);
+    } else if (screen.value === "cart") {
+      dirtyToolCart = true;
+    } else {
+      for (const project of app.value.projects) if (project.id) dirtyProjects.add(project.id);
+    }
+  }
+
+  function markAllDirty(): void {
+    for (const type of AIRCRAFT_TYPES) dirtyTemplates.add(type);
+    for (const project of app.value.projects) if (project.id) dirtyProjects.add(project.id);
+    dirtyToolCart = true;
+  }
+
+  function hasDirtyData(): boolean {
+    return dirtyProjects.size > 0 || dirtyTemplates.size > 0 || dirtyToolCart;
+  }
+
   function persist(): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+    markCurrentDirty();
     clearTimeout(saveTimer);
     if (cloud.available) saveTimer = setTimeout(saveRemote, 450);
   }
@@ -105,29 +131,39 @@ export function useToolbox() {
       return;
     }
     remoteSaving = true;
+    const projectIds = [...dirtyProjects];
+    const templateTypes = [...dirtyTemplates];
+    const saveToolCart = dirtyToolCart;
+    dirtyProjects.clear();
+    dirtyTemplates.clear();
+    dirtyToolCart = false;
     try {
       cloud.text = "正在保存…";
       cloud.state = "warn";
-      if (editingLibrary.value) {
-        if (active.value) await backend.saveTemplate(editingLibrary.value, sectionsFromState(active.value));
-      } else if (currentProject.value) {
-        await backend.updateProject(currentProject.value.id, projectPayload(currentProject.value));
-      } else if (screen.value === "cart") {
-        await backend.saveToolCart(app.value.toolCart.map((item) => ({ name: item.name, quantity: item.qty })));
-      } else {
-        await Promise.all(app.value.projects.filter((project) => project.id).map((project) => backend.updateProject(project.id, projectPayload(project))));
-      }
+      await Promise.all([
+        ...projectIds.map((id) => app.value.projects.find((project) => project.id === id))
+          .filter((project): project is Project => Boolean(project))
+          .map((project) => backend.updateProject(project.id, projectPayload(project))),
+        ...templateTypes.map((type) => backend.saveTemplate(type, sectionsFromState(app.value.libraries[type]))),
+        ...(saveToolCart
+          ? [backend.saveToolCart(app.value.toolCart.map((item) => ({ name: item.name, quantity: item.qty })))]
+          : []),
+      ]);
       cloud.text = "已连接 Django · 数据已保存";
       cloud.state = "ok";
     } catch (error) {
+      for (const id of projectIds) dirtyProjects.add(id);
+      for (const type of templateTypes) dirtyTemplates.add(type);
+      if (saveToolCart) dirtyToolCart = true;
       cloud.text = "保存失败 · 已保留本地缓存";
       cloud.state = "err";
       notify(errorMessage(error, "保存失败"));
     } finally {
       remoteSaving = false;
-      if (remotePending) {
+      if (remotePending || hasDirtyData()) {
         remotePending = false;
-        saveRemote();
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveRemote, 0);
       }
     }
   }
@@ -135,6 +171,7 @@ export function useToolbox() {
   function replaceApp(value: ToolboxApp): void {
     app.value = normalizeApp(value);
     computeNextId();
+    markAllDirty();
     persist();
   }
 
@@ -279,6 +316,7 @@ export function useToolbox() {
   function addItem(cat: string, sub: string): void {
     const state = requireActive();
     if (!state) return;
+    if (!state.categories.includes(cat)) state.categories.push(cat);
     state.items.push({ id: nextId++, cat, sub, name: "新物品", qty: 1 });
     persist();
   }
