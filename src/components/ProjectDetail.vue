@@ -1,31 +1,39 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
-import { AIRCRAFT_TYPES } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, type AircraftType } from "../domain/toolbox";
+import type { ToolboxStore } from "../composables/useToolbox";
 import { formatDate } from "../utils/format";
 import CategorySection from "./CategorySection.vue";
 
-const props = defineProps({ store: { type: Object, required: true } });
-const emit = defineEmits(["export-sheet", "export-image", "import-sheet", "share"]);
-const capture = ref(null);
+const props = defineProps<{ store: ToolboxStore }>();
+const emit = defineEmits<{
+  "export-sheet": [];
+  "export-image": [element: HTMLElement | null];
+  "import-sheet": [file: File];
+  share: [];
+}>();
+const capture = ref<HTMLElement | null>(null);
 
 function addCategory() {
   const name = window.prompt("请输入新部位名称：");
   if (name?.trim()) props.store.addCategory(name.trim());
 }
 
-function changeAircraft(event) {
-  const type = event.target.value;
+function changeAircraft(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  const type = select.value as AircraftType;
   if (!window.confirm(`切换到 ${type} 会用对应标准库重置当前项目，是否继续？`)) {
-    event.target.value = props.store.currentProject.value.aircraftType;
+    if (props.store.currentProject.value) select.value = props.store.currentProject.value.aircraftType;
     return;
   }
   props.store.setAircraftType(type);
 }
 
-function importFile(event) {
-  const file = event.target.files?.[0];
+function importFile(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
   if (file) emit("import-sheet", file);
-  event.target.value = "";
+  input.value = "";
 }
 
 function clear() {

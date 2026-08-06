@@ -1,11 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
-import { AIRCRAFT_TYPES, TEAMS } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, TEAMS, type AircraftType, type Project } from "../domain/toolbox";
+import type { ToolboxStore } from "../composables/useToolbox";
 import { formatDate } from "../utils/format";
 
-const props = defineProps({ store: { type: Object, required: true } });
-const emit = defineEmits(["export-all", "import-all", "share"]);
-const newType = ref("A320");
+const props = defineProps<{ store: ToolboxStore }>();
+const emit = defineEmits<{ "export-all": []; "import-all": [file: File]; share: [] }>();
+const newType = ref<AircraftType>("A320");
 const newName = ref("");
 
 async function createProject() {
@@ -18,19 +19,24 @@ async function createProject() {
   newName.value = "";
 }
 
-function rename(project) {
+function rename(project: Project): void {
   const name = window.prompt("请输入新的项目名称：", project.name);
   if (name?.trim()) props.store.updateProject(project, { name: name.trim() });
 }
 
-function remove(project) {
+function remove(project: Project): void {
   if (window.confirm(`确认删除“${project.name}”？`)) props.store.deleteProject(project);
 }
 
-function chooseFile(event) {
-  const file = event.target.files?.[0];
+function chooseFile(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
   if (file) emit("import-all", file);
-  event.target.value = "";
+  input.value = "";
+}
+
+function updateTeam(project: Project, event: Event): void {
+  props.store.updateProject(project, { team: (event.target as HTMLSelectElement).value });
 }
 </script>
 
@@ -65,7 +71,7 @@ function chooseFile(event) {
           <strong>{{ project.name }}</strong>
           <span>{{ project.aircraftType }} · {{ formatDate(project.createdAt) }}</span>
         </button>
-        <select :value="project.team" aria-label="项目班组" @change="store.updateProject(project, { team: $event.target.value })">
+        <select :value="project.team" aria-label="项目班组" @change="updateTeam(project, $event)">
           <option value="">未分配班组</option>
           <option v-for="team in TEAMS" :key="team">{{ team }}</option>
         </select>

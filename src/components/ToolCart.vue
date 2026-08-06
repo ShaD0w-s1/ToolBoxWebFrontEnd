@@ -1,21 +1,24 @@
-<script setup>
-const props = defineProps({ store: { type: Object, required: true } });
-const emit = defineEmits(["import-sheet", "share"]);
+<script setup lang="ts">
+import type { ToolboxStore } from "../composables/useToolbox";
+
+const props = defineProps<{ store: ToolboxStore }>();
+const emit = defineEmits<{ "import-sheet": [file: File]; share: [] }>();
 
 function add() {
   props.store.app.value.toolCart.push({ name: "新物品", qty: 1 });
   props.store.persist();
 }
 
-function remove(index) {
+function remove(index: number): void {
   props.store.app.value.toolCart.splice(index, 1);
   props.store.persist();
 }
 
-function importFile(event) {
-  const file = event.target.files?.[0];
+function importFile(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
   if (file) emit("import-sheet", file);
-  event.target.value = "";
+  input.value = "";
 }
 </script>
 

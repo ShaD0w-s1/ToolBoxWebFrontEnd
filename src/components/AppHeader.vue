@@ -1,5 +1,11 @@
-<script setup>
-defineProps({ cloud: { type: Object, required: true } });
+<script setup lang="ts">
+interface CloudStatus {
+  text: string;
+  state: "ok" | "warn" | "err";
+  available: boolean;
+}
+
+defineProps<{ cloud: CloudStatus }>();
 </script>
 
 <template>

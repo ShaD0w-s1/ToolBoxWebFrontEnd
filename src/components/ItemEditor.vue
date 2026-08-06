@@ -1,6 +1,8 @@
-<script setup>
-defineProps({ item: { type: Object, required: true }, duplicate: Boolean });
-defineEmits(["save", "remove"]);
+<script setup lang="ts">
+import type { ToolItem } from "../domain/toolbox";
+
+defineProps<{ item: ToolItem; duplicate?: boolean }>();
+defineEmits<{ save: []; remove: [] }>();
 </script>
 
 <template>

@@ -1,6 +1,16 @@
 # ToolBox Web FrontEnd
 
-Vue 3 + Vite 驱动的 Web 管理端，通过 Django REST API 读写工作项目、机型模板和工具车数据。
+Vue 3 + TypeScript + Vite 驱动的 Web 管理端，通过 Django REST API 读写工作项目、机型模板和工具车数据。
+
+## 前端结构
+
+- `src/components/`：页面与可复用 Vue 组件。
+- `src/composables/`：响应式业务状态和业务操作。
+- `src/domain/`：领域类型、数据清洗与 API 数据转换。
+- `src/services/`：表格导入导出和分享服务。
+- `src/utils/`：无业务状态的通用工具。
+
+业务代码统一使用 TypeScript；注释使用中文，并重点说明数据转换、兼容处理和不直观的业务规则。
 
 ## 本地联调
 
@@ -33,6 +43,7 @@ npm run dev
 ## 构建
 
 ```powershell
+npm run type-check
 npm run build
 npm run preview
 ```
