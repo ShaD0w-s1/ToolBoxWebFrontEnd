@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import { AIRCRAFT_TYPES, TEAMS, type AircraftType, type Project } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { formatDate } from "../utils/format";
 
 const props = defineProps<{ store: ToolboxStore }>();
-const emit = defineEmits<{ "export-all": []; "import-all": [file: File]; share: [] }>();
+const emit = defineEmits<{ "export-all": []; share: [] }>();
 const newType = ref<AircraftType>("A320");
 const newName = ref("");
+const showNew = ref(false);
+const newInput = ref<HTMLInputElement | null>(null);
 
-async function createProject() {
+async function startNew(): Promise<void> {
+  showNew.value = true;
+  await nextTick();
+  newInput.value?.focus();
+}
+
+async function createProject(): Promise<void> {
   const name = newName.value.trim();
   if (!name) {
     props.store.notify("请先输入工作项目名称");
@@ -17,6 +25,12 @@ async function createProject() {
   }
   await props.store.createProject(name, newType.value);
   newName.value = "";
+  showNew.value = false;
+}
+
+function cancelNew(): void {
+  newName.value = "";
+  showNew.value = false;
 }
 
 function rename(project: Project): void {
@@ -26,13 +40,6 @@ function rename(project: Project): void {
 
 function remove(project: Project): void {
   if (window.confirm(`确认删除“${project.name}”？`)) props.store.deleteProject(project);
-}
-
-function chooseFile(event: Event): void {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (file) emit("import-all", file);
-  input.value = "";
 }
 
 function updateTeam(project: Project, event: Event): void {
@@ -49,18 +56,20 @@ function updateTeam(project: Project, event: Event): void {
 
     <template v-if="store.listTab.value === 'tools'">
       <div class="toolbar list-toolbar">
-        <input v-model="newName" class="project-name-input" placeholder="输入工作项目名称" @keydown.enter="createProject" />
-        <button class="primary" @click="createProject">+ 新建工作项目</button>
-        <select v-model="newType" aria-label="新项目机型"><option v-for="type in AIRCRAFT_TYPES" :key="type">{{ type }}</option></select>
+        <button v-if="!showNew" class="primary" @click="startNew">+ 新建工作项目</button>
+        <template v-else>
+          <input ref="newInput" v-model="newName" class="project-name-input" placeholder="输入工作项目名称" @keydown.enter="createProject" />
+          <button class="primary" @click="createProject">创建</button>
+          <button @click="cancelNew">取消</button>
+        </template>
         <button @click="emit('export-all')">导出全部</button>
-        <label class="button">导入全部<input hidden type="file" accept="application/json" @change="chooseFile" /></label>
         <button @click="emit('share')">分享本页</button>
         <span class="spacer" />
         <select v-model="store.teamFilter.value" aria-label="按班组筛选">
           <option value="">班组：全部</option>
           <option v-for="team in TEAMS" :key="team">{{ team }}</option>
         </select>
-        <input v-model="store.searchDay.value" class="date-search" placeholder="日期 ±5 天，如 2026-08-06" />
+        <input type="date" v-model="store.searchDay.value" class="date-search" aria-label="按日期筛选" />
         <button @click="store.searchDay.value = ''; store.teamFilter.value = ''">清除</button>
       </div>
 

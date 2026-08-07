@@ -58,6 +58,8 @@ export function useToolbox() {
   const cloud = reactive<{ text: string; state: CloudState; available: boolean }>({ text: "连接中…", state: "warn", available: false });
   const toast = reactive({ message: "", visible: false });
   const shared = ref(false);
+  /** 导出图片时临时强制展开所有部位卡片，保证长图完整。 */
+  const forceExpandAll = ref(false);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let remoteSaving = false;
@@ -284,8 +286,20 @@ export function useToolbox() {
   function addSub(cat: string): void {
     const state = requireActive();
     if (!state) return;
-    const sub = `新工作${subsOf(cat).length + 1}`;
-    state.items.push({ id: nextId++, cat, sub, name: "新物品", qty: 1 });
+    const subs = subsOf(cat);
+    const fixedSub = subs.find((sub) => sub.trim() === "固定");
+    const sub = `新工作${subs.length + 1}`;
+    const newItem = { id: nextId++, cat, sub, name: "新物品", qty: 1 };
+    if (fixedSub) {
+      // 名称为「固定」的工作卡片默认占满首行，新增工作排到它下方第一格
+      let anchor = state.items.length;
+      for (let i = state.items.length - 1; i >= 0; i--) {
+        if (state.items[i].cat === cat && state.items[i].sub === fixedSub) { anchor = i + 1; break; }
+      }
+      state.items.splice(anchor, 0, newItem);
+    } else {
+      state.items.push(newItem);
+    }
     persist();
   }
 
@@ -308,8 +322,14 @@ export function useToolbox() {
     if (!state || !key) return;
     const [sourceCat, sourceSub] = key.split("||");
     const sourceItems = app.value.libraries[currentProject.value?.aircraftType || "A320"].items.filter((item) => item.cat === sourceCat && item.sub === sourceSub);
+    // 记录当前工作在原数组中的首个位置，导入后插回该位置，保证工作卡片位置不变
+    let anchor = state.items.length;
+    for (let i = 0; i < state.items.length; i++) {
+      if (state.items[i].cat === cat && state.items[i].sub === currentSub) { anchor = i; break; }
+    }
     state.items = state.items.filter((item) => !(item.cat === cat && item.sub === currentSub));
-    state.items.push(...sourceItems.map((item) => ({ ...deepCopy(item), id: nextId++, cat, sub: sourceSub })));
+    const imported = sourceItems.map((item) => ({ ...deepCopy(item), id: nextId++, cat, sub: sourceSub }));
+    state.items.splice(anchor, 0, ...imported);
     persist();
   }
 
@@ -391,7 +411,7 @@ export function useToolbox() {
     notify, persist, replaceApp, openProject, openLibrary, openCart, backToList,
     createProject, deleteProject, updateProject, setAircraftType,
     itemsOf, subsOf, subTotal, catTotal, allTotal, isCartDuplicate,
-    addCategory, renameCategory, deleteCategory, addSub, renameSub, deleteSub,
+    addCategory, renameCategory, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
     importStandardSub, addItem, deleteItem, replaceActive, clearActive, setToolCart, loadRemote,
   };
 }
