@@ -56,9 +56,8 @@ npm run preview
 生产构建。`main` 构建成功后，工作流会把同一份 `dist` artifact 部署到 CloudBase
 静态托管。请在 GitHub 仓库的 `production` Environment 中配置：
 
-- `TCB_SECRET_ID`：腾讯云 CAM SecretId
-- `TCB_SECRET_KEY`：腾讯云 CAM SecretKey
 - `TCB_ENV_ID`：CloudBase 环境 ID
+- `CLOUDBASE_API_KEY`：对应环境的 CloudBase API Key
 
 建议给 `production` Environment 启用 required reviewers，并为 `main` 启用分支保护，
 要求 CI 通过后才能合并。

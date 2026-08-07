@@ -65,7 +65,7 @@ jobs:
         run: npm install --global @cloudbase/cli@latest
 
       - name: Log in to CloudBase
-        run: tcb login --apiKeyId "${{ secrets.TCB_SECRET_ID }}" --apiKey "${{ secrets.TCB_SECRET_KEY }}"
+        run: tcb login --cloudbase-api-key "${{ secrets.CLOUDBASE_API_KEY }}" -e "${{ secrets.TCB_ENV_ID }}"
 
       - name: Deploy static website
         run: tcb hosting deploy ./dist / -e "${{ secrets.TCB_ENV_ID }}"
