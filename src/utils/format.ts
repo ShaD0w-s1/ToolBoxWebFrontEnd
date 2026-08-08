@@ -27,3 +27,32 @@ export function download(blob: Blob, name: string): void {
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(anchor.href), 0);
 }
+
+/**
+ * 移动端可靠保存文件：优先用系统分享面板（可“存储到文件”），不支持则退回 blob 下载。
+ * 移动端浏览器（尤其中文 xlsx）对 <a download> + blob: 直接点击基本不触发下载，
+ * 而 navigator.share({ files }) 在 iOS/Android 上能唤起系统分享，是最稳的“下载”路径。
+ */
+export async function saveFile(file: File): Promise<void> {
+  const nav = navigator as unknown as {
+    canShare?: (data: { files?: File[] }) => boolean;
+    share?: (data: { files?: File[]; title?: string }) => Promise<void>;
+  };
+  if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
+    try {
+      await nav.share({ files: [file], title: file.name });
+      return;
+    } catch (error) {
+      // 用户取消（AbortError）不算失败；其它分享异常继续走兜底下载
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+  }
+  const url = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = file.name;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

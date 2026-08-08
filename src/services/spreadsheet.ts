@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { normalizeState, type ToolCartItem, type ToolState } from "../domain/toolbox";
-import { download } from "../utils/format";
+import { saveFile } from "../utils/format";
 
 type SheetCell = string | number;
 
@@ -13,7 +13,7 @@ function readFile(file: File): Promise<ArrayBuffer> {
   });
 }
 
-/** 导出两个工作表：工具清单和部位备注。 */
+/** 导出两个工作表：工具清单和部位备注。移动端通过 saveFile（系统分享）可靠保存。 */
 export function exportState(state: ToolState, name: string): void {
   const rows: SheetCell[][] = [["部位", "工作", "物品", "数量"]];
   for (const cat of state.categories) {
@@ -23,7 +23,11 @@ export function exportState(state: ToolState, name: string): void {
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "工具清单");
   const notes: SheetCell[][] = [["部位", "备注"], ...state.categories.map((cat) => [cat, state.notes[cat] || ""])];
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(notes), "部位备注");
-  XLSX.writeFile(workbook, `${name || "工作项目"}.xlsx`);
+  const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const file = new File([data], `${name || "工作项目"}.xlsx`, {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  void saveFile(file).catch(() => {});
 }
 
 export async function importState(file: File): Promise<ToolState> {
@@ -63,7 +67,8 @@ export async function importCart(file: File): Promise<ToolCartItem[]> {
 }
 
 export function exportJson(value: unknown, name = "全部工作项目数据.json"): void {
-  download(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }), name);
+  const file = new File([JSON.stringify(value, null, 2)], name, { type: "application/json" });
+  void saveFile(file).catch(() => {});
 }
 
 export function importJson(file: File): Promise<unknown> {

@@ -4,6 +4,7 @@ import { AIRCRAFT_TYPES, type AircraftType } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { formatDate } from "../utils/format";
 import CategorySection from "./CategorySection.vue";
+import { parseWorkCardXlsx } from "../services/workcard";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{
@@ -14,9 +15,15 @@ const emit = defineEmits<{
 }>();
 const capture = ref<HTMLElement | null>(null);
 
-function addCategory() {
-  const name = window.prompt("请输入新部位名称：");
-  if (name?.trim()) props.store.addCategory(name.trim());
+// “添加部位”下拉：默认占位项；选“新部位”添加未命名新部位；选标准部位则从标准库带入该部位卡片
+const addCatValue = ref("");
+function onAddCategory(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  const value = select.value;
+  if (value === "__NEW__") props.store.addNewCategory();
+  else if (value) props.store.addCategoryFromStandard(value);
+  addCatValue.value = "";
+  select.value = "";
 }
 
 function changeAircraft(event: Event): void {
@@ -39,28 +46,61 @@ function importFile(event: Event): void {
 function clear() {
   if (window.confirm(`确认清空“${props.store.detailTitle.value}”的全部数据？`)) props.store.clearActive();
 }
+
+async function applyWorkCard(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const { workContents, rowCount } = await parseWorkCardXlsx(file);
+    if (!rowCount) { props.store.notify("表格的 E/G 列中未找到有效内容"); return; }
+    const toDelete = props.store.previewFilterByWorkCard(workContents);
+    const toAdd = props.store.previewAddFromStandard(workContents);
+    if (toDelete === 0 && toAdd === 0) { props.store.notify("没有需要变更的工作卡片"); return; }
+    const lines: string[] = [];
+    if (toDelete > 0) lines.push(`· 删除 ${toDelete} 个不相关的工作卡片（保留“固定”工作及“通用”“接机”部位）`);
+    if (toAdd > 0) lines.push(`· 从标准库补充 ${toAdd} 个相关工作卡片到对应部位`);
+    if (!window.confirm(`依据工卡清单（E/G 列），将：\n${lines.join("\n")}\n\n确认执行？`)) return;
+    const deleted = props.store.filterByWorkCard(workContents);
+    const added = props.store.addMissingFromStandard(workContents);
+    const parts: string[] = [];
+    if (deleted > 0) parts.push(`删除 ${deleted} 个`);
+    if (added > 0) parts.push(`补充 ${added} 个`);
+    props.store.notify(`已依据工卡清单${parts.join("、")}工作卡片`);
+  } catch (error) {
+    props.store.notify(error instanceof Error ? error.message : "解析表格失败");
+  }
+}
 </script>
 
 <template>
   <section v-if="store.active.value" ref="capture">
-    <header class="detail-head">
-      <button @click="store.backToList">← 返回</button>
-      <div><strong>{{ store.detailTitle.value }}</strong><span>{{ store.currentProject.value ? formatDate(store.currentProject.value.createdAt) : '机型标准数据库' }}</span></div>
-      <div class="summary">全部合计 <b>{{ store.allTotal() }}</b></div>
-    </header>
+    <div class="detail-sticky">
+      <header class="detail-head">
+        <button @click="store.backToList">← 返回</button>
+        <div><strong>{{ store.detailTitle.value }}</strong><span>{{ store.currentProject.value ? formatDate(store.currentProject.value.createdAt) : '机型标准数据库' }}</span></div>
+      </header>
 
-    <div class="toolbar">
-      <button class="primary" @click="addCategory">+ 添加部位</button>
-      <label v-if="store.currentProject.value" class="field">机型
-        <select :value="store.currentProject.value.aircraftType" @change="changeAircraft"><option v-for="type in AIRCRAFT_TYPES" :key="type">{{ type }}</option></select>
-      </label>
-      <label v-if="store.editingLibrary.value" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
-      <label class="check"><input v-model="store.active.value.useCart" type="checkbox" @change="store.persist" /> 使用工具车</label>
-      <button @click="emit('export-sheet')">导出表格</button>
-      <button @click="emit('export-image', capture)">导出图片</button>
-      <button @click="emit('share')">分享本页</button>
-      <span class="spacer" />
-      <button class="danger" @click="clear">清空数据</button>
+      <div class="toolbar">
+        <select class="primary add-cat" :value="addCatValue" @change="onAddCategory" aria-label="添加部位">
+        <option value="" disabled>+ 添加部位</option>
+        <option value="__NEW__">新部位</option>
+        <option v-for="cat in store.standardCategories.value" :key="cat" :value="cat">{{ cat }}</option>
+      </select>
+        <label v-if="store.currentProject.value" class="field">机型
+          <select :value="store.currentProject.value.aircraftType" @change="changeAircraft"><option v-for="type in AIRCRAFT_TYPES" :key="type">{{ type }}</option></select>
+        </label>
+        <label v-if="store.editingLibrary.value" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
+        <label v-if="store.currentProject.value" class="button">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="applyWorkCard" /></label>
+        <label class="check"><input v-model="store.active.value.useCart" type="checkbox" @change="store.persist" /> 使用工具车</label>
+        <button @click="emit('export-sheet')">导出表格</button>
+        <button @click="emit('export-image', capture)">导出图片</button>
+        <button @click="emit('share')">分享本页</button>
+        <span class="spacer" />
+        <div class="summary">全部合计 <b>{{ store.allTotal() }}</b></div>
+        <button class="danger" @click="clear">清空数据</button>
+      </div>
     </div>
 
     <nav class="tabs">

@@ -45,6 +45,14 @@ function remove(project: Project): void {
 function updateTeam(project: Project, event: Event): void {
   props.store.updateProject(project, { team: (event.target as HTMLSelectElement).value });
 }
+
+/** 编辑标准库/工具车前先确认，避免误触进入大段编辑界面。 */
+function editLibrary(type: AircraftType): void {
+  if (window.confirm("确认维护标准库？")) props.store.openLibrary(type);
+}
+function editCart(): void {
+  if (window.confirm("确认维护工具车？")) props.store.openCart();
+}
 </script>
 
 <template>
@@ -94,11 +102,11 @@ function updateTeam(project: Project, event: Event): void {
     <div v-else class="database-grid">
       <article v-for="type in AIRCRAFT_TYPES" :key="type" class="library-card">
         <div><strong>{{ type }} 标准库</strong><span>{{ store.app.value.libraries[type].items.length }} 项物品</span></div>
-        <button class="primary" @click="store.openLibrary(type)">编辑标准库</button>
+        <button class="primary" @click="editLibrary(type)">编辑标准库</button>
       </article>
       <article class="library-card cart-card">
         <div><strong>工具车数据库</strong><span>{{ store.app.value.toolCart.length }} 项物品</span></div>
-        <button class="primary" @click="store.openCart">编辑工具车</button>
+        <button class="primary" @click="editCart">编辑工具车</button>
       </article>
     </div>
   </section>

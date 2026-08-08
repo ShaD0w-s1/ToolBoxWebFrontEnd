@@ -19,7 +19,7 @@ import {
   type ToolItem,
   type ToolState,
 } from "../domain/toolbox";
-import { parseDay } from "../utils/format";
+import { formatDay, parseDay } from "../utils/format";
 
 const STORAGE_KEY = "categoryItemManager.v2";
 
@@ -53,7 +53,8 @@ export function useToolbox() {
   const detailTab = ref<DetailTab>("display");
   const currentProjectId = ref<string | null>(null);
   const editingLibrary = ref<AircraftType | null>(null);
-  const searchDay = ref("");
+  // 一级页面日期筛选框：默认显示当日（输入 type=date 直接展示当天），清空后退回“全部”
+  const searchDay = ref(formatDay(Date.now()));
   const teamFilter = ref("");
   const cloud = reactive<{ text: string; state: CloudState; available: boolean }>({ text: "连接中…", state: "warn", available: false });
   const toast = reactive({ message: "", visible: false });
@@ -72,6 +73,11 @@ export function useToolbox() {
   const currentProject = computed(() => app.value.projects.find((item) => item.id === currentProjectId.value) || null);
   const active = computed(() => editingLibrary.value ? app.value.libraries[editingLibrary.value] : currentProject.value?.data || null);
   const detailTitle = computed(() => editingLibrary.value ? `${editingLibrary.value} 标准库` : currentProject.value?.name || "");
+  /** “添加部位”下拉里可选择的“来自标准数据库”的部位列表（当前机型的全部标准部位）。 */
+  const standardCategories = computed<string[]>(() => {
+    const type = editingLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    return app.value.libraries[type]?.categories || [];
+  });
   const filteredProjects = computed(() => {
     const query = parseDay(searchDay.value);
     return app.value.projects.filter((project) => {
@@ -246,7 +252,16 @@ export function useToolbox() {
   }
 
   function itemsOf(cat: string, sub: string): ToolItem[] { return active.value?.items.filter((item) => item.cat === cat && item.sub === sub) || []; }
-  function subsOf(cat: string): string[] { return [...new Set((active.value?.items || []).filter((item) => item.cat === cat).map((item) => item.sub))]; }
+  function subsOf(cat: string): string[] {
+    const subs = [...new Set((active.value?.items || []).filter((item) => item.cat === cat).map((item) => item.sub))];
+    // 名称为“固定”的工作卡片始终排在部位卡片首行（配合 CSS 全行 span）
+    const fixedIndex = subs.findIndex((sub) => sub.trim() === "固定");
+    if (fixedIndex > 0) {
+      const [fixed] = subs.splice(fixedIndex, 1);
+      subs.unshift(fixed);
+    }
+    return subs;
+  }
   function subTotal(cat: string, sub: string): number { return itemsOf(cat, sub).reduce((total, item) => total + (+item.qty || 0), 0); }
   function catTotal(cat: string): number { return (active.value?.items || []).filter((item) => item.cat === cat).reduce((total, item) => total + (+item.qty || 0), 0); }
   function allTotal(): number { return (active.value?.items || []).reduce((total, item) => total + (+item.qty || 0), 0); }
@@ -256,12 +271,41 @@ export function useToolbox() {
     return active.value;
   }
 
-  function addCategory(name: string): void {
+  /** 添加空的新部位（未命名，无默认工作卡片），名称自动去重避免重复。 */
+  function addNewCategory(): void {
     const state = requireActive();
-    if (!state || !name || state.categories.includes(name)) return;
+    if (!state) return;
+    let name = "未命名部位";
+    let index = 2;
+    while (state.categories.includes(name)) name = `未命名部位 ${index++}`;
     state.categories.push(name);
-    state.items.push({ id: nextId++, cat: name, sub: "新工作1", name: "新物品", qty: 1 });
     persist();
+  }
+
+  /** 从标准数据库添加一个部位卡片：若该部位已存在则仅补充项目里还没有的标准工作（按工作名去重），
+   *  否则新建该部位并带入标准库里该部位的全部工作与物品。 */
+  function addCategoryFromStandard(name: string): void {
+    const state = requireActive();
+    if (!state || !name) return;
+    const aircraftType = editingLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const lib = app.value.libraries[aircraftType];
+    const libItems = (lib?.items || []).filter((item) => item.cat === name);
+    if (state.categories.includes(name)) {
+      const existingSubs = new Set(subsOf(name));
+      let added = 0;
+      for (const item of libItems) {
+        if (existingSubs.has(item.sub)) continue;
+        state.items.push({ ...deepCopy(item), id: nextId++, cat: name, sub: item.sub });
+        added++;
+      }
+      persist();
+      notify(added > 0 ? `已补充「${name}」的标准工作 ${added} 项` : `「${name}」已存在且无新增标准工作`);
+      return;
+    }
+    state.categories.push(name);
+    for (const item of libItems) state.items.push({ ...deepCopy(item), id: nextId++, cat: name, sub: item.sub });
+    persist();
+    notify(`已添加标准部位「${name}」`);
   }
 
   function renameCategory(oldName: string, name: string): void {
@@ -331,6 +375,143 @@ export function useToolbox() {
     const imported = sourceItems.map((item) => ({ ...deepCopy(item), id: nextId++, cat, sub: sourceSub }));
     state.items.splice(anchor, 0, ...imported);
     persist();
+  }
+
+  /** 始终保留的部位：这些部位下的全部工作卡片不被删除。 */
+  const KEEP_CATEGORIES = ["通用", "接机"];
+  /** 工作卡片名称包含该字则保留。 */
+  const FIXED_MARK = "固定";
+  /** 名称与工卡工作内容需相同的连续汉字数。 */
+  const MIN_MATCH_CHARS = 3;
+
+  /** 比对用归一化：转小写，仅保留中文/字母/数字（去掉标点、空格、括号、全角符号等）。 */
+  function normalizeMatch(text: string): string {
+    return (text || "").toLowerCase().replace(/[^一-鿿a-z0-9]/g, "");
+  }
+  /** 在归一化基础上再去掉中文连接词，便于“起落架的润滑”与“主起落架和门的润滑”这类断词也能命中。 */
+  function stripConnectors(text: string): string {
+    return normalizeMatch(text).replace(/[的啦呢吧啊哟嗯哈和與及并或等等、与以及]/g, "");
+  }
+  /** needle 的字符是否按出现顺序全部能在 hay 中找到（不要求连续）。 */
+  function isSubsequence(needle: string, hay: string): boolean {
+    let i = 0;
+    for (let j = 0; j < hay.length && i < needle.length; j++) {
+      if (hay[j] === needle[i]) i++;
+    }
+    return i === needle.length;
+  }
+
+  /** 某工作卡片名称是否与任一工卡“工作内容”相关。命中规则（任一即可）：
+   *  1) 名称整体（归一化后）被某条内容包含（兼容 RAT / 回油滤 及大小写差异）；
+   *  2) 名称与内容存在 MIN_MATCH_CHARS 个连续相同字（双向，兼容“起落架”这类片段）；
+   *  3) 去连接词后名称是内容的子序列（兼容“X的Y”↔“主X和门的Y”这类断词）。 */
+  function sharesWorkContent(subName: string, workContents: string[]): boolean {
+    const name = (subName || "").trim();
+    if (!name) return false;
+    const nNorm = normalizeMatch(name);
+    if (nNorm.length === 0) return false;
+    for (const content of workContents) {
+      const cNorm = normalizeMatch(content);
+      if (cNorm.length === 0) continue;
+      // 1) 名称整体命中（归一化、大小写不敏感）
+      if (cNorm.includes(nNorm)) return true;
+      if (nNorm.length < MIN_MATCH_CHARS) continue;
+      // 2) 双向连续 MIN_MATCH_CHARS 字
+      let gramHit = false;
+      for (let i = 0; i + MIN_MATCH_CHARS <= nNorm.length; i++) {
+        if (cNorm.includes(nNorm.slice(i, i + MIN_MATCH_CHARS))) { gramHit = true; break; }
+      }
+      if (!gramHit) {
+        for (let i = 0; i + MIN_MATCH_CHARS <= cNorm.length; i++) {
+          if (nNorm.includes(cNorm.slice(i, i + MIN_MATCH_CHARS))) { gramHit = true; break; }
+        }
+      }
+      if (gramHit) return true;
+      // 3) 去连接词后子序列（兼容“起落架的润滑”↔“主起落架和门的润滑”）
+      const ns = stripConnectors(name);
+      const cs = stripConnectors(content);
+      if (ns.length >= MIN_MATCH_CHARS && isSubsequence(ns, cs)) return true;
+    }
+    return false;
+  }
+
+  /** 计算需要删除的工作卡片键集合（cat::sub）。规则：通用/接机 部位全保留；名称含“固定”保留；
+   *  其他部位名称与工卡工作内容有 MIN_MATCH_CHARS 个连续相同汉字则保留；其余删除。 */
+  function subsToDeleteByWorkCard(workContents: string[]): Set<string> {
+    const state = requireActive();
+    const toDelete = new Set<string>();
+    if (!state) return toDelete;
+    for (const cat of state.categories) {
+      const keepCategory = KEEP_CATEGORIES.includes(cat.trim());
+      for (const sub of subsOf(cat)) {
+        if (keepCategory) continue;
+        if (sub.includes(FIXED_MARK)) continue;
+        if (sharesWorkContent(sub, workContents)) continue;
+        toDelete.add(`${cat}::${sub}`);
+      }
+    }
+    return toDelete;
+  }
+
+  /** 预览：返回依据工卡清单将被删除的工作卡片数量（不修改数据）。 */
+  function previewFilterByWorkCard(workContents: string[]): number {
+    return subsToDeleteByWorkCard(workContents).size;
+  }
+
+  /** 执行：删除不符合规则的工作卡片，返回删除数量。 */
+  function filterByWorkCard(workContents: string[]): number {
+    const keys = subsToDeleteByWorkCard(workContents);
+    const state = requireActive();
+    if (!state || keys.size === 0) return 0;
+    state.items = state.items.filter((item) => !keys.has(`${item.cat}::${item.sub}`));
+    persist();
+    return keys.size;
+  }
+
+  /** 计算应“从标准库补充”的工作卡片（部位, 工作）。规则：标准库某工作卡片名称与任一工卡内容有
+   *  MIN_MATCH_CHARS 个连续相同汉字，且当前项目里该（部位, 工作）尚不存在，则纳入补充。 */
+  function subsToAddFromStandard(workContents: string[]): Array<{ cat: string; sub: string }> {
+    const state = requireActive();
+    const aircraftType = currentProject.value?.aircraftType || "A320";
+    const lib = app.value.libraries[aircraftType];
+    if (!state || !lib) return [];
+    const result: Array<{ cat: string; sub: string }> = [];
+    const seen = new Set<string>();
+    for (const cat of lib.categories) {
+      const libSubs = [...new Set(lib.items.filter((item) => item.cat === cat).map((item) => item.sub))];
+      for (const sub of libSubs) {
+        const key = `${cat}::${sub}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (!sharesWorkContent(sub, workContents)) continue;
+        if (state.items.some((item) => item.cat === cat && item.sub === sub)) continue;
+        result.push({ cat, sub });
+      }
+    }
+    return result;
+  }
+
+  /** 预览：返回依据工卡清单将从标准库补充的工作卡片数量（不修改数据）。 */
+  function previewAddFromStandard(workContents: string[]): number {
+    return subsToAddFromStandard(workContents).length;
+  }
+
+  /** 执行：把标准库里与工卡相关、但当前项目缺失的工作卡片（含其物品）补到对应部位，返回补充数量。 */
+  function addMissingFromStandard(workContents: string[]): number {
+    const state = requireActive();
+    const aircraftType = currentProject.value?.aircraftType || "A320";
+    const lib = app.value.libraries[aircraftType];
+    if (!state || !lib) return 0;
+    const toAdd = subsToAddFromStandard(workContents);
+    let added = 0;
+    for (const { cat, sub } of toAdd) {
+      if (!state.categories.includes(cat)) state.categories.push(cat);
+      const libItems = lib.items.filter((item) => item.cat === cat && item.sub === sub);
+      for (const item of libItems) state.items.push({ ...deepCopy(item), id: nextId++, cat, sub });
+      added++;
+    }
+    if (added > 0) persist();
+    return added;
   }
 
   function addItem(cat: string, sub: string): void {
@@ -411,8 +592,9 @@ export function useToolbox() {
     notify, persist, replaceApp, openProject, openLibrary, openCart, backToList,
     createProject, deleteProject, updateProject, setAircraftType,
     itemsOf, subsOf, subTotal, catTotal, allTotal, isCartDuplicate,
-    addCategory, renameCategory, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
+    addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
     importStandardSub, addItem, deleteItem, replaceActive, clearActive, setToolCart, loadRemote,
+    previewFilterByWorkCard, filterByWorkCard, previewAddFromStandard, addMissingFromStandard,
   };
 }
 

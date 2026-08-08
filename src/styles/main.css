@@ -57,11 +57,23 @@ button.danger:hover { background: #fdecea; }
 .tab.active { color: var(--blue-dark); border-bottom-color: var(--blue); }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
 .toolbar select, .toolbar input { border: 0; outline: 0; color: var(--blue-dark); background: transparent; }
-.list-toolbar > select, .date-search, .project-name-input { min-height: 36px; padding: 7px 10px; border: 1px solid #8eaadb; border-radius: 8px; background: #fff; }
-.project-name-input { min-width: 190px; }
+.list-toolbar > select { min-height: 36px; padding: 7px 10px; border: 1px solid #8eaadb; border-radius: 8px; background: #fff; }
+/* 注意：.toolbar input 会把输入框底色置为透明且优先级更高，这里用 .toolbar .xxx 提升优先级，
+   给日期框明显的浅蓝底色（修复此前“看起来没底色”的问题），并保留项目名输入框白底 */
+.toolbar .date-search { min-width: 225px; min-height: 36px; padding: 7px 10px; border: 1px solid #8eaadb; border-radius: 8px; background: #eef4fc; }
+.toolbar .project-name-input { min-width: 190px; min-height: 36px; padding: 7px 10px; border: 1px solid #8eaadb; border-radius: 8px; background: #fff; }
 .date-search { min-width: 225px; }
 .field, .check { display: inline-flex; align-items: center; gap: 7px; }
 .check input { width: 16px; height: 16px; accent-color: var(--blue); }
+/* 统一工具栏功能按钮高度（含下拉与标签按钮），垂直居中，避免原生 select 与 button 高度不一致 */
+.toolbar > button, .toolbar > .button, .toolbar > .field, .toolbar > .check, .toolbar > select.add-cat {
+  height: 36px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.toolbar > .field > select, .toolbar > .check { padding: 0 13px; }
 
 .list-status { padding: 7px 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 12px; }
 .project-card { display: flex; align-items: center; gap: 12px; margin-bottom: 11px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 11px; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 4%); }
@@ -81,7 +93,14 @@ button.danger:hover { background: #fdecea; }
 .detail-head { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
 .detail-head > div:not(.summary) { display: flex; flex-direction: column; }
 .detail-head strong { font-size: 17px; }
-.summary { margin-left: auto; color: var(--muted); }
+/* “添加部位”下拉：保持蓝色主按钮外观（覆盖 .toolbar select 的透明背景规则） */
+.toolbar select.add-cat { background: var(--blue); color: #fff; border-color: var(--blue); }
+.toolbar select.add-cat:hover { background: var(--blue-dark); }
+/* 返回按钮行 + 功能按钮行固定在屏幕顶端：滚动时跟随视口吸附，背景盖住下方内容 */
+.detail-sticky { position: sticky; top: 0; z-index: 30; background: #f4f6fb; padding: 2px 0 6px; box-shadow: 0 3px 8px rgb(0 0 0 / 8%); }
+/* 导出图片时脱离 sticky，稳定停在长图最上方，避免被吸顶/重叠干扰渲染 */
+.exporting .detail-sticky { position: static; box-shadow: none; }
+.summary { flex: 0 0 auto; color: var(--muted); white-space: nowrap; align-self: center; }
 .summary b { color: #222; font-size: 18px; }
 .category-list { display: grid; gap: 14px; }
 .category-card { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 5%); }
@@ -99,6 +118,14 @@ button.danger:hover { background: #fdecea; }
 .sub-head input:hover, .sub-head input:focus { border-color: #8eaadb; background: #fff; }
 .sub-head button { min-height: 28px; padding: 3px 7px; font-size: 12px; }
 .standard-picker { width: 100%; margin: 7px 0 1px; padding: 6px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--blue-dark); }
+/* “从标准库替换此工作”改为可模糊搜索的组合框：输入过滤，无输入显示全部 */
+.standard-combo { position: relative; width: 100%; margin: 7px 0 1px; }
+.standard-input { width: 100%; margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--blue-dark); font-size: 13px; }
+.standard-input::placeholder { color: #9aa4b5; }
+.standard-menu { position: absolute; z-index: 25; top: calc(100% + 3px); left: 0; right: 0; max-height: 240px; overflow-y: auto; border: 1px solid #8eaadb; border-radius: 8px; background: #fff; box-shadow: 0 6px 16px rgb(0 0 0 / 14%); padding: 4px; }
+.standard-option { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 8px; border-radius: 6px; color: var(--blue-dark); font-size: 13px; }
+.standard-option.active, .standard-option:hover { background: var(--blue-light); }
+.standard-empty { padding: 8px; color: var(--muted); font-size: 12px; text-align: center; }
 .item-grid { display: grid; gap: 7px; margin-top: 7px; }
 .item-row { position: relative; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 7px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .item-row.duplicate, tr.duplicate { background: #fff8bd; }
@@ -141,7 +168,6 @@ td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var
   .project-card { align-items: stretch; flex-direction: column; }
   .actions button { flex: 1; }
   .detail-head { flex-wrap: wrap; }
-  .summary { width: 100%; margin-left: 0; }
   .toolbar .spacer { display: none; }
   .toolbar > button, .toolbar > .button { flex: 1 1 auto; }
   .category-head { flex-wrap: wrap; }

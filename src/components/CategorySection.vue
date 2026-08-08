@@ -2,9 +2,9 @@
 import { computed, ref } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { useWorkColumns } from "../composables/useResponsiveGrid";
-import { vItemColumns } from "../directives/itemColumns";
 import { sectionHex, sectionRgba } from "../utils/sectionColor";
 import ItemEditor from "./ItemEditor.vue";
+import StandardPicker from "./StandardPicker.vue";
 
 const props = defineProps<{ store: ToolboxStore; category: string }>();
 const collapsed = ref(false);
@@ -14,12 +14,30 @@ const headBg = computed(() => sectionRgba(props.category, 0.5));
 const subNames = computed(() => props.store.subsOf(props.category));
 // 导出图片时强制展开（forceExpandAll），否则跟随本地 collapsed 状态
 const showBody = computed(() => !collapsed.value || props.store.forceExpandAll.value);
-// 工作卡片每行数量由页面宽度决定（1–3），见 useResponsiveGrid
-const { workCols } = useWorkColumns();
+// 工作卡片每行数量由页面宽度决定（1–3），见 useResponsiveGrid；layoutIsMobile 用于区分移动端
+const { workCols, layoutIsMobile } = useWorkColumns();
 
-/** 工作卡片跨列：固定卡片占满整行（1/-1），其余各占一列（由 sub-grid 列数控制，无需 span）。 */
+/**
+ * 某工作卡片的物品列数（同时决定该卡片在 sub-grid 中的跨列数与内部 item-grid 列数）：
+ *   物品 ≤5 → 1 列；6–10 → 2 列；>10 → 3 列（上限 3）。
+ * 仅网页端（非移动布局）按物品数拓展；移动端保持 1 列（原有情况）。
+ * 跨列数再被 sub-grid 实际列数(workCols) 钳制，避免 span 超出网格。
+ * 例外：“固定”卡片占满整行（默认 3 列宽），其内部物品卡片须保持单列页面宽度，
+ *   故直接按 sub-grid 列数(workCols) 分列，使每个物品卡 ≈ 1 个页面列宽，不会被拉伸到整行 3 列宽。
+ */
+function itemColsFor(sub: string): number {
+  const count = props.store.itemsOf(props.category, sub).length;
+  if (sub.trim() === "固定") return layoutIsMobile.value ? 1 : workCols.value;
+  let n = count > 10 ? 3 : count > 5 ? 2 : 1;
+  if (layoutIsMobile.value) n = 1;
+  return Math.min(n, workCols.value);
+}
+
+/** 工作卡片跨列：固定卡片占满整行（1/-1）；其余按物品数量跨 1–3 列。 */
 function workSpanStyle(sub: string): Record<string, string> {
-  return sub.trim() === "固定" ? { gridColumn: "1 / -1" } : {};
+  if (sub.trim() === "固定") return { gridColumn: "1 / -1" };
+  const n = itemColsFor(sub);
+  return n > 1 ? { gridColumn: `span ${n}` } : {};
 }
 
 /** 全局同名物品配色：名称出现 ≥2 次时，每个名称分配一个稳定颜色，用于卡片左上角三角。 */
@@ -61,12 +79,6 @@ function renameSub(oldName: string, event: Event): void {
 function deleteSub(sub: string): void {
   if (window.confirm(`确认删除工作“${sub}”？`)) props.store.deleteSub(props.category, sub);
 }
-
-function importStandard(sub: string, event: Event): void {
-  const select = event.target as HTMLSelectElement;
-  props.store.importStandardSub(props.category, sub, select.value);
-  select.value = "";
-}
 </script>
 
 <template>
@@ -97,11 +109,14 @@ function importStandard(sub: string, event: Event): void {
             <button @click="store.addItem(category, sub)">+ 物品</button>
             <button class="danger" @click="deleteSub(sub)">删除</button>
           </header>
-          <select v-if="!store.editingLibrary.value" class="standard-picker" value="" @change="importStandard(sub, $event)">
-            <option value="">从标准库替换此工作…</option>
-            <option v-for="key in standardSubs" :key="key" :value="key">{{ key.replace('||', ' / ') }}</option>
-          </select>
-          <div class="item-grid" v-item-columns>
+          <StandardPicker
+            v-if="!store.editingLibrary.value"
+            :options="standardSubs"
+            :category="category"
+            :sub="sub"
+            :store="store"
+          />
+          <div class="item-grid" :style="{ gridTemplateColumns: `repeat(${itemColsFor(sub)}, minmax(0, 1fr))` }">
             <ItemEditor
               v-for="item in store.itemsOf(category, sub)"
               :key="item.id"

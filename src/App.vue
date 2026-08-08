@@ -16,6 +16,7 @@ import {
   type ToolState,
 } from "./domain/toolbox";
 import { useToolbox } from "./composables/useToolbox";
+import { setForceDesktop } from "./composables/useResponsiveGrid";
 import { exportJson, exportState, importCart, importState } from "./services/spreadsheet";
 import { copyText, createShareUrl, readSharePayload, type SharePayload } from "./services/sharing";
 import { download, formatDay } from "./utils/format";
@@ -46,15 +47,39 @@ function downloadPreview(): void {
 
 async function exportImage(element: HTMLElement | null): Promise<void> {
   if (!element) return;
+  // 移动端按网页宽屏（1100px、3 列）重排后再截，得到“网页宽屏长截图”
+  const isMobile = window.innerWidth < 768;
+  const prevOverflow = document.body.style.overflow;
   try {
     store.notify("正在生成图片…");
     // 导出前强制展开所有部位卡片，保证长图完整
     store.forceExpandAll.value = true;
+    if (isMobile) {
+      setForceDesktop(true);
+      element.style.width = "1100px";
+      // 防止临时加宽导致页面出现横向滚动条
+      document.body.style.overflow = "hidden";
+    }
     await nextTick();
-    // 手机端用 scale=1 避免画布尺寸超限导致生成失败
-    const scale = window.innerWidth < 768 ? 1 : Math.min(2, window.devicePixelRatio || 1);
-    const canvas = await html2canvas(element, { backgroundColor: "#f4f6fb", scale, useCORS: true });
+    // 等 ResizeObserver 把各工作卡片内的 item-grid 按新宽度重排列数
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 150))));
+    // 导出时让返回栏 + 功能按钮行脱离 sticky，稳定停在长图最上方（不被吸顶/重叠干扰）
+    element.classList.add("exporting");
+    // 手机端用 scale=1 避免画布尺寸超限导致生成失败；windowWidth 让媒体查询按 1100 渲染
+    const scale = isMobile ? 1 : Math.min(2, window.devicePixelRatio || 1);
+    const canvas = await html2canvas(element, {
+      backgroundColor: "#f4f6fb",
+      scale,
+      useCORS: true,
+      windowWidth: isMobile ? 1100 : window.innerWidth,
+    });
+    element.classList.remove("exporting");
     store.forceExpandAll.value = false;
+    if (isMobile) {
+      setForceDesktop(false);
+      element.style.width = "";
+      document.body.style.overflow = prevOverflow;
+    }
     canvas.toBlob((blob) => {
       if (!blob) { store.notify("生成图片失败"); return; }
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -65,7 +90,13 @@ async function exportImage(element: HTMLElement | null): Promise<void> {
       if (!isIOS) download(blob, `${store.detailTitle.value}_集中显示.jpg`);
     }, "image/jpeg", 0.92);
   } catch (error) {
+    element.classList.remove("exporting");
     store.forceExpandAll.value = false;
+    if (isMobile) {
+      setForceDesktop(false);
+      element.style.width = "";
+      document.body.style.overflow = prevOverflow;
+    }
     store.notify(errorMessage(error) || "生成图片失败");
   }
 }
