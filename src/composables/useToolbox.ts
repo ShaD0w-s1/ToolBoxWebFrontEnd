@@ -271,15 +271,16 @@ export function useToolbox() {
     return active.value;
   }
 
-  /** 添加空的新部位（未命名，无默认工作卡片），名称自动去重避免重复。 */
-  function addNewCategory(): void {
+  /** 添加空的新部位（未命名，无默认工作卡片），名称自动去重避免重复。返回新建的部位名。 */
+  function addNewCategory(): string | null {
     const state = requireActive();
-    if (!state) return;
+    if (!state) return null;
     let name = "未命名部位";
     let index = 2;
     while (state.categories.includes(name)) name = `未命名部位 ${index++}`;
     state.categories.push(name);
     persist();
+    return name;
   }
 
   /** 从标准数据库添加一个部位卡片：若该部位已存在则仅补充项目里还没有的标准工作（按工作名去重），
@@ -514,12 +515,46 @@ export function useToolbox() {
     return added;
   }
 
-  function addItem(cat: string, sub: string): void {
+  function addItem(cat: string, sub: string, prepend = false): void {
     const state = requireActive();
     if (!state) return;
     if (!state.categories.includes(cat)) state.categories.push(cat);
-    state.items.push({ id: nextId++, cat, sub, name: "新物品", qty: 1 });
+    const item = { id: nextId++, cat, sub, name: "新物品", qty: 1 };
+    // prepend=true 时插入到数据库首项（满足“添加行”默认显示在首行）；否则追加到末尾。
+    if (prepend) state.items.unshift(item);
+    else state.items.push(item);
     persist();
+  }
+
+  /** 导入“新部位.xlsx”时合并到当前标准库（仅标准库模式有效）：
+   *  - xlsx 中的“部位”在标准库不存在 → 整体新增该部位及其数据；
+   *  - 已存在 → 只补不覆盖：同部位下已有(工作,物品)不动，仅把库里没有的新条目补进去；
+   *  - 备注仅补充库里没有的部位。
+   *  返回新增的部位数与补充的物品数。 */
+  function mergeImportedSections(imported: ToolState): { addedCats: number; addedItems: number } {
+    const state = requireActive();
+    if (!state || !editingLibrary.value) return { addedCats: 0, addedItems: 0 };
+    let addedCats = 0;
+    let addedItems = 0;
+    for (const cat of imported.categories) {
+      if (!state.categories.includes(cat)) {
+        state.categories.push(cat);
+        addedCats++;
+      }
+      const existingKeys = new Set(
+        state.items.filter((item) => item.cat === cat).map((item) => `${item.sub} ${item.name}`),
+      );
+      for (const item of imported.items.filter((entry) => entry.cat === cat)) {
+        if (existingKeys.has(`${item.sub} ${item.name}`)) continue;
+        state.items.push({ ...deepCopy(item), id: nextId++, cat, sub: item.sub, name: item.name });
+        addedItems++;
+      }
+    }
+    for (const [cat, note] of Object.entries(imported.notes)) {
+      if (note && !state.notes[cat]) state.notes[cat] = note;
+    }
+    if (addedCats > 0 || addedItems > 0) persist();
+    return { addedCats, addedItems };
   }
 
   function deleteItem(id: number): void {
@@ -593,7 +628,7 @@ export function useToolbox() {
     createProject, deleteProject, updateProject, setAircraftType,
     itemsOf, subsOf, subTotal, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
-    importStandardSub, addItem, deleteItem, replaceActive, clearActive, setToolCart, loadRemote,
+    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearActive, setToolCart, loadRemote,
     previewFilterByWorkCard, filterByWorkCard, previewAddFromStandard, addMissingFromStandard,
   };
 }

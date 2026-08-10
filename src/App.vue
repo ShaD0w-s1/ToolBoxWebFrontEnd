@@ -108,6 +108,15 @@ async function importActive(file: File): Promise<void> {
   } catch (error) { store.notify(`导入失败：${errorMessage(error)}`); }
 }
 
+/** “导入新部位.xlsx”：解析后合并进当前标准库（只补不覆盖），由 store 实现合并逻辑。 */
+async function importNewSections(file: File): Promise<void> {
+  try {
+    const imported = await importState(file);
+    const { addedCats, addedItems } = store.mergeImportedSections(imported);
+    store.notify(`导入新部位完成：新增部位 ${addedCats} 个，补充物品 ${addedItems} 项`);
+  } catch (error) { store.notify(`导入失败：${errorMessage(error)}`); }
+}
+
 async function importToolCart(file: File): Promise<void> {
   try {
     const items = await importCart(file);
@@ -248,6 +257,7 @@ function exportCurrentState(): void {
       @export-sheet="exportCurrentState"
       @export-image="exportImage"
       @import-sheet="importActive"
+      @import-new-sections="importNewSections"
       @share="share('detail')"
     />
     <ToolCart v-else :store="store" @import-sheet="importToolCart" @share="share('cart')" />

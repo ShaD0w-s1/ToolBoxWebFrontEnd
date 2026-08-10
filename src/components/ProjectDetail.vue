@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { AIRCRAFT_TYPES, type AircraftType } from "../domain/toolbox";
+import { computed, ref, watch } from "vue";
+import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, type AircraftType } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { formatDate } from "../utils/format";
 import CategorySection from "./CategorySection.vue";
@@ -11,17 +11,59 @@ const emit = defineEmits<{
   "export-sheet": [];
   "export-image": [element: HTMLElement | null];
   "import-sheet": [file: File];
+  "import-new-sections": [file: File];
   share: [];
 }>();
 const capture = ref<HTMLElement | null>(null);
 
 // “添加部位”下拉：默认占位项；选“新部位”添加未命名新部位；选标准部位则从标准库带入该部位卡片
 const addCatValue = ref("");
+// 项目（二级）页默认只显示 DEFAULT_CATEGORIES 中的部位；其余已有部位需手动选入后才显示。
+// revealed 记录用户从下拉中“选入显示”的非默认部位；切换项目时清空。
+const revealed = ref<string[]>([]);
+watch(() => props.store.currentProject.value?.id, () => { revealed.value = []; });
+const isLibrary = computed(() => Boolean(props.store.editingLibrary.value));
+// 集中显示要渲染的部位：标准库页显示全部；项目页只显示默认 6 个 + 被手动选入的部位。
+const defaultSet = new Set<string>(DEFAULT_CATEGORIES);
+const displayCats = computed<string[]>(() => {
+  const state = props.store.active.value;
+  if (!state) return [];
+  if (isLibrary.value) return state.categories;
+  const present = new Set(state.categories);
+  const defaults = DEFAULT_CATEGORIES.filter((cat) => present.has(cat));
+  const extras = state.categories.filter((cat) => !defaultSet.has(cat) && revealed.value.includes(cat));
+  return [...defaults, ...extras];
+});
+// 项目页“添加部位”下拉可选项：被隐藏的已有部位（选入显示）+ 标准库里尚未加入的部位（添加并带入数据）。
+const projectAddOptions = computed<Array<{ value: string; label: string }>>(() => {
+  const state = props.store.active.value;
+  const opts: Array<{ value: string; label: string }> = [];
+  if (!state) return opts;
+  const shown = displayCats.value;
+  for (const cat of state.categories) {
+    if (!shown.includes(cat)) opts.push({ value: cat, label: `显示：${cat}` });
+  }
+  for (const cat of props.store.standardCategories.value) {
+    if (!state.categories.includes(cat)) opts.push({ value: cat, label: `添加：${cat}` });
+  }
+  return opts;
+});
+
 function onAddCategory(event: Event): void {
   const select = event.target as HTMLSelectElement;
   const value = select.value;
-  if (value === "__NEW__") props.store.addNewCategory();
-  else if (value) props.store.addCategoryFromStandard(value);
+  const state = props.store.active.value;
+  if (value === "__NEW__") {
+    const name = props.store.addNewCategory();
+    if (name && !isLibrary.value && !revealed.value.includes(name)) revealed.value.push(name);
+  } else if (!isLibrary.value && state && state.categories.includes(value)) {
+    // 项目页：选入一个被隐藏的已有部位
+    if (!revealed.value.includes(value)) revealed.value.push(value);
+  } else {
+    // 库内补充 或 项目页从标准库添加（非默认部位需同时加入显示集合）
+    props.store.addCategoryFromStandard(value);
+    if (!isLibrary.value && !revealed.value.includes(value)) revealed.value.push(value);
+  }
   addCatValue.value = "";
   select.value = "";
 }
@@ -41,6 +83,13 @@ function importFile(event: Event): void {
   const file = input.files?.[0];
   if (file) emit("import-sheet", file);
   input.value = "";
+}
+
+function importNewSectionsFile(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (file) emit("import-new-sections", file);
 }
 
 function clear() {
@@ -86,12 +135,18 @@ async function applyWorkCard(event: Event): Promise<void> {
         <select class="primary add-cat" :value="addCatValue" @change="onAddCategory" aria-label="添加部位">
         <option value="" disabled>+ 添加部位</option>
         <option value="__NEW__">新部位</option>
-        <option v-for="cat in store.standardCategories.value" :key="cat" :value="cat">{{ cat }}</option>
+        <template v-if="isLibrary">
+          <option v-for="cat in store.standardCategories.value" :key="cat" :value="cat">{{ cat }}</option>
+        </template>
+        <template v-else>
+          <option v-for="opt in projectAddOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </template>
       </select>
         <label v-if="store.currentProject.value" class="field">机型
           <select :value="store.currentProject.value.aircraftType" @change="changeAircraft"><option v-for="type in AIRCRAFT_TYPES" :key="type">{{ type }}</option></select>
         </label>
         <label v-if="store.editingLibrary.value" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
+        <label v-if="store.editingLibrary.value" class="button">导入新部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importNewSectionsFile" /></label>
         <label v-if="store.currentProject.value" class="button">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="applyWorkCard" /></label>
         <label class="check"><input v-model="store.active.value.useCart" type="checkbox" @change="store.persist" /> 使用工具车</label>
         <button @click="emit('export-sheet')">导出表格</button>
@@ -109,12 +164,12 @@ async function applyWorkCard(event: Event): Promise<void> {
     </nav>
 
     <div v-if="store.detailTab.value === 'display'" class="category-list">
-      <CategorySection v-for="category in store.active.value.categories" :key="category" :category="category" :store="store" />
-      <div v-if="!store.active.value.categories.length" class="empty-state">当前没有部位，点击“添加部位”开始录入。</div>
+      <CategorySection v-for="category in displayCats" :key="category" :category="category" :store="store" />
+      <div v-if="!displayCats.length" class="empty-state">当前没有部位，点击“添加部位”开始录入。</div>
     </div>
 
     <div v-else>
-      <div class="toolbar"><button class="primary" @click="store.addItem(store.active.value.categories[0] || 'A', '新工作')">+ 添加行</button></div>
+      <div class="toolbar"><button class="primary" @click="store.addItem(store.active.value.categories[0] || 'A', '新工作', true)">+ 添加行</button></div>
       <div class="table-wrap"><table>
         <thead><tr><th>部位</th><th>工作</th><th>物品</th><th>数量</th><th>操作</th></tr></thead>
         <tbody>
