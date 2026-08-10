@@ -5,6 +5,11 @@ export type AircraftType = (typeof AIRCRAFT_TYPES)[number];
 /** 管理端可分配的班组。 */
 export const TEAMS = ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3", "外站"] as const;
 
+/** 项目（二级）页集中显示默认渲染的部位；其余已有部位需手动“新增部位”才显示。
+ *  顺序即显示顺序（与 sectionColor 固定配色表一致）。标准库页不受此限制，显示全部。 */
+export const DEFAULT_CATEGORIES = ["ENG", "AV CB", "FC", "LG", "通用", "接机"] as const;
+export type DefaultCategory = (typeof DEFAULT_CATEGORIES)[number];
+
 export interface ToolItem {
   id: number;
   cat: string;
