@@ -75,12 +75,20 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const backend = {
   status: () => request<ApiEnvelope>("/api/cloudbase/status/"),
+  verifyAirnav: (password: string) => request<ApiEnvelope>("/api/airnav-verify/", { method: "POST", body: { password } }),
   listProjects: () => request<ApiEnvelope<unknown>>("/api/projects/?limit=100"),
   createProject: (project: ProjectPayload) => request<ApiEnvelope<Record<string, unknown>>>("/api/projects/", { method: "POST", body: project }),
   updateProject: (id: string, project: ProjectPayload) => request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "PATCH", body: project }),
   deleteProject: (id: string) => request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "DELETE" }),
   getTemplate: (type: string) => request<ApiEnvelope<unknown>>(`/api/templates/${encodeURIComponent(type)}/`),
   saveTemplate: (type: string, sections: SectionPayload[]) => request<ApiEnvelope>(`/api/templates/${encodeURIComponent(type)}/`, { method: "PUT", body: { sections } }),
+  getMaterialTemplate: (type: string) => request<ApiEnvelope<unknown>>(`/api/material-templates/${encodeURIComponent(type)}/`),
+  saveMaterialTemplate: (type: string, sections: SectionPayload[]) => request<ApiEnvelope>(`/api/material-templates/${encodeURIComponent(type)}/`, { method: "PUT", body: { sections } }),
   getToolCart: () => request<ApiEnvelope<unknown>>("/api/tool-cart/"),
   saveToolCart: (items: Array<{ name: string; quantity: number }>) => request<ApiEnvelope>("/api/tool-cart/", { method: "PUT", body: { items } }),
+  getStandardLibrary: (key: string) => request<ApiEnvelope<unknown>>(`/api/standard-libraries/${encodeURIComponent(key)}/`),
+  saveStandardLibrary: (key: string, rows: Record<string, string>[]) =>
+    request<ApiEnvelope>(`/api/standard-libraries/${encodeURIComponent(key)}/`, { method: "PUT", body: { rows } }),
+  getAnnouncement: () => request<ApiEnvelope<unknown>>("/api/announcement/"),
+  saveAnnouncement: (content: string) => request<ApiEnvelope>("/api/announcement/", { method: "PUT", body: { content } }),
 };

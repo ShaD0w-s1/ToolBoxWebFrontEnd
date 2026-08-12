@@ -51,6 +51,26 @@ button.danger, .danger { color: var(--danger); border-color: #e6a0a0; }
 button.danger:hover { background: #fdecea; }
 .spacer { flex: 1; }
 
+/* ===== 二级子页面统一：标题栏布局 + 功能按钮样式 ===== */
+/* 标题行：标题在左、功能按钮组在右（工作准备单 / 工卡分配清单 共用） */
+.subpage-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 6px 0 14px; }
+.subpage-head h3 { margin: 0; font-size: 18px; }
+.subpage-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* 次要/导出类功能按钮：统一白底蓝字样式（覆盖全局 button 的蓝色边框/底色，三页一致） */
+button.ghost, .ghost {
+  min-height: 0; padding: 6px 12px; border: 1px solid var(--blue);
+  border-radius: 8px; background: #fff; color: var(--blue-dark);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+button.ghost:hover, .ghost:hover { background: var(--blue-light); }
+
+/* 项目类型选择框（A检/零散/换发/换APU/单独项目）：统一白底蓝字 */
+.type-select {
+  background: #fff; color: var(--blue-dark); border: 1px solid var(--blue);
+  border-radius: 8px; padding: 4px 8px; font-weight: 600; font-size: 13px; cursor: pointer;
+}
+.type-select option { background: #fff; color: #000; }
+
 .tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .tab { border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); background: transparent; }
 .tab:hover { background: #eaf0fb; }
@@ -103,8 +123,10 @@ button.danger:hover { background: #fdecea; }
 .summary { flex: 0 0 auto; color: var(--muted); white-space: nowrap; align-self: center; }
 .summary b { color: #222; font-size: 18px; }
 .category-list { display: grid; gap: 14px; }
-.category-card { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 5%); }
-.category-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: linear-gradient(90deg, #edf2fc, #fff); }
+.category-card { position: relative; overflow: visible; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 5%); }
+/* 聚焦（打开下拉）时抬高本卡片，确保溢出的下拉菜单盖住后续卡片 */
+.category-card:focus-within { z-index: 40; }
+.category-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: linear-gradient(90deg, #edf2fc, #fff); border-radius: 11px 11px 0 0; }
 .category-head strong { font-size: 17px; }
 .category-head > span, .sub-head > span { color: var(--blue-dark); font-size: 13px; font-weight: 650; }
 .category-head button { min-height: 30px; padding: 4px 9px; font-size: 12px; }

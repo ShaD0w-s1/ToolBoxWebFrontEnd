@@ -1,3 +1,6 @@
+import type { Project } from "../domain/toolbox";
+import { formatDay } from "../utils/format";
+
 export interface SharePayload {
   v: number;
   scope: "app" | "cart" | "detail";
@@ -134,4 +137,13 @@ export async function copyText(value: string): Promise<void> {
   area.select();
   document.execCommand("copy");
   area.remove();
+}
+
+/**
+ * 二级页面（某个工作项目）的分享/打开链接：裸域名 + ?p=名称/日期（查询格式，零配置、不触发 404）。
+ * 新标签页打开二级页时复用此链接，接收方 onMounted 按名称+日期在云端匹配并打开。
+ */
+export function projectShareUrl(project: Project): string {
+  const base = location.origin + location.pathname.replace(/index\.html$/i, "");
+  return `${base}?p=${encodeURIComponent(project.name)}/${formatDay(project.createdAt)}`;
 }
