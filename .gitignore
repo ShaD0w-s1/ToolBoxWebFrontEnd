@@ -25,3 +25,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Stray artifacts
+dist_old_*
+compare_report.html
