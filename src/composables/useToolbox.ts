@@ -130,10 +130,13 @@ export function useToolbox() {
   /** 当前打开的“表格型标准库”（飞机信息 / 320 / 787 工卡分配）。 */
   const stdLibActive = computed(() => editingStdLib.value ? app.value.standardLibraries[editingStdLib.value] : null);
   const stdLibTitle = computed(() => editingStdLib.value ? STANDARD_LIB_META[editingStdLib.value].label : "");
-  /** 飞机信息标准库里的全部飞机号，供工作准备单机号下拉框模糊查询。 */
-  const aircraftNumbers = computed<string[]>(() =>
-    (app.value.standardLibraries.aircraft_info?.rows || []).map((row) => String(row["飞机号"] || "")).filter(Boolean),
-  );
+  /** 飞机信息标准库里的全部飞机号，供工作准备单机号下拉框模糊查询。
+   *  优先用公开机号接口（不依赖 AIRNAV 授权），回退本地标准库机号。 */
+  const aircraftNumberList = ref<string[]>([]);
+  const aircraftNumbers = computed<string[]>(() => {
+    if (aircraftNumberList.value.length) return aircraftNumberList.value;
+    return (app.value.standardLibraries.aircraft_info?.rows || []).map((row) => String(row["飞机号"] || "")).filter(Boolean);
+  });
   /** 从工作准备单的"机型"字段推断机型：含 320/321 → A320，含 787 → B787，无数据 → A320。
    *  单独项目从单项准备单的机型字段推断。 */
   const aircraftTypeFromPrep = computed<AircraftType>(() => {
@@ -1889,7 +1892,7 @@ export function useToolbox() {
         cloud.state = "warn";
         return;
       }
-      const [projects, a320, b787, ma320, mb787, cart, aiLib, wc320, ann, cfg] = await Promise.all([
+      const [projects, a320, b787, ma320, mb787, cart, aiLib, wc320, ann, cfg, nums] = await Promise.all([
         backend.listProjects(),
         backend.getTemplate("A320").catch(() => null),
         backend.getTemplate("B787").catch(() => null),
@@ -1901,7 +1904,11 @@ export function useToolbox() {
         backend.getStandardLibrary("workcard_320").catch(() => null),
         backend.getAnnouncement().catch(() => null),
         backend.getConfig().catch(() => null),
+        backend.getAircraftNumbers().catch(() => null),
       ]);
+      // 公开机号列表（不依赖 AIRNAV 授权），供机号下拉模糊搜索。
+      const numsData = nums?.data;
+      if (Array.isArray(numsData)) aircraftNumberList.value = numsData.filter((n): n is string => typeof n === "string");
       // 远端配置下发：watch 开关与阈值（方案C）。
       const cfgDoc = unwrapDocument(cfg?.data);
       watchEnabled = Boolean(cfgDoc?.watch_enabled);

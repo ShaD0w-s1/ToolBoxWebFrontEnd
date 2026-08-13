@@ -77,6 +77,7 @@ export const backend = {
   status: () => request<ApiEnvelope>("/api/cloudbase/status/"),
   verifyAirnav: (password: string) => request<{ ok: boolean; verified?: boolean; token?: string; expires_in?: number }>("/api/airnav-verify/", { method: "POST", body: { password } }),
   getConfig: () => request<ApiEnvelope<{ watch_enabled?: boolean; watch_max_users?: number }>>("/api/config/"),
+  getAircraftNumbers: () => request<ApiEnvelope<string[]>>("/api/aircraft-numbers/"),
   listProjects: () => request<ApiEnvelope<unknown>>("/api/projects/?limit=100"),
   createProject: (project: ProjectPayload) => request<ApiEnvelope<Record<string, unknown>>>("/api/projects/", { method: "POST", body: project }),
   updateProject: (id: string, project: ProjectPayload | Partial<ProjectPayload>, expectedVersion?: number) =>
