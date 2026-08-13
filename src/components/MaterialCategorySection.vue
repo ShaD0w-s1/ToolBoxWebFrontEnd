@@ -111,7 +111,7 @@ async function supplementPart(): Promise<void> {
             <button class="danger" @click="deleteSub(sub)">删除</button>
           </header>
           <div class="item-grid" :style="{ gridTemplateColumns: 'repeat(2, 1fr)' }">
-            <div v-for="it in store.mItemsOf(category, sub)" :key="it.id" class="m-item">
+            <div v-for="it in store.mItemsOf(category, sub)" :key="it.id" class="m-item" :class="{ 'flash-update': store.isFlashing(it) }">
               <label class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.partNo" @input="onAutoSize" class="m-name m-partno"></textarea></label>
               <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" @input="onAutoSize" class="m-name"></textarea></label>
               <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" type="number" min="0" @input="store.persist" /></label>

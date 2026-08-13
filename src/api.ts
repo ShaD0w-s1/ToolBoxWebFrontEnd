@@ -78,8 +78,13 @@ export const backend = {
   verifyAirnav: (password: string) => request<ApiEnvelope>("/api/airnav-verify/", { method: "POST", body: { password } }),
   listProjects: () => request<ApiEnvelope<unknown>>("/api/projects/?limit=100"),
   createProject: (project: ProjectPayload) => request<ApiEnvelope<Record<string, unknown>>>("/api/projects/", { method: "POST", body: project }),
-  updateProject: (id: string, project: ProjectPayload) => request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "PATCH", body: project }),
+  updateProject: (id: string, project: ProjectPayload | Partial<ProjectPayload>, expectedVersion?: number) =>
+    request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "PATCH", body: { ...project, expected_version: expectedVersion } }),
   deleteProject: (id: string) => request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "DELETE" }),
+  poll: (revision?: string) =>
+    request<ApiEnvelope<{ revision: string; changed: boolean; poll_after_ms?: number }>>(
+      `/api/poll/${revision ? `?revision=${encodeURIComponent(revision)}` : ""}`,
+    ),
   getTemplate: (type: string) => request<ApiEnvelope<unknown>>(`/api/templates/${encodeURIComponent(type)}/`),
   saveTemplate: (type: string, sections: SectionPayload[]) => request<ApiEnvelope>(`/api/templates/${encodeURIComponent(type)}/`, { method: "PUT", body: { sections } }),
   getMaterialTemplate: (type: string) => request<ApiEnvelope<unknown>>(`/api/material-templates/${encodeURIComponent(type)}/`),

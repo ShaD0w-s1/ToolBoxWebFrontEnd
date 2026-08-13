@@ -1,5 +1,5 @@
 import { computed, reactive, ref } from "vue";
-import { backend, type ApiEnvelope } from "../api";
+import { backend, ApiError, type ApiEnvelope } from "../api";
 import {
   AIRCRAFT_TYPES,
   DEFAULT_CATEGORIES,
@@ -16,6 +16,8 @@ import {
   normalizeStdLib,
   projectFromDocument,
   projectPayload,
+  projectPartialPayload,
+  itemKey,
   sectionsFromState,
   stateFromSections,
   unwrapDocument,
@@ -28,8 +30,10 @@ import {
   type WorkCardRow,
   type AircraftType,
   type Project,
+  type ProjectField,
   type ProjectType,
   type SectionPayload,
+  type StandardLib,
   type StandardLibKey,
   type StandardLibRow,
   type WorkcardSection,
@@ -97,6 +101,16 @@ export function useToolbox() {
   let dirtyToolCart = false;
   const dirtyStdLibs = new Set<StandardLibKey>();
   let nextId = 1;
+  // —— 字段级 dirty + 同步状态（PR-A 轮询 / PR-B 字段合并 / PR-C 行合并） ——
+  const dirtyFields = new Map<string, Set<ProjectField>>();
+  let editingField: ProjectField = "data";
+  const syncing = ref(false);
+  const flashKeys = ref<Set<string>>(new Set());
+  let flashTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastRevision = "";
+  let pollingTimer: ReturnType<typeof setTimeout> | null = null;
+  let pollingPaused = false;
+  let consecutiveFailures = 0;
 
   const currentProject = computed(() => app.value.projects.find((item) => item.id === currentProjectId.value) || null);
   const active = computed(() => editingLibrary.value ? app.value.libraries[editingLibrary.value] : currentProject.value?.data || null);
@@ -188,7 +202,13 @@ export function useToolbox() {
     toastTimer = setTimeout(() => { toast.visible = false; }, 2200);
   }
 
-  function markCurrentDirty(): void {
+  function markProjectField(id: string, field: ProjectField): void {
+    let set = dirtyFields.get(id);
+    if (!set) { set = new Set(); dirtyFields.set(id, set); }
+    set.add(field);
+  }
+
+  function markCurrentDirty(field?: ProjectField): void {
     if (editingLibrary.value) {
       dirtyTemplates.add(editingLibrary.value);
     } else if (editingMaterialLibrary.value) {
@@ -197,11 +217,26 @@ export function useToolbox() {
       dirtyStdLibs.add(editingStdLib.value);
     } else if (currentProject.value?.id) {
       dirtyProjects.add(currentProject.value.id);
+      markProjectField(currentProject.value.id, field ?? editingField);
     } else if (screen.value === "cart") {
       dirtyToolCart = true;
     } else {
       for (const project of app.value.projects) if (project.id) dirtyProjects.add(project.id);
     }
+  }
+
+  /** 显式标记当前项目的某个顶层字段为脏（如 meta 变更）。 */
+  function markField(field: ProjectField): void {
+    const id = currentProject.value?.id;
+    if (id) {
+      dirtyProjects.add(id);
+      markProjectField(id, field);
+    }
+  }
+
+  /** 子页切换时设置「当前正在编辑的字段」，使 persist 自动归到正确字段。 */
+  function setEditingField(field: ProjectField): void {
+    editingField = field;
   }
 
   function markAllDirty(): void {
@@ -221,6 +256,34 @@ export function useToolbox() {
     markCurrentDirty();
     clearTimeout(saveTimer);
     if (cloud.available) saveTimer = setTimeout(saveRemote, 450);
+  }
+
+  /** 显式以指定字段标记当前项目为脏并落盘（用于 meta 等非子页字段的变更）。 */
+  function persistField(field: ProjectField): void {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+    markCurrentDirty(field);
+    clearTimeout(saveTimer);
+    if (cloud.available) saveTimer = setTimeout(saveRemote, 450);
+  }
+
+  /** 保存单个项目：字段级部分 PATCH + 乐观锁（version）。成功则递增本地版本；409 冲突则采纳远端版本并保留本地编辑稍后重试。 */
+  async function saveProject(project: Project, fields?: Set<ProjectField>): Promise<void> {
+    const payload = fields && fields.size ? projectPartialPayload(project, fields) : projectPayload(project);
+    try {
+      await backend.updateProject(project.id, payload, project.version);
+      project.version += 1;
+      dirtyFields.delete(project.id);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        const current = (error.payload as { current_version?: number } | null)?.current_version;
+        if (typeof current === "number") project.version = current;
+        notify("检测到并发修改，将以你的修改为准重新保存");
+        dirtyProjects.add(project.id);
+        return;
+      }
+      dirtyProjects.add(project.id);
+      throw error;
+    }
   }
 
   async function saveRemote(): Promise<void> {
@@ -245,7 +308,7 @@ export function useToolbox() {
       await Promise.all([
         ...projectIds.map((id) => app.value.projects.find((project) => project.id === id))
           .filter((project): project is Project => Boolean(project))
-          .map((project) => backend.updateProject(project.id, projectPayload(project))),
+          .map((project) => saveProject(project, dirtyFields.get(project.id))),
         ...templateTypes.map((type) => backend.saveTemplate(type, sectionsFromState(app.value.libraries[type]))),
         ...materialTemplateTypes.map((type) => backend.saveMaterialTemplate(type, sectionsFromState(app.value.materialLibraries[type]))),
         ...(saveToolCart
@@ -255,10 +318,10 @@ export function useToolbox() {
           backend.saveStandardLibrary(key, (app.value.standardLibraries[key]?.rows || []).map((row) => ({ ...row }))),
         ),
       ]);
+      syncRevision();
       cloud.text = "已连接 Django · 数据已保存";
       cloud.state = "ok";
     } catch (error) {
-      for (const id of projectIds) dirtyProjects.add(id);
       for (const type of templateTypes) dirtyTemplates.add(type);
       for (const type of materialTemplateTypes) dirtyMaterialTemplates.add(type);
       for (const key of stdLibKeys) dirtyStdLibs.add(key);
@@ -349,12 +412,14 @@ export function useToolbox() {
       workcardAssignment: defaultWorkcardAssignment(),
       standalonePrepSheet: defaultStandalonePrepSheet(),
       materialList: normalizeState(projectType === "A检" ? { categories: [...DEFAULT_CATEGORIES] } : {}),
+      version: 0,
     };
     if (cloud.available) {
       try {
         const result = await backend.createProject(projectPayload(project));
         project.id = String(result.data?._id || project.id);
         project.createdAt = result.data?.created_at ? new Date(String(result.data.created_at)).getTime() : project.createdAt;
+        project.version = Number(result.data?.version) || 1;
       } catch (error) { notify(errorMessage(error, "云端创建失败，已保存到本地")); }
     }
     app.value.projects.unshift(project);
@@ -372,14 +437,14 @@ export function useToolbox() {
 
   function updateProject(project: Project, changes: Partial<Project>): void {
     Object.assign(project, changes);
-    persist();
+    persistField("meta");
   }
 
   /** 修改项目类型（需求 8）。 */
   function updateProjectType(project: Project, newType: ProjectType | ""): void {
     if (project.type === newType) return;
     project.type = (PROJECT_TYPES as readonly string[]).includes(newType) ? newType : "";
-    persist();
+    persistField("meta");
   }
 
   /** 复制项目：深拷贝当前项目全部数据（工具清单/工作准备单/工卡分配清单），默认命名“原名+副本”，云端创建并插入列表首位。 */
@@ -389,12 +454,14 @@ export function useToolbox() {
       id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name: `${project.name}副本`,
       createdAt: Date.now(),
+      version: 0,
     };
     if (cloud.available) {
       try {
         const result = await backend.createProject(projectPayload(copy));
         copy.id = String(result.data?._id || copy.id);
         copy.createdAt = result.data?.created_at ? new Date(String(result.data.created_at)).getTime() : copy.createdAt;
+        copy.version = Number(result.data?.version) || 1;
       } catch (error) { notify(errorMessage(error, "云端复制失败，已保存到本地")); }
     }
     app.value.projects.unshift(copy);
@@ -411,7 +478,13 @@ export function useToolbox() {
       currentProject.value.data.aircraftType = type;
     }
     currentProject.value.materialList.aircraftType = type;
-    persist();
+    // 同时影响 meta / data / materialList 三个字段
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+    markField("meta");
+    markField("data");
+    markField("materialList");
+    clearTimeout(saveTimer);
+    if (cloud.available) saveTimer = setTimeout(saveRemote, 450);
   }
 
   function itemsOf(cat: string, sub: string): ToolItem[] { return active.value?.items.filter((item) => item.cat === cat && item.sub === sub) || []; }
@@ -1644,7 +1717,92 @@ export function useToolbox() {
     persist();
   }
 
-  async function loadRemote(): Promise<void> {
+  /** 合并两个 ToolState 的物品行（内容键对齐，本地优先）：本地正在编辑的行保留，
+   *  远端新增的行并入（分配不冲突的新 id）。 */
+  function mergeToolStateRows(local: ToolState, remote: ToolState): ToolState {
+    const localKeys = new Set(local.items.map((it) => itemKey(it)));
+    const remoteOnly = remote.items.filter((it) => !localKeys.has(itemKey(it)));
+    if (remoteOnly.length === 0) return local;
+    let maxId = local.items.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0);
+    const merged = [...local.items];
+    for (const it of remoteOnly) merged.push({ ...deepCopy(it), id: ++maxId });
+    const categories = [...local.categories];
+    for (const c of remote.categories) if (!categories.includes(c)) categories.push(c);
+    for (const it of merged) if (it.cat && !categories.includes(it.cat)) categories.push(it.cat);
+    nextId = maxId + 1;
+    // 黄闪：标记本次并入的新行，供组件做短暂高亮
+    flashKeys.value = new Set(remoteOnly.map((it) => itemKey(it)));
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { flashKeys.value = new Set(); }, 1500);
+    return { ...local, categories, items: merged, notes: { ...remote.notes, ...local.notes } };
+  }
+
+  /** 字段级合并单个项目：本地脏字段保留（data/materialList 脏时按内容键行合并），其余采用远端。 */
+  function mergeProjectFields(local: Project, remote: Project, fields?: Set<ProjectField>): Project {
+    const dirty = (f: ProjectField) => fields?.has(f) ?? false;
+    return {
+      ...local,
+      name: dirty("meta") ? local.name : remote.name,
+      aircraftType: dirty("meta") ? local.aircraftType : remote.aircraftType,
+      team: dirty("meta") ? local.team : remote.team,
+      type: dirty("meta") ? local.type : remote.type,
+      data: dirty("data") ? mergeToolStateRows(local.data, remote.data) : remote.data,
+      prepSheet: dirty("prepSheet") ? local.prepSheet : remote.prepSheet,
+      workcardAssignment: dirty("workcardAssignment") ? local.workcardAssignment : remote.workcardAssignment,
+      standalonePrepSheet: dirty("standalonePrepSheet") ? local.standalonePrepSheet : remote.standalonePrepSheet,
+      materialList: dirty("materialList") ? mergeToolStateRows(local.materialList, remote.materialList) : remote.materialList,
+      version: remote.version,
+    };
+  }
+
+  /** 把远端数据合并进本地 app（非脏字段/实体才覆盖）。 */
+  function applyRemoteMerge(remote: {
+    libraries: Record<AircraftType, ToolState>;
+    materialLibraries: Record<AircraftType, ToolState>;
+    projects: Project[];
+    toolCart: ToolCartItem[];
+    standardLibraries: Record<StandardLibKey, StandardLib>;
+  }): void {
+    const nextLibraries = { ...app.value.libraries } as Record<AircraftType, ToolState>;
+    for (const type of AIRCRAFT_TYPES) {
+      if (!dirtyTemplates.has(type)) nextLibraries[type] = remote.libraries[type];
+    }
+    const nextMaterialLibraries = { ...app.value.materialLibraries } as Record<AircraftType, ToolState>;
+    for (const type of AIRCRAFT_TYPES) {
+      if (!dirtyMaterialTemplates.has(type)) nextMaterialLibraries[type] = remote.materialLibraries[type];
+    }
+    const remoteIds = new Set(remote.projects.map((p) => p.id));
+    const mergedProjects: Project[] = [];
+    for (const local of app.value.projects) {
+      const remoteProject = remote.projects.find((p) => p.id === local.id);
+      if (remoteProject) {
+        mergedProjects.push(mergeProjectFields(local, remoteProject, dirtyFields.get(local.id)));
+      } else if (dirtyFields.has(local.id)) {
+        mergedProjects.push(local); // 远端已删除但本地正在编辑：保留，等保存时以本地为准
+      }
+      // 否则：远端已删除且本地未编辑 → 丢弃
+    }
+    for (const remoteProject of remote.projects) {
+      if (!remoteIds.has(remoteProject.id)) {
+        // 本地没有的新项目 → 追加
+        if (!app.value.projects.some((p) => p.id === remoteProject.id)) mergedProjects.push(remoteProject);
+      }
+    }
+    const nextStdLibs = { ...app.value.standardLibraries } as Record<StandardLibKey, StandardLib>;
+    for (const key of STANDARD_LIB_KEYS) {
+      if (!dirtyStdLibs.has(key)) nextStdLibs[key] = remote.standardLibraries[key];
+    }
+    app.value = normalizeApp({
+      libraries: nextLibraries,
+      materialLibraries: nextMaterialLibraries,
+      projects: mergedProjects,
+      toolCart: dirtyToolCart ? app.value.toolCart : remote.toolCart,
+      standardLibraries: nextStdLibs,
+    });
+  }
+
+  async function loadRemote(merge = false, showOverlay = true): Promise<void> {
+    if (showOverlay) syncing.value = true;
     cloud.text = "正在连接 Django 后端…";
     try {
       const status = await backend.status();
@@ -1685,9 +1843,16 @@ export function useToolbox() {
       if (aiDoc && Array.isArray(aiDoc.rows)) stdLibs.aircraft_info = normalizeStdLib({ rows: aiDoc.rows as StandardLibRow[] });
       if (wc320Doc && Array.isArray(wc320Doc.rows)) stdLibs.workcard_320 = normalizeStdLib({ rows: wc320Doc.rows as StandardLibRow[] });
       const annDoc = unwrapDocument(ann?.data);
-      announcement.value = String(annDoc?.content || "");
-      announcementDirty = false;
-      app.value = normalizeApp({ libraries, materialLibraries, projects: listDocuments(projects).map(projectFromDocument), toolCart, standardLibraries: stdLibs });
+      if (!merge || !announcementDirty) {
+        announcement.value = String(annDoc?.content || "");
+        announcementDirty = false;
+      }
+      const remoteProjects = listDocuments(projects).map(projectFromDocument);
+      if (merge) {
+        applyRemoteMerge({ libraries, materialLibraries, projects: remoteProjects, toolCart, standardLibraries: stdLibs });
+      } else {
+        app.value = normalizeApp({ libraries, materialLibraries, projects: remoteProjects, toolCart, standardLibraries: stdLibs });
+      }
       computeNextId();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
       cloud.available = true;
@@ -1697,16 +1862,63 @@ export function useToolbox() {
       cloud.text = "后端连接失败 · 正在使用本地缓存";
       cloud.state = "err";
       notify(errorMessage(error, "无法连接后端"));
+    } finally {
+      if (showOverlay) syncing.value = false;
     }
   }
 
-  /** 手动刷新：先把本地未保存的改动推送到云端，再整体从云端重新拉取，避免刷新丢失编辑。 */
+  /** 手动刷新：先把本地未保存的改动推送到云端，再从云端拉取（仍有脏数据时走字段级合并，避免丢失编辑）。 */
   async function refresh(): Promise<void> {
     if (hasDirtyData()) {
       try { await saveRemote(); } catch { /* 推送失败也继续刷新 */ }
     }
-    await loadRemote();
+    await loadRemote(hasDirtyData());
     notify("数据已刷新");
+  }
+
+  /** 同步本地 revision 基线（保存成功后调用，避免把自己的写入误判为远端变更）。 */
+  function syncRevision(): void {
+    void backend.poll().then((r) => { lastRevision = String(r.revision || lastRevision); }).catch(() => {});
+  }
+
+  /** 单次轮询：revision 有变化则做字段级合并。 */
+  async function pollOnce(): Promise<void> {
+    if (pollingPaused || syncing.value || remoteSaving) { scheduleNextPoll(); return; }
+    try {
+      const result = await backend.poll(lastRevision);
+      lastRevision = String(result.revision || lastRevision);
+      consecutiveFailures = 0;
+      if (result.changed) await loadRemote(true, false);
+    } catch {
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= 3) {
+        pollingPaused = true;
+        notify("同步轮询已暂停，请手动刷新");
+        return;
+      }
+    }
+    scheduleNextPoll();
+  }
+
+  function scheduleNextPoll(): void {
+    if (pollingTimer) clearTimeout(pollingTimer);
+    const interval = document.hidden ? 15000 : 5000;
+    pollingTimer = setTimeout(pollOnce, interval);
+  }
+
+  function startPolling(): void {
+    pollingPaused = false;
+    consecutiveFailures = 0;
+    scheduleNextPoll();
+  }
+
+  function stopPolling(): void {
+    if (pollingTimer) { clearTimeout(pollingTimer); pollingTimer = null; }
+  }
+
+  /** 某个物品是否处于「远端并入」黄闪状态。 */
+  function isFlashing(item: { cat: string; sub: string; name: string; partNo?: string }): boolean {
+    return flashKeys.value.has(itemKey(item));
   }
 
   computeNextId();
@@ -1780,7 +1992,7 @@ export function useToolbox() {
     sortAvCbCards,
     lookupAircraftRow, appendAircraftRow, upsertAircraftInfo,
     renamePrepTitle, addPrepItem, removePrepItem,
-    startAutoSync,
+    startAutoSync, startPolling, stopPolling, setEditingField, isFlashing, syncing,
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
   };

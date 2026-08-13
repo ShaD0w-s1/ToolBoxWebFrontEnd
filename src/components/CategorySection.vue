@@ -161,6 +161,7 @@ async function supplementStdLib(sub: string): Promise<void> {
               v-for="item in store.itemsOf(category, sub)"
               :key="item.id"
               :item="item"
+              :class="{ 'flash-update': store.isFlashing(item) }"
               :duplicate="store.isCartDuplicate(item.name)"
               :same-name="sameNameColors.get(item.name.trim().toLowerCase()) || null"
               @save="store.persist"

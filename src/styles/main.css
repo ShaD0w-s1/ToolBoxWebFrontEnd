@@ -203,3 +203,12 @@ td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var
   .quantity { flex: 1; }
   .quantity input { flex: 1; }
 }
+
+/* 远端变更并入时的黄闪反馈（PR-C）：物品行短暂高亮 */
+.flash-update {
+  animation: flash-update 1.5s ease-out;
+}
+@keyframes flash-update {
+  0% { background-color: #fde68a; }
+  100% { background-color: transparent; }
+}

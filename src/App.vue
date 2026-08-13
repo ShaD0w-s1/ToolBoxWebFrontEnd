@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, nextTick, ref } from "vue";
+import { onMounted, onUnmounted, nextTick, ref } from "vue";
 import html2canvas from "html2canvas";
 import AppHeader from "./components/AppHeader.vue";
 import ProjectList from "./components/ProjectList.vue";
@@ -268,6 +268,12 @@ onMounted(async () => {
   }
   // 启动每 2 秒自动同步（推送本地变更到云端，不覆盖本地编辑）
   store.startAutoSync(2000);
+  // 启动变更轮询（拉取远端更新，字段级合并）
+  store.startPolling();
+});
+
+onUnmounted(() => {
+  store.stopPolling();
 });
 
 function exportCurrentState(displayCats?: string[]): void {
@@ -306,6 +312,14 @@ function exportCurrentState(displayCats?: string[]): void {
     <ToolCart v-else :store="store" @import-sheet="importToolCart" @share="share('cart')" />
   </main>
 
+  <div v-if="store.syncing.value" class="sync-overlay">
+    <div class="sync-overlay-card">
+      <div class="sync-spinner" aria-hidden="true"></div>
+      <p>加载中，正在同步数据…</p>
+      <button class="ghost" @click="store.backToList()">返回</button>
+    </div>
+  </div>
+
   <aside v-if="store.shared.value" class="share-banner">
     <span>你正在查看通过链接分享的内容（尚未保存到本地）。</span>
     <div class="spacer" />
@@ -325,3 +339,43 @@ function exportCurrentState(displayCats?: string[]): void {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 全屏「加载中」冻结遮罩：仅允许操作其中的「返回」按钮 */
+.sync-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(2px);
+}
+.sync-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 36px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+.sync-overlay-card p {
+  margin: 0;
+  color: #333;
+  font-size: 15px;
+}
+.sync-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: sync-spin 0.8s linear infinite;
+}
+@keyframes sync-spin {
+  to { transform: rotate(360deg); }
+}
+</style>

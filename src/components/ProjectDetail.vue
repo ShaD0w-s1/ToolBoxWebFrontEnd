@@ -33,6 +33,15 @@ const isStandalone = computed(() => {
 const subPage = ref<"prep" | "workcard" | "material" | "tools">("prep");
 watch(() => props.store.currentProject.value?.id, () => { subPage.value = "prep"; });
 
+// 子页 → 顶层字段映射：切换子页时同步「正在编辑的字段」，供字段级 dirty 追踪 / 合并使用。
+function fieldForSubPage(): "data" | "materialList" | "prepSheet" | "workcardAssignment" | "standalonePrepSheet" {
+  if (subPage.value === "material") return "materialList";
+  if (subPage.value === "tools") return "data";
+  if (subPage.value === "workcard") return "workcardAssignment";
+  return isStandalone.value ? "standalonePrepSheet" : "prepSheet";
+}
+watch([subPage, isAcheck, isStandalone], () => props.store.setEditingField(fieldForSubPage()), { immediate: true });
+
 // 修复 2：工作准备单机号/机型变化 → 自动切换工具清单机型并覆盖数据（无需弹窗确认）。
 watch(
   () => props.store.aircraftTypeFromPrep.value,

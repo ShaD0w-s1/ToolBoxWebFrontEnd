@@ -326,6 +326,8 @@ export interface Project {
   standalonePrepSheet: StandalonePrepSheet;
   /** 「单独项目」的航材清单（部位与 data.categories 共享）；非单独项目为空。 */
   materialList: ToolState;
+  /** 云端文档版本号（后端每次写入原子递增），用于乐观锁冲突检测。 */
+  version: number;
 }
 
 export interface ToolboxApp {
@@ -532,6 +534,7 @@ export function normalizeApp(value: AppInput = {}): ToolboxApp {
       workcardAssignment: (project.workcardAssignment as WorkcardAssignment) || defaultWorkcardAssignment(),
       standalonePrepSheet: (project.standalonePrepSheet as StandalonePrepSheet) || defaultStandalonePrepSheet(),
       materialList: normalizeState((project.materialList as StateInput) || {}),
+      version: Number(project.version) || 0,
     })),
     toolCart: (value.toolCart || []).map((entry) => ({
       name: String(entry.name || ""),
@@ -762,6 +765,7 @@ export function projectFromDocument(raw: unknown): Project {
     workcardAssignment: workcardAssignmentFromDoc(doc),
     standalonePrepSheet: standalonePrepSheetFromDoc(doc),
     materialList: stateFromSections((doc.material_list || []) as SectionPayload[]),
+    version: Number(doc.version) || 0,
   };
 }
 
@@ -778,4 +782,34 @@ export function projectPayload(project: Project): ProjectPayload {
     standalone_prep_sheet: project.standalonePrepSheet,
     material_list: sectionsFromState(project.materialList),
   };
+}
+
+/** 项目顶层字段，用于字段级 dirty 追踪与非脏字段合并。 */
+export type ProjectField = "data" | "materialList" | "prepSheet" | "workcardAssignment" | "standalonePrepSheet" | "meta";
+
+/** 稳定的物品行身份：由「部位 + 工作/类型 + 物品名 + 件号」共同确定。
+ *  跨客户端一致，替代未持久化的本地数字 id，用于按行合并（PR-C）。 */
+export function itemKey(item: { cat: string; sub: string; name: string; partNo?: string }): string {
+  return [item.cat, item.sub, item.name, item.partNo || ""].join("\u0001");
+}
+
+/** 只序列化「本地被编辑过的字段」，实现字段级部分 PATCH，
+ *  避免把远端已更新的非脏字段覆盖掉（PR-B 的保存侧）。 */
+export function projectPartialPayload(project: Project, fields: Set<ProjectField>): Partial<ProjectPayload> {
+  const payload: Partial<ProjectPayload> = {};
+  if (fields.has("data")) {
+    payload.sections = sectionsFromState(project.data);
+    payload.use_tool_cart = Boolean(project.data.useCart);
+  }
+  if (fields.has("materialList")) payload.material_list = sectionsFromState(project.materialList);
+  if (fields.has("prepSheet")) payload.prep_sheet = project.prepSheet;
+  if (fields.has("workcardAssignment")) payload.workcard_assignment = project.workcardAssignment;
+  if (fields.has("standalonePrepSheet")) payload.standalone_prep_sheet = project.standalonePrepSheet;
+  if (fields.has("meta")) {
+    payload.name = project.name;
+    payload.aircraft_type = project.aircraftType;
+    payload.team = project.team;
+    payload.type = project.type;
+  }
+  return payload;
 }
