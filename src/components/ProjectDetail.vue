@@ -9,6 +9,7 @@ import WorkcardAssignment from "./WorkcardAssignment.vue";
 import StandalonePrepSheet from "./StandalonePrepSheet.vue";
 import MaterialList from "./MaterialList.vue";
 import { parseWorkCardList } from "../services/workcard";
+import { backend } from "../api";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{
@@ -204,11 +205,8 @@ async function finishLibrary(): Promise<void> {
   props.store.backToList();
 }
 
-/** 二级页首行「依据工卡清单」：导入工卡清单后——
- *  1) 填充工作准备单/工卡分配清单（工卡号）；
- *  2) A检 项目激活工具清单/航材清单：用工卡分配清单里的「工卡名称」按 3连续字匹配，从对应机型标准库
- *     增删 ENG/AV CB/FC/LG 部位卡片；通用/接机（工具）/通用（航材）完整引用；各部位「固定」完整引用+置顶。
- *  反馈合并为一条提示。 */
+/** 二级页首行「依据工卡清单」：前端解析 xlsx → 后端计算（工卡分配 + 工具/航材筛选）→
+ *  拉取云端权威结果显示。反馈合并为一条提示。 */
 async function applyWorkCardListFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -217,37 +215,50 @@ async function applyWorkCardListFile(event: Event): Promise<void> {
   try {
     const parsed = await parseWorkCardList(file);
     if (!parsed.cards.length) { props.store.notify("未从表格 B 列解析到工卡号"); return; }
-    const written = props.store.applyWorkCardList(parsed);
-    let msg = `已写入 ${written} 条工卡，并填充工作准备单/工卡分配清单`;
-    if (isAcheck.value) {
-      const t = props.store.applyAcheckToolByWorkcard();
-      const m = props.store.applyAcheckMaterialByWorkcard();
-      const tp: string[] = [];
-      if (t.deleted > 0) tp.push(`工具删除 ${t.deleted} 个`);
-      if (t.added > 0) tp.push(`工具补充 ${t.added} 个`);
-      if (tp.length) msg += `；${tp.join("、")}`;
-      const mp: string[] = [];
-      if (m.deleted > 0) mp.push(`航材删除 ${m.deleted} 个`);
-      if (m.added > 0) mp.push(`航材补充 ${m.added} 个`);
-      if (mp.length) msg += `；${mp.join("、")}`;
-    }
+    const project = props.store.currentProject.value;
+    if (!project) return;
+    const res = await backend.applyWorkcard(project.id, {
+      机号: parsed.机号,
+      工作内容: parsed.工作内容,
+      地点: parsed.地点,
+      cards: parsed.cards.map((c) => ({ 项次: c.项次, 工卡号: c.工卡号, 工卡名称: c.工卡名称 })),
+      aircraft_type: props.store.aircraftTypeFromPrep.value,
+    });
+    const d = res.data;
+    let msg = `已写入 ${d?.written ?? 0} 条工卡，并填充工作准备单/工卡分配清单`;
+    const parts: string[] = [];
+    if (d?.tool_deleted) parts.push(`工具删除 ${d.tool_deleted} 个`);
+    if (d?.tool_added) parts.push(`工具补充 ${d.tool_added} 个`);
+    if (d?.material_deleted) parts.push(`航材删除 ${d.material_deleted} 个`);
+    if (d?.material_added) parts.push(`航材补充 ${d.material_added} 个`);
+    if (parts.length) msg += `；${parts.join("、")}`;
     subPage.value = "tools";
     props.store.notify(msg);
-    // 依据工卡清单后立即推送+拉取，触发全项目强制同步一次（不等 autoSync/轮询）。
-    void props.store.forceSync();
+    // 后端已写入云端并 _bump_revision，拉取权威结果（其它端由轮询/watch 同步）。
+    await props.store.loadRemote();
   } catch (error) {
     props.store.notify(error instanceof Error ? error.message : "解析表格失败");
   }
 }
 
-/** 工具清单子页「按卡筛选」按钮：手动激活一次，按工卡分配清单的工卡名称做筛选与增减。 */
-function runToolFilterByWorkcard(): void {
+/** 工具清单子页「按卡筛选」按钮：调后端同一端点（筛选模式，不传 cards），再拉取权威结果。 */
+async function runToolFilterByWorkcard(): Promise<void> {
   if (!isAcheck.value || isLibrary.value) return;
-  const t = props.store.applyAcheckToolByWorkcard();
-  const parts: string[] = [];
-  if (t.deleted > 0) parts.push(`删除 ${t.deleted} 个`);
-  if (t.added > 0) parts.push(`补充 ${t.added} 个`);
-  props.store.notify(parts.length ? `工具清单已按卡筛选：${parts.join("、")}` : "工具清单无需变更");
+  const project = props.store.currentProject.value;
+  if (!project) return;
+  try {
+    const res = await backend.applyWorkcard(project.id, { aircraft_type: props.store.aircraftTypeFromPrep.value });
+    const d = res.data;
+    const parts: string[] = [];
+    if (d?.tool_deleted) parts.push(`工具删除 ${d.tool_deleted} 个`);
+    if (d?.tool_added) parts.push(`工具补充 ${d.tool_added} 个`);
+    if (d?.material_deleted) parts.push(`航材删除 ${d.material_deleted} 个`);
+    if (d?.material_added) parts.push(`航材补充 ${d.material_added} 个`);
+    props.store.notify(parts.length ? `已按卡筛选：${parts.join("、")}` : "清单无需变更");
+    await props.store.loadRemote();
+  } catch (error) {
+    props.store.notify(error instanceof Error ? error.message : "按卡筛选失败");
+  }
 }
 </script>
 
