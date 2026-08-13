@@ -11,7 +11,6 @@ import {
   type ProjectType,
 } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
-import { backend } from "../api";
 import { formatDate } from "../utils/format";
 import { projectShareUrl } from "../services/sharing";
 
@@ -83,17 +82,13 @@ function editLibrary(type: AircraftType): void {
 function editCart(): void {
   if (window.confirm("确认维护工具车？")) props.store.openCart();
 }
-/** 编辑标准库前先确认；飞机信息标准库需经后端校验 AIRNAV 密码通过才能进入。 */
+/** 编辑标准库前先确认；飞机信息标准库需经后端校验 AIRNAV 密码通过才能进入（读取也受保护）。 */
 async function editStdLib(k: typeof STANDARD_LIB_KEYS[number]): Promise<void> {
   if (k === "aircraft_info") {
     const pwd = window.prompt("请输入 AIRNAV 密码：");
     if (pwd === null) return;
     if (!pwd) { props.store.notify("请输入 AIRNAV 密码"); return; }
-    try {
-      const res = await backend.verifyAirnav(pwd);
-      if (res.verified) { props.store.openStdLib(k); }
-      else { props.store.notify("AIRNAV 密码错误，无法进入"); }
-    } catch { props.store.notify("AIRNAV 校验失败，请稍后重试"); }
+    if (await props.store.unlockAircraftInfo(pwd)) props.store.openStdLib(k);
     return;
   }
   if (window.confirm("确认维护标准库？")) props.store.openStdLib(k);

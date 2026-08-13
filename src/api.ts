@@ -75,7 +75,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const backend = {
   status: () => request<ApiEnvelope>("/api/cloudbase/status/"),
-  verifyAirnav: (password: string) => request<ApiEnvelope>("/api/airnav-verify/", { method: "POST", body: { password } }),
+  verifyAirnav: (password: string) => request<{ ok: boolean; verified?: boolean; token?: string; expires_in?: number }>("/api/airnav-verify/", { method: "POST", body: { password } }),
+  getConfig: () => request<ApiEnvelope<{ watch_enabled?: boolean; watch_max_users?: number }>>("/api/config/"),
   listProjects: () => request<ApiEnvelope<unknown>>("/api/projects/?limit=100"),
   createProject: (project: ProjectPayload) => request<ApiEnvelope<Record<string, unknown>>>("/api/projects/", { method: "POST", body: project }),
   updateProject: (id: string, project: ProjectPayload | Partial<ProjectPayload>, expectedVersion?: number) =>
@@ -91,9 +92,10 @@ export const backend = {
   saveMaterialTemplate: (type: string, sections: SectionPayload[]) => request<ApiEnvelope>(`/api/material-templates/${encodeURIComponent(type)}/`, { method: "PUT", body: { sections } }),
   getToolCart: () => request<ApiEnvelope<unknown>>("/api/tool-cart/"),
   saveToolCart: (items: Array<{ name: string; quantity: number }>) => request<ApiEnvelope>("/api/tool-cart/", { method: "PUT", body: { items } }),
-  getStandardLibrary: (key: string) => request<ApiEnvelope<unknown>>(`/api/standard-libraries/${encodeURIComponent(key)}/`),
-  saveStandardLibrary: (key: string, rows: Record<string, string>[]) =>
-    request<ApiEnvelope>(`/api/standard-libraries/${encodeURIComponent(key)}/`, { method: "PUT", body: { rows } }),
+  getStandardLibrary: (key: string, token?: string) =>
+    request<ApiEnvelope<unknown>>(`/api/standard-libraries/${encodeURIComponent(key)}/`, token ? { headers: { "X-Airnav-Token": token } } : {}),
+  saveStandardLibrary: (key: string, rows: Record<string, string>[], token?: string) =>
+    request<ApiEnvelope>(`/api/standard-libraries/${encodeURIComponent(key)}/`, { method: "PUT", body: { rows }, ...(token ? { headers: { "X-Airnav-Token": token } } : {}) }),
   getAnnouncement: () => request<ApiEnvelope<unknown>>("/api/announcement/"),
   saveAnnouncement: (content: string) => request<ApiEnvelope>("/api/announcement/", { method: "PUT", body: { content } }),
 };

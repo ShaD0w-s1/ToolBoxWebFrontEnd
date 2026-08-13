@@ -1,5 +1,6 @@
 import { computed, reactive, ref } from "vue";
 import { backend, ApiError, type ApiEnvelope } from "../api";
+import { startWatchRevision, stopWatchRevision } from "../services/realtime";
 import {
   AIRCRAFT_TYPES,
   DEFAULT_CATEGORIES,
@@ -111,6 +112,12 @@ export function useToolbox() {
   let pollingTimer: ReturnType<typeof setTimeout> | null = null;
   let pollingPaused = false;
   let consecutiveFailures = 0;
+  // —— AIRNAV 授权 token（飞机信息读取/编辑鉴权）+ watch 实时推送 ——
+  const AIRNAV_TOKEN_KEY = "toolbox_airnav_token";
+  let airnavToken = sessionStorage.getItem(AIRNAV_TOKEN_KEY) || "";
+  let watchActive = false;
+  let watchEnabled = false; // 由远端配置下发决定
+  let watchMaxUsers = 10;
 
   const currentProject = computed(() => app.value.projects.find((item) => item.id === currentProjectId.value) || null);
   const active = computed(() => editingLibrary.value ? app.value.libraries[editingLibrary.value] : currentProject.value?.data || null);
@@ -315,7 +322,7 @@ export function useToolbox() {
           ? [backend.saveToolCart(app.value.toolCart.map((item) => ({ name: item.name, quantity: item.qty })))]
           : []),
         ...[...stdLibKeys].map((key) =>
-          backend.saveStandardLibrary(key, (app.value.standardLibraries[key]?.rows || []).map((row) => ({ ...row }))),
+          backend.saveStandardLibrary(key, (app.value.standardLibraries[key]?.rows || []).map((row) => ({ ...row })), key === "aircraft_info" ? airnavToken : undefined),
         ),
       ]);
       cloud.text = "已连接 Django · 数据已保存";
@@ -394,6 +401,32 @@ export function useToolbox() {
     if (!app.value.standardLibraries[key]) app.value.standardLibraries[key] = { rows: [] };
     app.value.standardLibraries[key].rows = rows;
     persist();
+  }
+
+  /** 校验 AIRNAV 密码并解锁飞机信息标准库：成功后签发短期 token（sessionStorage 缓存），
+   *  立即拉取飞机信息（读取受 token 保护）。返回是否成功。 */
+  async function unlockAircraftInfo(password: string): Promise<boolean> {
+    try {
+      const res = await backend.verifyAirnav(password);
+      if (!res.verified || !res.token) {
+        notify("AIRNAV 密码错误，无法进入");
+        return false;
+      }
+      airnavToken = res.token;
+      sessionStorage.setItem(AIRNAV_TOKEN_KEY, airnavToken);
+      try {
+        const aiLib = await backend.getStandardLibrary("aircraft_info", airnavToken);
+        const aiDoc = unwrapDocument(aiLib?.data);
+        if (aiDoc && Array.isArray(aiDoc.rows)) {
+          app.value.standardLibraries.aircraft_info = normalizeStdLib({ rows: aiDoc.rows as StandardLibRow[] });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+        }
+      } catch { /* 拉取失败不阻塞进入编辑 */ }
+      return true;
+    } catch {
+      notify("AIRNAV 校验失败，请稍后重试");
+      return false;
+    }
   }
 
   async function createProject(name: string, aircraftType: AircraftType = "A320", projectType: ProjectType | "" = ""): Promise<void> {
@@ -1808,17 +1841,23 @@ export function useToolbox() {
         cloud.state = "warn";
         return;
       }
-      const [projects, a320, b787, ma320, mb787, cart, aiLib, wc320, ann] = await Promise.all([
+      const [projects, a320, b787, ma320, mb787, cart, aiLib, wc320, ann, cfg] = await Promise.all([
         backend.listProjects(),
         backend.getTemplate("A320").catch(() => null),
         backend.getTemplate("B787").catch(() => null),
         backend.getMaterialTemplate("A320").catch(() => null),
         backend.getMaterialTemplate("B787").catch(() => null),
         backend.getToolCart().catch(() => null),
-        backend.getStandardLibrary("aircraft_info").catch(() => null),
+        // 飞机信息读取受 AIRNAV 授权保护：无 token 时跳过（保留本地缓存），避免 403 刷屏。
+        airnavToken ? backend.getStandardLibrary("aircraft_info", airnavToken).catch(() => null) : Promise.resolve(null),
         backend.getStandardLibrary("workcard_320").catch(() => null),
         backend.getAnnouncement().catch(() => null),
+        backend.getConfig().catch(() => null),
       ]);
+      // 远端配置下发：watch 开关与阈值（方案C）。
+      const cfgDoc = unwrapDocument(cfg?.data);
+      watchEnabled = Boolean(cfgDoc?.watch_enabled);
+      watchMaxUsers = Number.parseInt(String(cfgDoc?.watch_max_users ?? "10"), 10) || 10;
       const a320Document = unwrapDocument(a320?.data);
       const b787Document = unwrapDocument(b787?.data);
       const ma320Document = unwrapDocument(ma320?.data);
@@ -1837,7 +1876,12 @@ export function useToolbox() {
       const stdLibs = defaultStandardLibraries();
       const aiDoc = unwrapDocument(aiLib?.data);
       const wc320Doc = unwrapDocument(wc320?.data);
-      if (aiDoc && Array.isArray(aiDoc.rows)) stdLibs.aircraft_info = normalizeStdLib({ rows: aiDoc.rows as StandardLibRow[] });
+      if (aiDoc && Array.isArray(aiDoc.rows)) {
+        stdLibs.aircraft_info = normalizeStdLib({ rows: aiDoc.rows as StandardLibRow[] });
+      } else if (!airnavToken) {
+        // 无授权 token 时读取被跳过：保留本地已有的飞机信息（不因无权限而清空）。
+        stdLibs.aircraft_info = app.value.standardLibraries.aircraft_info || stdLibs.aircraft_info;
+      }
       if (wc320Doc && Array.isArray(wc320Doc.rows)) stdLibs.workcard_320 = normalizeStdLib({ rows: wc320Doc.rows as StandardLibRow[] });
       const annDoc = unwrapDocument(ann?.data);
       if (!merge || !announcementDirty) {
@@ -1855,6 +1899,7 @@ export function useToolbox() {
       cloud.available = true;
       cloud.text = "已连接 Django · 数据已同步";
       cloud.state = "ok";
+      syncRealtimeMode();
     } catch (error) {
       cloud.text = "后端连接失败 · 正在使用本地缓存";
       cloud.state = "err";
@@ -1918,6 +1963,45 @@ export function useToolbox() {
 
   function stopPolling(): void {
     if (pollingTimer) { clearTimeout(pollingTimer); pollingTimer = null; }
+  }
+
+  // —— watch 实时推送（方案C：远端配置下发 + 轮询兜底）——
+  /** watch 推送来的 revision 序号：有变化且空闲时触发一次增量合并。 */
+  function applyWatchRevision(seq: string): void {
+    if (seq && seq !== lastRevision) {
+      lastRevision = seq;
+      if (!syncing.value && !remoteSaving) void loadRemote(true, false);
+    }
+  }
+
+  function startWatch(): void {
+    if (watchActive) return;
+    watchActive = true;
+    stopPolling(); // watch 优先，暂停轮询省调用
+    void startWatchRevision(
+      (seq) => applyWatchRevision(seq),
+      () => {
+        // watch 失败/超限（如连接数 > watch_max_users）→ 回退轮询兜底
+        watchActive = false;
+        if (!pollingTimer) startPolling();
+      },
+    );
+  }
+
+  function stopWatch(): void {
+    stopWatchRevision();
+    watchActive = false;
+  }
+
+  /** 根据远端配置动态切换 watch / 轮询（loadRemote 读取配置后调用）。
+   *  watch_max_users <= 0 时视为管理员禁用 watch，强制走轮询。 */
+  function syncRealtimeMode(): void {
+    if (watchEnabled && watchMaxUsers > 0) {
+      startWatch();
+    } else {
+      stopWatch();
+      if (!pollingTimer) startPolling();
+    }
   }
 
   /** 某个物品是否处于「远端并入」黄闪状态。 */
@@ -1997,6 +2081,7 @@ export function useToolbox() {
     lookupAircraftRow, appendAircraftRow, upsertAircraftInfo,
     renamePrepTitle, addPrepItem, removePrepItem,
     startAutoSync, startPolling, stopPolling, setEditingField, isFlashing, syncing,
+    unlockAircraftInfo, startWatch, stopWatch, syncRealtimeMode,
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
   };

@@ -268,12 +268,14 @@ onMounted(async () => {
   }
   // 启动每 2 秒自动同步（推送本地变更到云端，不覆盖本地编辑）
   store.startAutoSync(2000);
-  // 启动变更轮询（拉取远端更新，字段级合并）
-  store.startPolling();
+  // 根据远端配置启动 watch 实时推送或轮询（loadRemote 成功后内部已按配置启动，
+  // 此处兜底：若 loadRemote 因故未成功，确保至少轮询在跑）。幂等，可安全重复调用。
+  store.syncRealtimeMode();
 });
 
 onUnmounted(() => {
   store.stopPolling();
+  store.stopWatch();
 });
 
 function exportCurrentState(displayCats?: string[]): void {
