@@ -1664,6 +1664,11 @@ export function useToolbox() {
     }
     // 需求 4：AV CB 分组内按子部位排序（AV 在前、CB 在后、未知最后）
     sortAvCbCards();
+    // 显式标记本次实际修改的字段为脏：persist() 默认按「当前子页 editingField」标脏，
+    // 在非「工卡分配清单」子页上传时会漏标 workcardAssignment/prepSheet，导致改动未推送、
+    // 反而被 forceSync 的 loadRemote 用远端旧数据覆盖（工卡分配清单无数据的根因）。
+    markField("prepSheet");
+    markField("workcardAssignment");
     persist();
     return written;
   }
@@ -1714,11 +1719,20 @@ export function useToolbox() {
     return rows.find((row) => String(row["飞机号"] || "").trim() === target) || null;
   }
 
-  /** 在飞机信息标准库中追加一条新机号行；若已存在则返回原行（不重复添加）。 */
-  function appendAircraftRow(regNo: string, extra: Partial<StandardLibRow> = {}): StandardLibRow {
+  /** 机号格式校验：仅 "B-"+4 个字母数字字符（如 B-1005、B-226N）视为合法，允许新增到标准库。 */
+  function isValidAircraftReg(regNo: string): boolean {
+    return /^B-[A-Za-z0-9]{4}$/.test((regNo || "").trim());
+  }
+
+  /** 在飞机信息标准库中追加一条新机号行。
+   *  去重：已存在相同机号则返回原行（不新增）。
+   *  格式校验：仅机号满足 "B-"+4字符 且标准库无匹配项才新增；否则不新增（返回 null）。 */
+  function appendAircraftRow(regNo: string, extra: Partial<StandardLibRow> = {}): StandardLibRow | null {
     const target = (regNo || "").trim();
+    if (!target) return null;
     const existing = lookupAircraftRow(target);
     if (existing) return existing;
+    if (!isValidAircraftReg(target)) return null;
     const cols = STANDARD_LIB_META.aircraft_info.rowKeys;
     const row: StandardLibRow = {};
     for (const col of cols) row[col] = "";
