@@ -1386,7 +1386,7 @@ export function useToolbox() {
         added++;
       }
     }
-    persist();
+    persistField("data");
     return { deleted, added };
   }
 
@@ -1481,7 +1481,7 @@ export function useToolbox() {
         added++;
       }
     }
-    persist();
+    persistField("materialList");
     return { deleted, added };
   }
 
