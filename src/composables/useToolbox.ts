@@ -318,7 +318,6 @@ export function useToolbox() {
           backend.saveStandardLibrary(key, (app.value.standardLibraries[key]?.rows || []).map((row) => ({ ...row }))),
         ),
       ]);
-      syncRevision();
       cloud.text = "已连接 Django · 数据已保存";
       cloud.state = "ok";
     } catch (error) {
@@ -1771,7 +1770,7 @@ export function useToolbox() {
     for (const type of AIRCRAFT_TYPES) {
       if (!dirtyMaterialTemplates.has(type)) nextMaterialLibraries[type] = remote.materialLibraries[type];
     }
-    const remoteIds = new Set(remote.projects.map((p) => p.id));
+    const localIds = new Set(app.value.projects.map((p) => p.id));
     const mergedProjects: Project[] = [];
     for (const local of app.value.projects) {
       const remoteProject = remote.projects.find((p) => p.id === local.id);
@@ -1783,10 +1782,8 @@ export function useToolbox() {
       // 否则：远端已删除且本地未编辑 → 丢弃
     }
     for (const remoteProject of remote.projects) {
-      if (!remoteIds.has(remoteProject.id)) {
-        // 本地没有的新项目 → 追加
-        if (!app.value.projects.some((p) => p.id === remoteProject.id)) mergedProjects.push(remoteProject);
-      }
+      // 本地没有的新项目 → 追加
+      if (!localIds.has(remoteProject.id)) mergedProjects.push(remoteProject);
     }
     const nextStdLibs = { ...app.value.standardLibraries } as Record<StandardLibKey, StandardLib>;
     for (const key of STANDARD_LIB_KEYS) {
@@ -1876,12 +1873,19 @@ export function useToolbox() {
     notify("数据已刷新");
   }
 
-  /** 同步本地 revision 基线（保存成功后调用，避免把自己的写入误判为远端变更）。 */
-  function syncRevision(): void {
-    void backend.poll().then((r) => { lastRevision = String(r.revision || lastRevision); }).catch(() => {});
+  /** 强制同步一次：立即推送本地改动 + 立即拉取合并。
+   *  供「依据工卡清单」等重量级操作后调用——不等 2s autoSync / 5s 轮询，
+   *  本端立刻把改动推上云端，其余端会在下一轮轮询（3s）内拉到。 */
+  async function forceSync(): Promise<void> {
+    if (hasDirtyData()) {
+      try { await saveRemote(); } catch { /* 推送失败也继续拉取 */ }
+    }
+    await loadRemote(true, false);
   }
 
-  /** 单次轮询：revision 有变化则做字段级合并。 */
+  /** 单次轮询：revision 有变化则做字段级合并。
+   *  注意：不做「保存后重设基线」——那会越过别端的变更导致漏同步；
+   *  保存后的轮询会检测到自己的写入并触发一次合并，等价于把最新远端拉齐。 */
   async function pollOnce(): Promise<void> {
     if (pollingPaused || syncing.value || remoteSaving) { scheduleNextPoll(); return; }
     try {
@@ -1902,7 +1906,7 @@ export function useToolbox() {
 
   function scheduleNextPoll(): void {
     if (pollingTimer) clearTimeout(pollingTimer);
-    const interval = document.hidden ? 15000 : 5000;
+    const interval = document.hidden ? 10000 : 3000;
     pollingTimer = setTimeout(pollOnce, interval);
   }
 
@@ -1977,7 +1981,7 @@ export function useToolbox() {
     createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
     itemsOf, subsOf, subTotal, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
-    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearActive, clearProjectAllData, setToolCart, loadRemote, refresh,
+    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearActive, clearProjectAllData, setToolCart, loadRemote, refresh, forceSync,
     syncSubToLibrary,
     mSubsOf, mItemsOf, mSubTotal, mCatTotal, mAllTotal, mCategoryList,
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,

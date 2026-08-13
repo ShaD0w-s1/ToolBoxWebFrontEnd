@@ -233,6 +233,8 @@ async function applyWorkCardListFile(event: Event): Promise<void> {
     }
     subPage.value = "tools";
     props.store.notify(msg);
+    // 依据工卡清单后立即推送+拉取，触发全项目强制同步一次（不等 autoSync/轮询）。
+    void props.store.forceSync();
   } catch (error) {
     props.store.notify(error instanceof Error ? error.message : "解析表格失败");
   }
