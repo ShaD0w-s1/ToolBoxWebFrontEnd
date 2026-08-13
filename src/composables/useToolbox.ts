@@ -29,6 +29,7 @@ import {
   AREA_BY_SECTION,
   WORKCARD_SECTIONS,
   type WorkCardRow,
+  type WorkcardAssignment,
   type AircraftType,
   type Project,
   type ProjectField,
@@ -1570,7 +1571,9 @@ export function useToolbox() {
     const id = 工卡号.trim();
     const rows = lib.rows;
     const idx = rows.findIndex((r) => String(r["工卡号"] || "").trim() === id);
-    const row: StandardLibRow = { 工卡号: id, 工卡名: 工卡名称, MP项目号: "", 部位, 分级 };
+    // 保留原有 MP项目号（避免改分级/部位时清空标准库已有数据）。
+    const mp = idx >= 0 ? String(rows[idx]["MP项目号"] || "") : "";
+    const row: StandardLibRow = { 工卡号: id, 工卡名: 工卡名称, MP项目号: mp, 部位, 分级 };
     if (idx >= 0) rows[idx] = row;
     else rows.push(row);
     dirtyStdLibs.add("workcard_320");
@@ -1783,6 +1786,30 @@ export function useToolbox() {
     return { ...local, categories, items: merged, notes: { ...remote.notes, ...local.notes } };
   }
 
+  /** 工卡分配清单按「工卡号」行级合并：本地正在编辑时保留本地卡片，同时合并远端新增的工卡
+   *  （避免整字段「本地为准」把别端新增的工卡丢掉）。相同工卡号仍以本地为准（本地编辑优先）。 */
+  function mergeWorkcardAssignment(local: WorkcardAssignment, remote: WorkcardAssignment, localDirty: boolean): WorkcardAssignment {
+    if (!localDirty) return remote;
+    const merged: WorkcardAssignment = { sections: {} as WorkcardAssignment["sections"], unassigned: [...local.unassigned] };
+    for (const section of WORKCARD_SECTIONS) {
+      const ls = local.sections[section];
+      const rs = remote.sections[section];
+      const localIds = new Set(ls.cards.map((c) => String(c.工卡号 || "").trim()).filter(Boolean));
+      const cards = [...ls.cards];
+      for (const rc of rs.cards) {
+        const rid = String(rc.工卡号 || "").trim();
+        if (rid && !localIds.has(rid)) cards.push(deepCopy(rc));
+      }
+      merged.sections[section] = { personnel: { ...ls.personnel }, cards, extra: [...ls.extra] };
+    }
+    const localUnassignedIds = new Set(local.unassigned.map((c) => String(c.工卡号 || "").trim()).filter(Boolean));
+    for (const rc of remote.unassigned) {
+      const rid = String(rc.工卡号 || "").trim();
+      if (rid && !localUnassignedIds.has(rid)) merged.unassigned.push(deepCopy(rc));
+    }
+    return merged;
+  }
+
   /** 字段级合并单个项目：本地脏字段保留（data/materialList 脏时按内容键行合并），其余采用远端。 */
   function mergeProjectFields(local: Project, remote: Project, fields?: Set<ProjectField>): Project {
     const dirty = (f: ProjectField) => fields?.has(f) ?? false;
@@ -1794,7 +1821,7 @@ export function useToolbox() {
       type: dirty("meta") ? local.type : remote.type,
       data: dirty("data") ? mergeToolStateRows(local.data, remote.data) : remote.data,
       prepSheet: dirty("prepSheet") ? local.prepSheet : remote.prepSheet,
-      workcardAssignment: dirty("workcardAssignment") ? local.workcardAssignment : remote.workcardAssignment,
+      workcardAssignment: mergeWorkcardAssignment(local.workcardAssignment, remote.workcardAssignment, dirty("workcardAssignment")),
       standalonePrepSheet: dirty("standalonePrepSheet") ? local.standalonePrepSheet : remote.standalonePrepSheet,
       materialList: dirty("materialList") ? mergeToolStateRows(local.materialList, remote.materialList) : remote.materialList,
       version: remote.version,

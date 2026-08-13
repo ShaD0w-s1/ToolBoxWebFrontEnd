@@ -690,6 +690,8 @@ function workcardAssignmentFromDoc(doc: Record<string, unknown>): WorkcardAssign
         const row = (card && typeof card === "object" ? card : {}) as Record<string, unknown>;
         const out = {} as WorkCardRow;
         for (const col of WORKCARD_COLUMNS) out[col] = String(row[col] ?? "");
+        // 「部位」不在列里（不显示），但需跨端保留：AV CB 子部位（AV/CB）区分依赖它。
+        out.部位 = String(row["部位"] ?? "");
         return out;
       }),
       extra: extras.map((item) => {
@@ -704,6 +706,7 @@ function workcardAssignmentFromDoc(doc: Record<string, unknown>): WorkcardAssign
     const row = (card && typeof card === "object" ? card : {}) as Record<string, unknown>;
     const out = {} as WorkCardRow;
     for (const col of WORKCARD_COLUMNS) out[col] = String(row[col] ?? "");
+    out.部位 = String(row["部位"] ?? "");
     return out;
   });
   return assignment;
