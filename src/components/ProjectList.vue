@@ -13,6 +13,7 @@ import {
 import type { ToolboxStore } from "../composables/useToolbox";
 import { formatDate } from "../utils/format";
 import { projectShareUrl } from "../services/sharing";
+import NameCompare from "./NameCompare.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-all": []; share: [] }>();
@@ -23,6 +24,8 @@ const showNew = ref(false);
 const newInput = ref<HTMLInputElement | null>(null);
 const editingAnnouncement = ref(false);
 const announcementDraft = ref("");
+// 类型工作名称对照页面：null=隐藏，否则为机型（A320/B787）。
+const nameCompareType = ref<AircraftType | null>(null);
 
 async function startNew(): Promise<void> {
   showNew.value = true;
@@ -181,30 +184,57 @@ function cancelEditAnnouncement(): void {
     </template>
 
     <div v-else class="database-grid">
-      <article v-for="type in AIRCRAFT_TYPES" :key="type" class="library-card">
-        <div><strong>{{ type }} 工具标准库</strong><span>{{ store.app.value.libraries[type].items.length }} 项物品</span></div>
-        <div class="library-actions">
-          <button class="primary" @click="editLibrary(type)">编辑标准库</button>
-        </div>
-      </article>
-      <article v-for="type in AIRCRAFT_TYPES" :key="`m-${type}`" class="library-card">
-        <div><strong>{{ type }} 航材标准库</strong><span>{{ store.app.value.materialLibraries[type].items.length }} 项航材</span></div>
-        <div class="library-actions">
-          <button class="primary" @click="editMaterialLibrary(type)">编辑标准库</button>
-        </div>
-      </article>
-      <article v-for="k in STANDARD_LIB_KEYS" :key="k" class="library-card">
-        <div><strong>{{ STANDARD_LIB_META[k].label }}</strong><span>{{ store.app.value.standardLibraries[k].rows.length }} 行</span></div>
-        <div class="library-actions">
-          <button class="primary" @click="editStdLib(k)">编辑标准库</button>
-        </div>
-      </article>
-      <article class="library-card cart-card">
-        <div><strong>工具车数据库</strong><span>{{ store.app.value.toolCart.length }} 项物品</span></div>
-        <div class="library-actions">
-          <button class="primary" @click="editCart">编辑工具车</button>
-        </div>
-      </article>
+      <NameCompare v-if="nameCompareType" :store="store" :type="nameCompareType" @close="nameCompareType = null" />
+
+      <template v-else>
+        <section class="db-group">
+          <h3 class="db-group-title">工具库</h3>
+          <div class="db-group-cards">
+            <article v-for="type in AIRCRAFT_TYPES" :key="type" class="library-card">
+              <div><strong>{{ type }} 工具标准库</strong><span>{{ store.app.value.libraries[type].items.length }} 项物品</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="editLibrary(type)">编辑标准库</button>
+              </div>
+            </article>
+            <article class="library-card cart-card">
+              <div><strong>工具车数据库</strong><span>{{ store.app.value.toolCart.length }} 项物品</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="editCart">编辑工具车</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="db-group">
+          <h3 class="db-group-title">航材库</h3>
+          <div class="db-group-cards">
+            <article v-for="type in AIRCRAFT_TYPES" :key="`m-${type}`" class="library-card">
+              <div><strong>{{ type }} 航材标准库</strong><span>{{ store.app.value.materialLibraries[type].items.length }} 项航材</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="editMaterialLibrary(type)">编辑标准库</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="db-group">
+          <h3 class="db-group-title">基准库</h3>
+          <div class="db-group-cards">
+            <article v-for="k in STANDARD_LIB_KEYS" :key="k" class="library-card">
+              <div><strong>{{ STANDARD_LIB_META[k].label }}</strong><span>{{ store.app.value.standardLibraries[k].rows.length }} 行</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="editStdLib(k)">编辑标准库</button>
+              </div>
+            </article>
+            <article class="library-card compare-card">
+              <div><strong>类型工作名称对照</strong><span>航材 ↔ 工具 名称对照</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="nameCompareType = 'A320'">打开对照</button>
+              </div>
+            </article>
+          </div>
+        </section>
+      </template>
     </div>
   </section>
 </template>
@@ -245,4 +275,8 @@ function cancelEditAnnouncement(): void {
 }
 .library-actions { display: flex; gap: 6px; }
 .library-actions button { min-height: 28px; padding: 3px 7px; font-size: 12px; }
+.db-group { margin-bottom: 20px; }
+.db-group-title { font-size: 14px; font-weight: 700; color: #2f3b52; margin: 0 0 8px; padding-left: 4px; border-left: 4px solid #378add; }
+.db-group-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.compare-card { border-color: #378add; }
 </style>

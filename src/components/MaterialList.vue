@@ -4,6 +4,7 @@ import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, type AircraftType } from "../domain
 import type { ToolboxStore } from "../composables/useToolbox";
 import MaterialCategorySection from "./MaterialCategorySection.vue";
 import { exportMaterialList, importMaterialList } from "../services/spreadsheet";
+import { backend } from "../api";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
@@ -143,15 +144,24 @@ async function onImportNewSections(event: Event): Promise<void> {
   } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
 }
 
-/** 航材清单子页「按卡筛选」按钮：手动激活一次，按工卡分配清单的工卡名称做筛选与增减。 */
-function runMaterialFilterByWorkcard(): void {
+/** 航材清单子页「按卡筛选」按钮：调后端筛选模式（不传 cards），再拉取权威结果。 */
+async function runMaterialFilterByWorkcard(): Promise<void> {
   if (isLibrary.value) return;
-  if (props.store.currentProject.value?.type !== "A检") return;
-  const m = props.store.applyAcheckMaterialByWorkcard();
-  const parts: string[] = [];
-  if (m.deleted > 0) parts.push(`删除 ${m.deleted} 个`);
-  if (m.added > 0) parts.push(`补充 ${m.added} 个`);
-  props.store.notify(parts.length ? `航材清单已按卡筛选：${parts.join("、")}` : "航材清单无需变更");
+  const project = props.store.currentProject.value;
+  if (!project || project.type !== "A检") return;
+  try {
+    const res = await backend.applyWorkcard(project.id, { aircraft_type: props.store.aircraftTypeFromPrep.value });
+    const d = res.data;
+    const parts: string[] = [];
+    if (d?.tool_deleted) parts.push(`工具删除 ${d.tool_deleted} 个`);
+    if (d?.tool_added) parts.push(`工具补充 ${d.tool_added} 个`);
+    if (d?.material_deleted) parts.push(`航材删除 ${d.material_deleted} 个`);
+    if (d?.material_added) parts.push(`航材补充 ${d.material_added} 个`);
+    props.store.notify(parts.length ? `已按卡筛选：${parts.join("、")}` : "航材清单无需变更");
+    await props.store.loadRemote();
+  } catch (error) {
+    props.store.notify(error instanceof Error ? error.message : "按卡筛选失败");
+  }
 }
 </script>
 
