@@ -924,6 +924,13 @@ export function useToolbox() {
     project.workcardAssignment = defaultWorkcardAssignment();
     project.standalonePrepSheet = defaultStandalonePrepSheet();
     project.materialList = normalizeState();
+    // 显式标记所有字段为脏：persist() 默认只标当前子页 editingField，会漏标其它字段，
+    // 导致清空后其它字段未推送、被 loadRemote 用远端旧数据覆盖回（数据残留的根因）。
+    markField("data");
+    markField("prepSheet");
+    markField("workcardAssignment");
+    markField("standalonePrepSheet");
+    markField("materialList");
     persist();
   }
 
