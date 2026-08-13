@@ -51,9 +51,9 @@ export async function startWatchRevision(
       return;
     }
     const db = (appInstance as any).database();
+    // 集合仅含 1 个 revision 计数器文档，直接 watch 整个集合（避免 _id 字段 where 的边缘问题）。
     watcher = db
       .collection("work_preparation_work_change_log")
-      .where({ _id: "revision" })
       .watch({
         onChange: (snapshot: { docs?: Array<{ _id?: string; seq?: number }> }) => {
           const docs = Array.isArray(snapshot?.docs) ? snapshot.docs : [];

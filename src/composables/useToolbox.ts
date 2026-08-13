@@ -1966,24 +1966,26 @@ export function useToolbox() {
   }
 
   // —— watch 实时推送（方案C：远端配置下发 + 轮询兜底）——
-  /** watch 推送来的 revision 序号：有变化且空闲时触发一次增量合并。 */
+  /** watch 推送来的 revision 序号：有变化且空闲时触发一次增量合并。
+   *  lastRevision 只在真正触发 loadRemote 时才前进——若正忙（同步/保存中），
+   *  不前移基线，让下一轮 watch/轮询再次触发，避免「基线已前进但未拉取」导致漏同步。 */
   function applyWatchRevision(seq: string): void {
-    if (seq && seq !== lastRevision) {
+    if (seq && seq !== lastRevision && !syncing.value && !remoteSaving) {
       lastRevision = seq;
-      if (!syncing.value && !remoteSaving) void loadRemote(true, false);
+      void loadRemote(true, false);
     }
   }
 
   function startWatch(): void {
     if (watchActive.value) return;
     watchActive.value = true;
-    stopPolling(); // watch 优先，暂停轮询省调用
+    // 注意：不停止轮询。轮询始终作为兜底（watch 提供亚秒级触发、轮询保证 3s 内同步），
+    // 即使 watch 静默失败（onChange 不触发）也不会失去同步。
     void startWatchRevision(
       (seq) => applyWatchRevision(seq),
       () => {
-        // watch 失败/超限（如连接数 > watch_max_users）→ 回退轮询兜底
+        // watch 失败/超限（如连接数 > watch_max_users）→ 置灰，轮询兜底继续
         watchActive.value = false;
-        if (!pollingTimer) startPolling();
       },
     );
   }
@@ -1994,14 +1996,15 @@ export function useToolbox() {
   }
 
   /** 根据远端配置动态切换 watch / 轮询（loadRemote 读取配置后调用）。
-   *  watch_max_users <= 0 时视为管理员禁用 watch，强制走轮询。 */
+   *  watch_max_users <= 0 时视为管理员禁用 watch，强制走轮询。
+   *  无论 watch 是否启用，轮询始终在跑（兜底）。 */
   function syncRealtimeMode(): void {
     if (watchEnabled && watchMaxUsers > 0) {
       startWatch();
     } else {
       stopWatch();
-      if (!pollingTimer) startPolling();
     }
+    if (!pollingTimer) startPolling();
   }
 
   /** 某个物品是否处于「远端并入」黄闪状态。 */
