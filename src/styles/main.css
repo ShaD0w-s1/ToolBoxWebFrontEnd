@@ -32,6 +32,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .cloud-status.ok { background: rgb(46 204 113 / 34%); }
 .cloud-status.warn { background: rgb(241 196 15 / 35%); }
 .cloud-status.err { background: rgb(231 76 60 / 42%); }
+.status-group { margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.status-group .cloud-status { margin-left: 0; }
+.watch-status { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; transition: background .25s; }
+.watch-status .cw-icon { width: 13px; height: 13px; fill: currentColor; }
+.watch-status.on { background: rgb(46 204 113 / 42%); color: #eafff2; }
+.watch-status.off { background: rgb(255 255 255 / 18%); color: rgb(255 255 255 / 55%); }
 
 main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 48px; }
 button, .button, .field, .check, .toolbar select {
@@ -182,7 +188,8 @@ td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var
 @media (max-width: 768px) {
   .top { align-items: flex-start; padding: 13px 15px; }
   .top p { display: none; }
-  .cloud-status { max-width: 45%; white-space: normal; text-align: right; }
+  .status-group { max-width: 52%; flex-wrap: wrap; justify-content: flex-end; }
+  .cloud-status, .watch-status { white-space: normal; text-align: right; }
   main { width: calc(100% - 22px); padding-top: 12px; }
   .list-toolbar { position: sticky; top: 0; z-index: 10; padding: 4px 0; background: #f4f6fb; }
   .list-toolbar .spacer { display: none; }

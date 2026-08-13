@@ -293,7 +293,7 @@ function exportCurrentState(displayCats?: string[]): void {
 </script>
 
 <template>
-  <AppHeader :cloud="store.cloud" />
+  <AppHeader :cloud="store.cloud" :watch-active="store.watchActive.value" />
   <main>
     <ProjectList
       v-if="store.screen.value === 'list'"

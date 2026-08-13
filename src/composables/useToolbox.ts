@@ -115,7 +115,7 @@ export function useToolbox() {
   // —— AIRNAV 授权 token（飞机信息读取/编辑鉴权）+ watch 实时推送 ——
   const AIRNAV_TOKEN_KEY = "toolbox_airnav_token";
   let airnavToken = sessionStorage.getItem(AIRNAV_TOKEN_KEY) || "";
-  let watchActive = false;
+  const watchActive = ref(false); // 是否正使用 watch 实时推送（供 UI 图标变色）
   let watchEnabled = false; // 由远端配置下发决定
   let watchMaxUsers = 10;
 
@@ -1975,14 +1975,14 @@ export function useToolbox() {
   }
 
   function startWatch(): void {
-    if (watchActive) return;
-    watchActive = true;
+    if (watchActive.value) return;
+    watchActive.value = true;
     stopPolling(); // watch 优先，暂停轮询省调用
     void startWatchRevision(
       (seq) => applyWatchRevision(seq),
       () => {
         // watch 失败/超限（如连接数 > watch_max_users）→ 回退轮询兜底
-        watchActive = false;
+        watchActive.value = false;
         if (!pollingTimer) startPolling();
       },
     );
@@ -1990,7 +1990,7 @@ export function useToolbox() {
 
   function stopWatch(): void {
     stopWatchRevision();
-    watchActive = false;
+    watchActive.value = false;
   }
 
   /** 根据远端配置动态切换 watch / 轮询（loadRemote 读取配置后调用）。
@@ -2081,7 +2081,7 @@ export function useToolbox() {
     lookupAircraftRow, appendAircraftRow, upsertAircraftInfo,
     renamePrepTitle, addPrepItem, removePrepItem,
     startAutoSync, startPolling, stopPolling, setEditingField, isFlashing, syncing,
-    unlockAircraftInfo, startWatch, stopWatch, syncRealtimeMode,
+    unlockAircraftInfo, startWatch, stopWatch, syncRealtimeMode, watchActive,
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
   };
