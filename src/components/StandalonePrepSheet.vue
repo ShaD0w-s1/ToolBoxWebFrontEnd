@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { exportStandalonePrep } from "../services/spreadsheet";
+import { exportFileName } from "../utils/format";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
@@ -39,7 +40,7 @@ const personnelLayout: Array<Array<{ key: string; cols: number }>> = [
 function exportImage(): void { emit("export-image", captureRef.value); }
 function exportTableXlsx(): void {
   if (!sheet.value) return;
-  exportStandalonePrep(sheet.value, project.value?.name || "单项准备单");
+  exportStandalonePrep(sheet.value, exportFileName(project.value?.name || "", "单项准备单"));
   props.store.notify("表格已导出");
 }
 

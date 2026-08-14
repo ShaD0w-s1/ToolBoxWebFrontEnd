@@ -14,7 +14,7 @@ import { backend } from "../api";
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{
   "export-sheet": [displayCats: string[]];
-  "export-image": [element: HTMLElement | null];
+  "export-image": [element: HTMLElement | null, subPageName?: string];
   "import-sheet": [file: File];
   "import-new-sections": [file: File];
   share: [];
@@ -191,6 +191,30 @@ function clearProjectAll(): void {
   props.store.clearProjectAllData();
 }
 
+/** 工具清单子页「下载现场管控单」：按当前项目类型下载云端对应文件。 */
+async function downloadControlDoc(): Promise<void> {
+  const project = props.store.currentProject.value;
+  if (!project) return;
+  const docType = project.type || "";
+  try {
+    const res = await backend.listControlDocs();
+    const doc = (res.data || []).find((d) => d.type === docType);
+    if (!doc) { props.store.notify(`尚未上传「${docType || "当前类型"}」的现场管控单`); return; }
+    const urlRes = await backend.getControlDocUrl(doc._id);
+    const url = urlRes.data?.downloadUrl;
+    if (!url) { props.store.notify("未获取到下载链接"); return; }
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = doc.fileName || "";
+    anchor.target = "_blank";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } catch (error) {
+    props.store.notify(error instanceof Error ? error.message : "下载失败");
+  }
+}
+
 /** 数据库（工具标准库）页内"完成"：保存到云端并提示后返回列表（替代原一级卡片上的完成按钮）。 */
 async function finishLibrary(): Promise<void> {
   const type = props.store.editingLibrary.value;
@@ -301,18 +325,18 @@ async function runToolFilterByWorkcard(): Promise<void> {
       </nav>
 
       <!-- A检子页面 -->
-      <PrepSheet v-if="isAcheck && subPage === 'prep'" :store="store" @export-image="emit('export-image', $event)" />
-      <WorkcardAssignment v-else-if="isAcheck && subPage === 'workcard'" :store="store" @export-image="emit('export-image', $event)" />
+      <PrepSheet v-if="isAcheck && subPage === 'prep'" :store="store" @export-image="(el) => emit('export-image', el, '工作准备单')" />
+      <WorkcardAssignment v-else-if="isAcheck && subPage === 'workcard'" :store="store" @export-image="(el) => emit('export-image', el, '工卡分配清单')" />
 
       <!-- 单独项目子页面 -->
-      <StandalonePrepSheet v-if="isStandalone && subPage === 'prep'" :store="store" @export-image="emit('export-image', $event)" />
-      <MaterialList v-else-if="isStandalone && subPage === 'material'" :store="store" @export-image="emit('export-image', $event)" />
+      <StandalonePrepSheet v-if="isStandalone && subPage === 'prep'" :store="store" @export-image="(el) => emit('export-image', el, '单项准备单')" />
+      <MaterialList v-else-if="isStandalone && subPage === 'material'" :store="store" @export-image="(el) => emit('export-image', el, '航材清单')" />
 
       <!-- A检 航材清单子页面 -->
-      <MaterialList v-else-if="isAcheck && subPage === 'material'" :store="store" @export-image="emit('export-image', $event)" />
+      <MaterialList v-else-if="isAcheck && subPage === 'material'" :store="store" @export-image="(el) => emit('export-image', el, '航材清单')" />
 
       <!-- 航材标准库编辑（库模式） -->
-      <MaterialList v-else-if="store.editingMaterialLibrary.value" :store="store" @export-image="emit('export-image', $event)" />
+      <MaterialList v-else-if="store.editingMaterialLibrary.value" :store="store" @export-image="(el) => emit('export-image', el, '航材标准库')" />
 
       <!-- 工具清单子页（统一布局：子页抬头 + 工具栏 + 红色提醒） -->
       <template v-if="store.active.value && ((!isAcheck && !isStandalone && !store.editingMaterialLibrary.value) || subPage === 'tools')">
@@ -321,7 +345,8 @@ async function runToolFilterByWorkcard(): Promise<void> {
           <span v-if="!isLibrary" class="auto-filter-warning">自动模糊筛选，需人工复核</span>
           <div class="subpage-actions">
             <button v-if="isLibrary" class="ghost" @click="finishLibrary">完成</button>
-            <button class="ghost" @click="emit('export-image', capture)">导出图片</button>
+            <button v-if="!isLibrary" class="ghost" @click="downloadControlDoc">下载现场管控单</button>
+            <button class="ghost" @click="emit('export-image', capture, isLibrary ? '工具标准库' : '工具清单')">导出图片</button>
             <button class="ghost" @click="emit('export-sheet', displayCats)">导出表格</button>
           </div>
         </div>

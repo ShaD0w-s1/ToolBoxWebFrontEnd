@@ -78,6 +78,11 @@ export const backend = {
   verifyAirnav: (password: string) => request<{ ok: boolean; verified?: boolean; token?: string; expires_in?: number }>("/api/airnav-verify/", { method: "POST", body: { password } }),
   getConfig: () => request<ApiEnvelope<{ watch_enabled?: boolean; watch_max_users?: number }>>("/api/config/"),
   getAircraftNumbers: () => request<ApiEnvelope<string[]>>("/api/aircraft-numbers/"),
+  listControlDocs: () => request<ApiEnvelope<Array<{ _id: string; type: string; fileName: string; cloudObjectId: string; uploadedAt?: string }>>>("/api/control-docs/"),
+  uploadControlDoc: (payload: { type: string; fileName: string; content: string }) =>
+    request<ApiEnvelope<{ _id: string; type: string; fileName: string; cloudObjectId: string }>>("/api/control-docs/", { method: "POST", body: payload }),
+  getControlDocUrl: (id: string) => request<ApiEnvelope<{ downloadUrl: string; fileName?: string }>>(`/api/control-docs/${encodeURIComponent(id)}/`),
+  deleteControlDoc: (id: string) => request<ApiEnvelope>(`/api/control-docs/${encodeURIComponent(id)}/`, { method: "DELETE" }),
   listProjects: () => request<ApiEnvelope<unknown>>("/api/projects/?limit=100"),
   createProject: (project: ProjectPayload) => request<ApiEnvelope<Record<string, unknown>>>("/api/projects/", { method: "POST", body: project }),
   updateProject: (id: string, project: ProjectPayload | Partial<ProjectPayload>, expectedVersion?: number) =>

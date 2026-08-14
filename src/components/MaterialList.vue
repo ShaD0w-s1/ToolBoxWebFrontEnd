@@ -5,6 +5,7 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import MaterialCategorySection from "./MaterialCategorySection.vue";
 import { exportMaterialList, importMaterialList } from "../services/spreadsheet";
 import { backend } from "../api";
+import { exportFileName } from "../utils/format";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
@@ -103,7 +104,7 @@ function changeAircraft(event: Event): void {
 function exportImage(): void { emit("export-image", captureRef.value); }
 function exportTableXlsx(): void {
   if (!state.value) return;
-  exportMaterialList(state.value, props.store.currentProject.value?.name || "航材清单");
+  exportMaterialList(state.value, exportFileName(props.store.currentProject.value?.name || "", "航材清单"));
   props.store.notify("表格已导出");
 }
 

@@ -20,7 +20,7 @@ import { useToolbox } from "./composables/useToolbox";
 import { setForceDesktop } from "./composables/useResponsiveGrid";
 import { exportJson, exportState, importCart, importState } from "./services/spreadsheet";
 import { copyText, createShareUrl, readSharePayload, projectShareUrl, type SharePayload } from "./services/sharing";
-import { download, formatDay } from "./utils/format";
+import { download, exportFileName, formatDay } from "./utils/format";
 
 const store = useToolbox();
 
@@ -30,6 +30,7 @@ function errorMessage(error: unknown): string {
 
 const previewImage = ref<string | null>(null);
 let previewUrl: string | null = null;
+let lastImageName = "导出图片.jpg";
 
 function closePreview(): void {
   previewImage.value = null;
@@ -40,14 +41,15 @@ function downloadPreview(): void {
   if (!previewUrl) return;
   const anchor = document.createElement("a");
   anchor.href = previewUrl;
-  anchor.download = `${store.detailTitle.value}_集中显示.jpg`;
+  anchor.download = lastImageName;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
 }
 
-async function exportImage(element: HTMLElement | null): Promise<void> {
+async function exportImage(element: HTMLElement | null, subPageName = ""): Promise<void> {
   if (!element) return;
+  lastImageName = `${exportFileName(store.currentProject.value?.name || store.detailTitle.value, subPageName)}.jpg`;
   // 移动端按网页宽屏（1100px、3 列）重排后再截，得到“网页宽屏长截图”
   const isMobile = window.innerWidth < 768;
   const prevOverflow = document.body.style.overflow;
@@ -124,7 +126,7 @@ async function exportImage(element: HTMLElement | null): Promise<void> {
         previewImage.value = previewUrl;
         // 电脑端（非 iOS）直接触发下载；iOS 不支持 blob 下载，靠预览层长按保存
         const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent);
-        if (!isIOS) download(blob, `${store.detailTitle.value}_集中显示.jpg`);
+        if (!isIOS) download(blob, lastImageName);
       }, "image/jpeg", 0.92);
     } catch (blobErr) {
       const m = blobErr instanceof Error ? `${blobErr.name} ${blobErr.message}` : String(blobErr);
@@ -288,7 +290,7 @@ function exportCurrentState(displayCats?: string[]): void {
     categories: cats.filter((c) => active.categories.includes(c)),
     items: active.items.filter((it) => cats.includes(it.cat)),
   };
-  exportState(filtered, store.detailTitle.value);
+  exportState(filtered, exportFileName(store.currentProject.value?.name || store.detailTitle.value, "工具清单"));
 }
 </script>
 

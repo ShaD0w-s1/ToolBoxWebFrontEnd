@@ -9,6 +9,14 @@ export function formatDay(timestamp: number): string {
   return formatDate(timestamp).slice(0, 10);
 }
 
+/** 导出文件名：日期 + 工作项目名称 + 子页名称（不含扩展名）。 */
+export function exportFileName(projectName: string, subPageName: string): string {
+  const today = formatDay(Date.now());
+  const project = (projectName || "").trim() || "工作项目";
+  const sub = (subPageName || "").trim();
+  return sub ? `${today}_${project}_${sub}` : `${today}_${project}`;
+}
+
 /** 只接受真实存在的年月日，避免 Date 自动进位造成错误筛选。 */
 export function parseDay(value: string): Date | null {
   const match = String(value || "").trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);

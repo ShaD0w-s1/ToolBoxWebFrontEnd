@@ -7,6 +7,7 @@ import {
 } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { exportPrepSheetSingle } from "../services/spreadsheet";
+import { exportFileName } from "../utils/format";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
@@ -96,7 +97,7 @@ function exportImage(): void { emit("export-image", captureRef.value); }
 // ----- 导出表格：单 Sheet，与网页格式相同（需求 7） -----
 function exportTableXlsx(): void {
   if (!prep.value) return;
-  exportPrepSheetSingle(prep.value, project.value?.name || "工作准备单");
+  exportPrepSheetSingle(prep.value, exportFileName(project.value?.name || "", "工作准备单"));
   props.store.notify("表格已导出");
 }
 </script>

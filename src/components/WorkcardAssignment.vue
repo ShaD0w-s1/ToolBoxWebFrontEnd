@@ -11,6 +11,7 @@ import {
 import type { ToolboxStore } from "../composables/useToolbox";
 import { exportWorkcardAssignment } from "../services/spreadsheet";
 import { sectionHex, sectionRgba } from "../utils/sectionColor";
+import { exportFileName } from "../utils/format";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
@@ -140,7 +141,7 @@ function exportImage(): void {
 /** 需求：把工卡分配清单（未分配 + 四部位工卡安排 + 人员安排）导出为单 Sheet xlsx。 */
 function exportTable(): void {
   if (!assignment.value) return;
-  exportWorkcardAssignment(assignment.value, project.value?.name || "");
+  exportWorkcardAssignment(assignment.value, exportFileName(project.value?.name || "", "工卡分配清单"));
 }
 
 /** 需求 3：加载时补全——非“三类”且必检为空的行，必检默认 N/A（仅本地修正，不主动写云）。 */

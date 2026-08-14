@@ -14,6 +14,7 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import { formatDate } from "../utils/format";
 import { projectShareUrl } from "../services/sharing";
 import NameCompare from "./NameCompare.vue";
+import ControlDocMaintain from "./ControlDocMaintain.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-all": []; share: [] }>();
@@ -26,6 +27,8 @@ const editingAnnouncement = ref(false);
 const announcementDraft = ref("");
 // 类型工作名称对照页面：null=隐藏，否则为机型（A320/B787）。
 const nameCompareType = ref<AircraftType | null>(null);
+// 现场管控单维护页面：true=显示。
+const showControlDoc = ref(false);
 
 async function startNew(): Promise<void> {
   showNew.value = true;
@@ -186,6 +189,7 @@ function cancelEditAnnouncement(): void {
 
     <div v-else class="database-grid">
       <NameCompare v-if="nameCompareType" :store="store" :type="nameCompareType" @close="nameCompareType = null" />
+      <ControlDocMaintain v-else-if="showControlDoc" :store="store" @close="showControlDoc = false" />
 
       <template v-else>
         <section class="db-group">
@@ -231,6 +235,12 @@ function cancelEditAnnouncement(): void {
               <div><strong>类型工作名称对照</strong><span>航材 ↔ 工具 名称对照</span></div>
               <div class="library-actions">
                 <button class="primary" @click="nameCompareType = 'A320'">打开对照</button>
+              </div>
+            </article>
+            <article class="library-card compare-card">
+              <div><strong>现场管控单维护</strong><span>上传/下载现场管控单</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="showControlDoc = true">打开维护</button>
               </div>
             </article>
           </div>
