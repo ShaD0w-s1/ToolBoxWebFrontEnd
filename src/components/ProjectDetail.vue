@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, PROJECT_TYPES, type AircraftType } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, PROJECT_TYPES } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { formatDate } from "../utils/format";
 import CategorySection from "./CategorySection.vue";
@@ -149,13 +149,6 @@ function onAddCategory(event: Event): void {
   }
   addCatValue.value = "";
   select.value = "";
-}
-
-function changeAircraft(event: Event): void {
-  const select = event.target as HTMLSelectElement;
-  const type = select.value as AircraftType;
-  // 修复 2：自动覆盖无需弹窗人工确认。
-  props.store.setAircraftType(type);
 }
 
 function importFile(event: Event): void {
@@ -364,7 +357,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
             </template>
           </select>
           <label v-if="store.currentProject.value" class="field">机型
-            <select :value="store.aircraftTypeFromPrep.value ?? ''" @change="changeAircraft"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
+            <select :value="store.aircraftTypeFromPrep.value ?? ''" disabled aria-label="机型（由工作准备单推断）"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
           </label>
           <label v-if="store.editingLibrary.value" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
           <label v-if="store.editingLibrary.value" class="button">导入新部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importNewSectionsFile" /></label>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, type AircraftType } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import MaterialCategorySection from "./MaterialCategorySection.vue";
 import { exportMaterialList, importMaterialList } from "../services/spreadsheet";
@@ -94,11 +94,6 @@ function onAddCategory(event: Event): void {
   }
   addCatValue.value = "";
   select.value = "";
-}
-
-function changeAircraft(event: Event): void {
-  const type = (event.target as HTMLSelectElement).value as AircraftType;
-  props.store.setAircraftType(type);
 }
 
 function exportImage(): void { emit("export-image", captureRef.value); }
@@ -199,7 +194,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <option v-for="o in addOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
       <label v-if="!isLibrary" class="field">机型
-        <select :value="store.aircraftTypeFromPrep.value ?? ''" @change="changeAircraft"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
+        <select :value="store.aircraftTypeFromPrep.value ?? ''" disabled aria-label="机型（由工作准备单推断）"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
       </label>
       <label v-if="isLibrary" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportFile" /></label>
       <label v-if="isLibrary" class="button">导入部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportNewSections" /></label>
