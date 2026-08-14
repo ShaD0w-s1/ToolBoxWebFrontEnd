@@ -503,6 +503,7 @@ export function normalizeState(value: StateInput = {}): ToolState {
       name: String(entry.name || ""),
       qty: Math.max(0, Number.parseInt(String(entry.qty), 10) || 0),
       partNo: entry.partNo != null ? String(entry.partNo) : "",
+      note: entry.note != null ? String(entry.note) : "",
     })) : [],
     notes: value.notes && typeof value.notes === "object" ? value.notes : {},
     useCart: Boolean(value.useCart),

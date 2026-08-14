@@ -61,6 +61,15 @@ function commitNote(it: ToolItem): void {
   }
 }
 
+/** 删除备注（清空并收起）。 */
+function removeNote(it: ToolItem): void {
+  it.note = "";
+  const s = new Set(noteExpanded.value);
+  s.delete(it.id);
+  noteExpanded.value = s;
+  props.store.persist();
+}
+
 /** 物品是否显示备注行（已有备注，或点 + 展开）。 */
 function noteVisible(it: ToolItem): boolean {
   return Boolean(it.note) || noteExpanded.value.has(it.id);
@@ -155,7 +164,10 @@ async function supplementPart(): Promise<void> {
                 <button class="m-op m-op-del" title="删除" @click="store.mDeleteItem(it.id)">×</button>
                 <button class="m-op" :title="it.note ? '编辑备注' : '添加备注'" @click="toggleNote(it)">+</button>
               </div>
-              <label v-if="noteVisible(it)" class="m-field m-field-note"><span>备注</span><textarea rows="1" v-model="it.note" placeholder="输入备注" @input="onAutoSize" @blur="commitNote(it)" class="m-name"></textarea></label>
+              <div v-if="noteVisible(it)" class="m-note-row">
+                <label class="m-field"><span>备注</span><textarea rows="1" v-model="it.note" placeholder="输入备注" @input="onAutoSize" @blur="commitNote(it)" class="m-name"></textarea></label>
+                <button class="m-op m-op-del" title="删除备注" @click="removeNote(it)">×</button>
+              </div>
             </div>
           </div>
         </section>
@@ -197,13 +209,15 @@ async function supplementPart(): Promise<void> {
 .m-op:hover { background: var(--blue-light); }
 .m-op-del { border-color: #f2cdcd; background: #fdecec; color: #b53a3a; }
 .m-op-del:hover { background: #f9dcdc; }
-/* 备注行：横跨整行 */
-.m-field-note { grid-column: 1 / -1; }
+/* 备注行：横跨整行，含删除按钮 */
+.m-note-row { grid-column: 1 / -1; display: flex; gap: 6px; align-items: flex-end; }
+.m-note-row .m-field { flex: 1; }
+.m-note-row .m-op { flex: 0 0 auto; min-height: 30px; }
 @media (max-width: 768px) {
   .sub-grid { grid-template-columns: 1fr !important; }
   .item-grid { grid-template-columns: 1fr !important; }
   .m-item { grid-template-columns: 1fr 1fr auto; }
   .m-field-name { grid-column: span 2; }
-  .m-field-note { grid-column: 1 / -1; }
+  .m-note-row { grid-column: 1 / -1; }
 }
 </style>
