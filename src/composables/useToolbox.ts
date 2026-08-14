@@ -440,7 +440,6 @@ export function useToolbox() {
   }
 
   async function createProject(name: string, aircraftType: AircraftType = "A320", projectType: ProjectType | "" = ""): Promise<void> {
-    const isStandalone = projectType === "单独项目";
     const project: Project = {
       id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name,
@@ -448,8 +447,9 @@ export function useToolbox() {
       aircraftType,
       team: "",
       type: (PROJECT_TYPES as readonly string[]).includes(projectType) ? projectType : "",
-      // 单独项目工具清单从空开始（添加部位下拉过滤 ENG/FC/AV CB/LG）；其余类型从标准库带入。
-      data: isStandalone ? normalizeState() : deepCopy(app.value.libraries[aircraftType]),
+      // 机型未确定（工作准备单「机型」字段为空）时不引用任何标准库内容，data 从空开始；
+      // 填好机型后由 aircraftTypeFromPrep 推断 → setAircraftType 切换到对应机型标准库。
+      data: normalizeState(),
       prepSheet: defaultPrepSheet(),
       workcardAssignment: defaultWorkcardAssignment(),
       standalonePrepSheet: defaultStandalonePrepSheet(),

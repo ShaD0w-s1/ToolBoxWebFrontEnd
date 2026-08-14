@@ -52,6 +52,7 @@ watch(
     if (!project || project.aircraftType === newType) return;
     props.store.setAircraftType(newType);
   },
+  { immediate: true },
 );
 
 // “添加部位”下拉：默认占位项；选“新部位”添加未命名新部位；选标准部位则从标准库带入该部位卡片
