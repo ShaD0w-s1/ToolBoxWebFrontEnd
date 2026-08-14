@@ -8,9 +8,10 @@ import StandardPicker from "./StandardPicker.vue";
 
 const props = defineProps<{ store: ToolboxStore; category: string; highlighted?: boolean }>();
 const collapsed = ref(false);
-// 部位配色：左侧实色边条覆盖整块，抬头底色为该色 50%
+// 部位配色：左侧实色边条覆盖整块，抬头底色为该色 50%，整卡底色 20%（80% 透明）
 const barColor = computed(() => sectionHex(props.category));
 const headBg = computed(() => sectionRgba(props.category, 0.5));
+const cardBg = computed(() => sectionRgba(props.category, 0.2));
 const subNames = computed(() => props.store.subsOf(props.category));
 // highlighted 由父组件工作查询控制：有查询时 highlighted 部位强制展开，非 highlighted 强制折叠
 const showBody = computed(() => {
@@ -122,7 +123,7 @@ async function supplementStdLib(sub: string): Promise<void> {
 </script>
 
 <template>
-  <article class="category-card" :style="{ borderLeft: `6px solid ${barColor}` }">
+  <article class="category-card" :style="{ borderLeft: `6px solid ${barColor}`, background: cardBg }">
     <header class="category-head" :style="{ background: headBg }" @click.self="collapsed = !collapsed">
       <button class="collapse" :aria-label="collapsed ? '展开' : '收起'" @click="collapsed = !collapsed">{{ collapsed ? '›' : '⌄' }}</button>
       <input class="cat-name" :value="category" list="cat-std-list" aria-label="部位名称" @change="onRenameCat" />

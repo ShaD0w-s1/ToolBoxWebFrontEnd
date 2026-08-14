@@ -12,7 +12,16 @@ const cardEl = ref<HTMLElement | null>(null);
 const noteExpanded = ref<Set<number>>(new Set());
 const barColor = computed(() => sectionHex(props.category));
 const headBg = computed(() => sectionRgba(props.category, 0.5));
+const cardBg = computed(() => sectionRgba(props.category, 0.2));
 const subNames = computed(() => props.store.mSubsOf(props.category));
+// 记录「收起的类型卡片」子类型名集合（点击类型卡片收起按钮切换）。
+const collapsedSubs = ref<Set<string>>(new Set());
+function toggleSub(sub: string): void {
+  const s = new Set(collapsedSubs.value);
+  if (s.has(sub)) s.delete(sub);
+  else s.add(sub);
+  collapsedSubs.value = s;
+}
 // highlighted 由父组件类型查询控制：有查询时 highlighted 部位强制展开，非 highlighted 强制折叠
 const showBody = computed(() => {
   if (props.highlighted === true) return true;
@@ -133,7 +142,7 @@ async function supplementPart(): Promise<void> {
 </script>
 
 <template>
-  <article ref="cardEl" class="category-card" :style="{ borderLeft: `6px solid ${barColor}` }">
+  <article ref="cardEl" class="category-card" :style="{ borderLeft: `6px solid ${barColor}`, background: cardBg }">
     <header class="category-head" :style="{ background: headBg }" @click.self="collapsed = !collapsed">
       <button class="collapse" @click="collapsed = !collapsed">{{ collapsed ? '›' : '⌄' }}</button>
       <input class="cat-name" :value="category" list="mcat-std-list" aria-label="部位名称" @change="onRenameCat" />
@@ -149,13 +158,14 @@ async function supplementPart(): Promise<void> {
       <div class="sub-grid" :style="{ gridTemplateColumns: `repeat(${subCols()}, 1fr)` }">
         <section v-for="sub in subNames" :key="`${category}-${sub}`" class="sub-card">
           <header class="sub-head">
+            <button class="collapse sub-collapse" :aria-label="collapsedSubs.has(sub) ? '展开' : '收起'" @click="toggleSub(sub)">{{ collapsedSubs.has(sub) ? '›' : '⌄' }}</button>
             <StandardPicker v-if="!isLibrary" :options="matStdSubs" :category="category" :sub="sub" :store="store" :material="true" />
             <input v-else class="type-name" :value="sub" aria-label="类型名称" @change="renameSub(sub, $event)" />
             <div class="spacer" />
             <button @click="store.mAddItem(category, sub)">+ 物品</button>
             <button class="danger" @click="deleteSub(sub)">删除</button>
           </header>
-          <div class="item-grid" :style="{ gridTemplateColumns: 'repeat(2, 1fr)' }">
+          <div v-if="!collapsedSubs.has(sub)" class="item-grid" :style="{ gridTemplateColumns: 'repeat(2, 1fr)' }">
             <div v-for="it in store.mItemsOf(category, sub)" :key="it.id" class="m-item" :class="{ 'flash-update': store.isFlashing(it) }">
               <label class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.partNo" @input="onAutoSize" class="m-name m-partno"></textarea></label>
               <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" @input="onAutoSize" class="m-name"></textarea></label>
@@ -186,8 +196,9 @@ async function supplementPart(): Promise<void> {
 .category-body { padding: 10px 12px; }
 .notes { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 13px; margin-bottom: 10px; resize: vertical; }
 .sub-grid { display: grid; gap: 10px; }
-.sub-card { border: 1px solid #e6e9f0; border-radius: 8px; padding: 8px 10px; background: #fafbff; }
+.sub-card { border: 1.5px solid #8eaadb; border-radius: 8px; padding: 8px 10px; background: #fff; }
 .sub-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sub-collapse { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: 16px; line-height: 1; color: #4a5160; flex: 0 0 auto; }
 .type-name { flex: 1 1 0; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; font-weight: 700; font-size: 14px; }
 .type-name:hover, .type-name:focus { border-color: #8eaadb; background: #fff; }
 /* 合并后：StandardPicker 在 sub-head 内作为类型名输入框，占满可用宽度、外观与 .type-name 一致 */

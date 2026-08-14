@@ -137,7 +137,7 @@ button.ghost:hover, .ghost:hover { background: var(--blue-light); }
 .category-body { padding: 0 14px 15px; }
 .notes { width: 100%; margin: 10px 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; resize: vertical; }
 .sub-grid { display: grid; gap: 11px; grid-auto-flow: dense; }
-.sub-card { min-width: 0; padding: 10px; border: 1px solid var(--blue-light); border-radius: 10px; background: #fafbff; }
+.sub-card { min-width: 0; padding: 10px; border: 1.5px solid #8eaadb; border-radius: 10px; background: #fff; }
 .sub-head { display: flex; align-items: center; gap: 7px; }
 .sub-head input { width: 145px; min-width: 0; padding: 5px 7px; border: 1px solid transparent; border-radius: 6px; background: transparent; font-weight: 700; }
 .sub-head input:hover, .sub-head input:focus { border-color: #8eaadb; background: #fff; }
