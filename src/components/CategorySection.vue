@@ -64,7 +64,7 @@ const categoryNote = computed({
 });
 /** 工作名联想源：合并「工具标准库 ∪ 航材标准库」的 部位||工作 键（共享检索；不跨库取物品）。 */
 const standardSubs = computed(() => {
-  const type = props.store.currentProject.value?.aircraftType || props.store.editingLibrary.value || "A320";
+  const type = props.store.editingLibrary.value || props.store.aircraftTypeFromPrep.value;
   const keys = new Set<string>();
   for (const item of props.store.app.value.libraries[type]?.items || []) keys.add(`${item.cat}||${item.sub}`);
   for (const item of props.store.app.value.materialLibraries[type]?.items || []) keys.add(`${item.cat}||${item.sub}`);

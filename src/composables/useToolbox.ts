@@ -150,7 +150,7 @@ export function useToolbox() {
   });
   /** “添加部位”下拉里可选择的“来自标准数据库”的部位列表（当前机型的全部标准部位）。 */
   const standardCategories = computed<string[]>(() => {
-    const type = editingLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type = editingLibrary.value ?? aircraftTypeFromPrep.value;
     return app.value.libraries[type]?.categories || [];
   });
   /** 航材清单当前编辑目标：航材标准库（库模式）或当前项目的航材清单。 */
@@ -160,7 +160,7 @@ export function useToolbox() {
   });
   /** 航材标准库的部位列表（用于航材清单“添加部位”下拉与标准库替换）。 */
   const standardMaterialCategories = computed<string[]>(() => {
-    const type = editingMaterialLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
     return app.value.materialLibraries[type]?.categories || [];
   });
   /** 航材清单的部位列表：库模式用航材库自身 categories；项目模式用航材清单自身 categories
@@ -554,7 +554,7 @@ export function useToolbox() {
    *  目标库 = 正在编辑的标准库（若有），否则当前项目的机型对应库（A320 / B787）。
    *  写完内存后立即 await saveLibraryNow 推送云端（不依赖 persist 的 setTimeout / dirty tracking），确保可靠同步。 */
   async function syncSubToLibrary(cat: string, sub: string): Promise<AircraftType | null> {
-    const type: AircraftType = editingLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type: AircraftType = editingLibrary.value ?? aircraftTypeFromPrep.value;
     const lib = app.value.libraries[type];
     if (!lib) return null;
     const current = itemsOf(cat, sub);
@@ -597,7 +597,7 @@ export function useToolbox() {
   function addCategoryFromStandard(name: string): void {
     const state = requireActive();
     if (!state || !name) return;
-    const aircraftType = editingLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const aircraftType = editingLibrary.value ?? aircraftTypeFromPrep.value;
     const lib = app.value.libraries[aircraftType];
     const libItems = (lib?.items || []).filter((item) => item.cat === name);
     if (state.categories.includes(name)) {
@@ -633,7 +633,7 @@ export function useToolbox() {
   function replaceCategoryFromStandard(oldCat: string, standardName: string): void {
     const state = requireActive();
     if (!state || !standardName) return;
-    const type = editingLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type = editingLibrary.value ?? aircraftTypeFromPrep.value;
     const lib = app.value.libraries[type];
     const hasStd = !!(lib && lib.categories.includes(standardName));
     // 先把旧部位改名并入 standardName（不依赖 renameCategory 的 includes 守卫，兼容目标已存在的情形）
@@ -702,7 +702,7 @@ export function useToolbox() {
     const state = requireActive();
     if (!state || !key) return;
     const [sourceCat, sourceSub] = key.split("||");
-    const sourceItems = app.value.libraries[currentProject.value?.aircraftType || "A320"].items.filter((item) => item.cat === sourceCat && item.sub === sourceSub);
+    const sourceItems = app.value.libraries[aircraftTypeFromPrep.value].items.filter((item) => item.cat === sourceCat && item.sub === sourceSub);
     // 本库（工具标准库）无该工作名对应物品：仅带入名称（改名），不删除卡片、不清空物品
     if (sourceItems.length === 0) {
       if (sourceSub && sourceSub !== currentSub) renameSub(cat, currentSub, sourceSub);
@@ -851,7 +851,7 @@ export function useToolbox() {
   function mAddCategoryFromStandard(name: string): void {
     const state = requireMaterial();
     if (!state || !name) return;
-    const type = editingMaterialLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
     const lib = app.value.materialLibraries[type];
     if (!lib) return;
     mAddCategory(name);
@@ -864,7 +864,7 @@ export function useToolbox() {
   function mReplaceCategoryFromStandard(oldCat: string, standardName: string): void {
     const state = requireMaterial();
     if (!state || !standardName) return;
-    const type = editingMaterialLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
     const lib = app.value.materialLibraries[type];
     const hasStd = !!(lib && lib.categories.includes(standardName));
     if (oldCat !== standardName) mRenameCategory(oldCat, standardName);
@@ -941,7 +941,7 @@ export function useToolbox() {
   }
   /** 航材标准库里的 (部位||类型) 选项，供类型下拉模糊匹配/替换。 */
   const mStandardSubs = computed<string[]>(() => {
-    const type = editingMaterialLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
     const lib = app.value.materialLibraries[type];
     return lib ? [...new Set(lib.items.map((it) => `${it.cat}||${it.sub}`))] : [];
   });
@@ -949,7 +949,7 @@ export function useToolbox() {
   function mImportStandardSub(cat: string, currentSub: string, key: string): void {
     const state = requireMaterial();
     if (!state || !key) return;
-    const type = editingMaterialLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
     const [sourceCat, sourceSub] = key.split("||");
     const source = app.value.materialLibraries[type]?.items.filter((it) => it.cat === sourceCat && it.sub === sourceSub) || [];
     // 本库（航材标准库）无该类型名对应物品：仅带入名称（改名），不删除卡片、不清空物品
@@ -965,7 +965,7 @@ export function useToolbox() {
   }
   /** 航材清单"补充标准库"：把当前 (cat,sub) 物品整体写入对应机型航材标准库，并立即推送。 */
   async function mSyncSubToMaterialLib(cat: string, sub: string): Promise<AircraftType | null> {
-    const type: AircraftType = editingMaterialLibrary.value ?? currentProject.value?.aircraftType ?? "A320";
+    const type: AircraftType = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
     const lib = app.value.materialLibraries[type];
     if (!lib) return null;
     const current = mItemsOf(cat, sub);
