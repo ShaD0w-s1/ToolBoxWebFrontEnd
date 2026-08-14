@@ -62,6 +62,7 @@ function toggleNote(it: ToolItem): void {
 
 /** 备注输入后持久化；清空则收起备注行。 */
 function commitNote(it: ToolItem): void {
+  props.store.markNoteDirty(it);
   props.store.persist();
   if (!(it.note || "").trim()) {
     const s = new Set(noteExpanded.value);
@@ -73,6 +74,7 @@ function commitNote(it: ToolItem): void {
 /** 删除备注（清空并收起）。 */
 function removeNote(it: ToolItem): void {
   it.note = "";
+  props.store.markNoteDirty(it);
   const s = new Set(noteExpanded.value);
   s.delete(it.id);
   noteExpanded.value = s;

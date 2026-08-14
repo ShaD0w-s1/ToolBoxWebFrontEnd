@@ -62,63 +62,6 @@ async function decode(value: string): Promise<SharePayload | null> {
   }
 }
 
-/**
- * 第三方短链：把长链接交给短链服务，返回短网址。
- * 仅影响"分享出去的链接"外观——接收方经短链 302 跳回原长链接后，
- * 前端照常按 #s= 解析，无需改动解码逻辑。
- * 注意：长链接里的项目数据会经过短链服务商服务器（隐私提示）。
- * 失败（网络/CORS/被墙）时返回 null，由调用方回退为原长链接。
- */
-const SHORTEN_PROVIDER = "isgd";
-
-function jsonpRequest<T>(url: string, timeoutMs = 6000): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const cb = "__jscb_" + Math.random().toString(36).slice(2);
-    let settled = false;
-    let timer = 0 as unknown as ReturnType<typeof setTimeout>;
-    const cleanup = () => {
-      if ((window as unknown as Record<string, unknown>)[cb]) delete (window as unknown as Record<string, unknown>)[cb];
-      if (script.parentNode) script.parentNode.removeChild(script);
-      clearTimeout(timer);
-    };
-    timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(new Error("timeout"));
-    }, timeoutMs);
-    const script = document.createElement("script");
-    (window as unknown as Record<string, unknown>)[cb] = (data: T) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(data);
-    };
-    script.onerror = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(new Error("network"));
-    };
-    const sep = url.includes("?") ? "&" : "?";
-    script.src = `${url}${sep}callback=${cb}`;
-    document.body.appendChild(script);
-  });
-}
-
-export async function shortenUrl(longUrl: string): Promise<string | null> {
-  try {
-    if (SHORTEN_PROVIDER === "isgd") {
-      const api = `https://is.gd/create.php?format=json&url=${encodeURIComponent(longUrl)}`;
-      const data = await jsonpRequest<{ shorturl?: string }>(api);
-      return data?.shorturl || null;
-    }
-  } catch {
-    /* 忽略，回退长链 */
-  }
-  return null;
-}
-
 export async function createShareUrl(payload: SharePayload): Promise<string> {
   return `${location.href.split("#")[0]}#s=${await encode(payload)}`;
 }
