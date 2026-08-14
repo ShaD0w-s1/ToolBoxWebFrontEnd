@@ -278,6 +278,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
           <option v-for="t in PROJECT_TYPES" :key="t" :value="t">{{ t }}</option>
         </select>
         <button @click="emit('share')">分享本页</button>
+        <button @click="store.saveNow()">保存</button>
         <button @click="store.refresh()">刷新</button>
         <span class="spacer" />
         <span class="hint">导入 AMES线控平台-打印其他 中的《例行工卡清单》</span>

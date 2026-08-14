@@ -2015,6 +2015,20 @@ export function useToolbox() {
     await loadRemote(true, false);
   }
 
+  /** 立即保存：无视 autoSync 防抖间隔，把本地编辑过的内容立刻推送云端（不拉取）。 */
+  async function saveNow(): Promise<void> {
+    if (!hasDirtyData()) {
+      notify("没有需要保存的改动");
+      return;
+    }
+    try {
+      await saveRemote();
+      notify("已保存");
+    } catch {
+      notify("保存失败，请重试");
+    }
+  }
+
   /** 单次轮询：revision 有变化则做字段级合并。
    *  注意：不做「保存后重设基线」——那会越过别端的变更导致漏同步；
    *  保存后的轮询会检测到自己的写入并触发一次合并，等价于把最新远端拉齐。 */
@@ -2155,7 +2169,7 @@ export function useToolbox() {
     createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
     itemsOf, subsOf, subTotal, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
-    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearActive, clearProjectAllData, setToolCart, loadRemote, refresh, forceSync,
+    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearActive, clearProjectAllData, setToolCart, loadRemote, refresh, forceSync, saveNow,
     syncSubToLibrary,
     mSubsOf, mItemsOf, mSubTotal, mCatTotal, mAllTotal, mCategoryList,
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,
