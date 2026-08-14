@@ -47,6 +47,7 @@ watch([subPage, isAcheck, isStandalone], () => props.store.setEditingField(field
 watch(
   () => props.store.aircraftTypeFromPrep.value,
   (newType) => {
+    if (!newType) return;
     const project = props.store.currentProject.value;
     if (!project || project.aircraftType === newType) return;
     props.store.setAircraftType(newType);
@@ -246,7 +247,7 @@ async function applyWorkCardListFile(event: Event): Promise<void> {
       工作内容: parsed.工作内容,
       地点: parsed.地点,
       cards: parsed.cards.map((c) => ({ 项次: c.项次, 工卡号: c.工卡号, 工卡名称: c.工卡名称 })),
-      aircraft_type: props.store.aircraftTypeFromPrep.value,
+      aircraft_type: props.store.aircraftTypeFromPrep.value ?? undefined,
     });
     const d = res.data;
     let msg = `已写入 ${d?.written ?? 0} 条工卡，并填充工作准备单/工卡分配清单`;
@@ -271,7 +272,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
   const project = props.store.currentProject.value;
   if (!project) return;
   try {
-    const res = await backend.applyWorkcard(project.id, { aircraft_type: props.store.aircraftTypeFromPrep.value });
+    const res = await backend.applyWorkcard(project.id, { aircraft_type: props.store.aircraftTypeFromPrep.value ?? undefined });
     const d = res.data;
     const parts: string[] = [];
     if (d?.tool_deleted) parts.push(`工具删除 ${d.tool_deleted} 个`);
@@ -362,7 +363,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
             </template>
           </select>
           <label v-if="store.currentProject.value" class="field">机型
-            <select :value="store.aircraftTypeFromPrep.value" @change="changeAircraft"><option v-for="type in AIRCRAFT_TYPES" :key="type">{{ type }}</option></select>
+            <select :value="store.aircraftTypeFromPrep.value ?? ''" @change="changeAircraft"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
           </label>
           <label v-if="store.editingLibrary.value" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
           <label v-if="store.editingLibrary.value" class="button">导入新部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importNewSectionsFile" /></label>

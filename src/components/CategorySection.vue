@@ -66,6 +66,7 @@ const categoryNote = computed({
 const standardSubs = computed(() => {
   const type = props.store.editingLibrary.value || props.store.aircraftTypeFromPrep.value;
   const keys = new Set<string>();
+  if (!type) return [...keys];
   for (const item of props.store.app.value.libraries[type]?.items || []) keys.add(`${item.cat}||${item.sub}`);
   for (const item of props.store.app.value.materialLibraries[type]?.items || []) keys.add(`${item.cat}||${item.sub}`);
   return [...keys];

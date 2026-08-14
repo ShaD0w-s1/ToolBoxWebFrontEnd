@@ -165,7 +165,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
   const project = props.store.currentProject.value;
   if (!project || project.type !== "A检") return;
   try {
-    const res = await backend.applyWorkcard(project.id, { aircraft_type: props.store.aircraftTypeFromPrep.value });
+    const res = await backend.applyWorkcard(project.id, { aircraft_type: props.store.aircraftTypeFromPrep.value ?? undefined });
     const d = res.data;
     const parts: string[] = [];
     if (d?.tool_deleted) parts.push(`工具删除 ${d.tool_deleted} 个`);
@@ -199,7 +199,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <option v-for="o in addOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
       <label v-if="!isLibrary" class="field">机型
-        <select :value="store.aircraftTypeFromPrep.value" @change="changeAircraft"><option v-for="type in AIRCRAFT_TYPES" :key="type">{{ type }}</option></select>
+        <select :value="store.aircraftTypeFromPrep.value ?? ''" @change="changeAircraft"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
       </label>
       <label v-if="isLibrary" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportFile" /></label>
       <label v-if="isLibrary" class="button">导入部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportNewSections" /></label>

@@ -94,6 +94,7 @@ const catNote = computed({
 const matStdSubs = computed(() => {
   const type = props.store.editingMaterialLibrary.value ?? props.store.aircraftTypeFromPrep.value;
   const keys = new Set<string>();
+  if (!type) return [...keys];
   for (const it of props.store.app.value.materialLibraries[type]?.items || []) keys.add(`${it.cat}||${it.sub}`);
   for (const it of props.store.app.value.libraries[type]?.items || []) keys.add(`${it.cat}||${it.sub}`);
   return [...keys];
