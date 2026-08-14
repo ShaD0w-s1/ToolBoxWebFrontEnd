@@ -168,8 +168,10 @@ onMounted(() => {
   <div v-if="assignment" ref="rootEl" class="workcard-assignment">
     <div class="subpage-head">
       <h3>工卡分配清单</h3>
-      <button class="ghost" @click="exportTable">导出表格</button>
-      <button class="ghost" @click="exportImage">导出图片</button>
+      <div class="subpage-actions">
+        <button class="ghost" @click="exportImage">导出图片</button>
+        <button class="ghost" @click="exportTable">导出表格</button>
+      </div>
     </div>
 
     <!-- 需求 1：未分配部位 -->

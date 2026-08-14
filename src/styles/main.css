@@ -54,6 +54,15 @@ button.danger, .danger { color: var(--danger); border-color: #e6a0a0; }
 button.danger:hover { background: #fdecea; }
 .spacer { flex: 1; }
 
+/* ===== 最小动效（纯 CSS，仅 transform/opacity/color，不触发布局重排） =====
+   原则：140–220ms 快速反馈；不做入场 stagger；不引入 JS 动画库。 */
+button, .button, .tab, .project-card, .library-card, .category-card, .sub-card {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+button:active:not(:disabled), .button:active:not(:disabled) { transform: translateY(1px); }
+.tab { transition: color 0.15s ease, border-bottom-color 0.2s ease, background-color 0.15s ease; }
+.project-card:hover, .library-card:hover { box-shadow: 0 2px 8px rgb(0 0 0 / 7%); }
+
 /* ===== 二级子页面统一：标题栏布局 + 功能按钮样式 ===== */
 /* 标题行：标题在左、功能按钮组在右（工作准备单 / 工卡分配清单 共用） */
 .subpage-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 6px 0 14px; }
@@ -215,4 +224,13 @@ td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var
 @keyframes flash-update {
   0% { background-color: #fde68a; }
   100% { background-color: transparent; }
+}
+
+/* 无障碍：系统开启「减少动态效果」时关闭所有过渡/动画 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
