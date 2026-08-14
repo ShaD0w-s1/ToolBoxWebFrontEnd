@@ -144,6 +144,20 @@ async function onImportNewSections(event: Event): Promise<void> {
   } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
 }
 
+/** 导入补充表格.xlsx：相同信息保留、不同信息覆盖、新增信息新增。 */
+async function onImportSupplement(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const imported = await importMaterialList(file);
+    if (!imported.items.length) { props.store.notify("未解析到航材数据"); return; }
+    const { updated, added } = props.store.mergeMaterialImport(imported);
+    props.store.notify(`导入补充完成：覆盖 ${updated} 项，新增 ${added} 项`);
+  } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
+}
+
 /** 航材清单子页「按卡筛选」按钮：调后端筛选模式（不传 cards），再拉取权威结果。 */
 async function runMaterialFilterByWorkcard(): Promise<void> {
   if (isLibrary.value) return;
@@ -188,6 +202,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
       </label>
       <label v-if="isLibrary" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportFile" /></label>
       <label v-if="isLibrary" class="button">导入部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportNewSections" /></label>
+      <label v-if="!isLibrary" class="button">导入补充表格<input hidden type="file" accept=".xlsx,.xls" @change="onImportSupplement" /></label>
       <button v-if="!isLibrary && store.currentProject.value?.type === 'A检'" class="button primary" @click="runMaterialFilterByWorkcard">按卡筛选</button>
       <label class="field">类型查询
         <input list="m-types" v-model="typeQuery" placeholder="输入/选择类型" />

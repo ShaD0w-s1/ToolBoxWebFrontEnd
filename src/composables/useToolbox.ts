@@ -1536,6 +1536,34 @@ export function useToolbox() {
     return { addedCats, addedItems };
   }
 
+  /** 「导入补充表格」：按件号（空则按名称）匹配，相同信息保留、不同信息覆盖（名称/数量/件号）、
+   *  新增信息追加。返回 { updated, added }。 */
+  function mergeMaterialImport(imported: ToolState): { updated: number; added: number } {
+    const state = requireMaterial();
+    if (!state) return { updated: 0, added: 0 };
+    let updated = 0;
+    let added = 0;
+    for (const cat of imported.categories) {
+      if (!state.categories.includes(cat)) state.categories.push(cat);
+    }
+    for (const item of imported.items) {
+      const key = (item.partNo || item.name).trim();
+      const existing = state.items.find((it) => it.cat === item.cat && it.sub === item.sub && (it.partNo || it.name).trim() === key);
+      if (existing) {
+        let changed = false;
+        if (existing.name !== item.name) { existing.name = item.name; changed = true; }
+        if (existing.qty !== item.qty) { existing.qty = item.qty; changed = true; }
+        if (item.partNo && existing.partNo !== item.partNo) { existing.partNo = item.partNo; changed = true; }
+        if (changed) updated++;
+      } else {
+        state.items.push({ ...deepCopy(item), id: nextId++ });
+        added++;
+      }
+    }
+    if (updated > 0 || added > 0) persist();
+    return { updated, added };
+  }
+
   // ----- 单项准备单 CRUD -----
   function spRenameTitle(title: string): void {
     const p = currentProject.value; if (!p) return;
@@ -2131,7 +2159,7 @@ export function useToolbox() {
     syncSubToLibrary,
     mSubsOf, mItemsOf, mSubTotal, mCatTotal, mAllTotal, mCategoryList,
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,
-    mImportStandardSub, mSyncSubToMaterialLib, saveMaterialLibraryNow, replaceMaterialActive, mergeMaterialSections,
+    mImportStandardSub, mSyncSubToMaterialLib, saveMaterialLibraryNow, replaceMaterialActive, mergeMaterialSections, mergeMaterialImport,
     mPreviewFilterByWorkCard, mFilterByWorkCard, mPreviewAddFromStandard, mAddMissingFromStandard,
     workcardNames, applyAcheckToolByWorkcard, applyAcheckMaterialByWorkcard,
     spRenameTitle, spOnAircraftChange, spAddWork, spRemoveWork, spAddPart, spRemovePart, spAddArrange, spRemoveArrange,

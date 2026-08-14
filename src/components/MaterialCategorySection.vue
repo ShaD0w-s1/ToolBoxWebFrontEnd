@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { sectionHex, sectionRgba } from "../utils/sectionColor";
+import type { ToolItem } from "../domain/toolbox";
 import StandardPicker from "./StandardPicker.vue";
 
 const props = defineProps<{ store: ToolboxStore; category: string; highlighted?: boolean }>();
 const collapsed = ref(false);
+const cardEl = ref<HTMLElement | null>(null);
+// 记录「正在展开备注行」的物品 id（点 + 展开，输入后 note 非空则保持，清空则收起）
+const noteExpanded = ref<Set<number>>(new Set());
 const barColor = computed(() => sectionHex(props.category));
 const headBg = computed(() => sectionRgba(props.category, 0.5));
 const subNames = computed(() => props.store.mSubsOf(props.category));
@@ -28,6 +32,38 @@ function onAutoSize(event: Event): void {
   el.style.height = "auto";
   el.style.height = `${el.scrollHeight}px`;
   props.store.persist();
+}
+
+/** 撑高卡片内所有 textarea（初始渲染/数据加载后也要正确换行显示）。 */
+function autoSizeAll(): void {
+  for (const el of cardEl.value?.querySelectorAll<HTMLTextAreaElement>(".m-name") || []) {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+}
+onMounted(() => { nextTick(autoSizeAll); });
+
+/** 展开/收起物品备注行。 */
+function toggleNote(it: ToolItem): void {
+  const s = new Set(noteExpanded.value);
+  if (s.has(it.id)) s.delete(it.id);
+  else s.add(it.id);
+  noteExpanded.value = s;
+}
+
+/** 备注输入后持久化；清空则收起备注行。 */
+function commitNote(it: ToolItem): void {
+  props.store.persist();
+  if (!(it.note || "").trim()) {
+    const s = new Set(noteExpanded.value);
+    s.delete(it.id);
+    noteExpanded.value = s;
+  }
+}
+
+/** 物品是否显示备注行（已有备注，或点 + 展开）。 */
+function noteVisible(it: ToolItem): boolean {
+  return Boolean(it.note) || noteExpanded.value.has(it.id);
 }
 
 const catNote = computed({
@@ -88,7 +124,7 @@ async function supplementPart(): Promise<void> {
 </script>
 
 <template>
-  <article class="category-card" :style="{ borderLeft: `6px solid ${barColor}` }">
+  <article ref="cardEl" class="category-card" :style="{ borderLeft: `6px solid ${barColor}` }">
     <header class="category-head" :style="{ background: headBg }" @click.self="collapsed = !collapsed">
       <button class="collapse" @click="collapsed = !collapsed">{{ collapsed ? '›' : '⌄' }}</button>
       <input class="cat-name" :value="category" list="mcat-std-list" aria-label="部位名称" @change="onRenameCat" />
@@ -115,7 +151,11 @@ async function supplementPart(): Promise<void> {
               <label class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.partNo" @input="onAutoSize" class="m-name m-partno"></textarea></label>
               <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" @input="onAutoSize" class="m-name"></textarea></label>
               <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" type="number" min="0" @input="store.persist" /></label>
-              <button class="ghost danger-cell" @click="store.mDeleteItem(it.id)">删除</button>
+              <div class="m-ops">
+                <button class="m-op m-op-del" title="删除" @click="store.mDeleteItem(it.id)">×</button>
+                <button class="m-op" :title="it.note ? '编辑备注' : '添加备注'" @click="toggleNote(it)">+</button>
+              </div>
+              <label v-if="noteVisible(it)" class="m-field m-field-note"><span>备注</span><textarea rows="1" v-model="it.note" placeholder="输入备注" @input="onAutoSize" @blur="commitNote(it)" class="m-name"></textarea></label>
             </div>
           </div>
         </section>
@@ -146,16 +186,24 @@ async function supplementPart(): Promise<void> {
 .sub-head :deep(.standard-input:hover),
 .sub-head :deep(.standard-input:focus) { border-color: #8eaadb; background: #fff; }
 .item-grid { display: grid; gap: 8px; }
-.m-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: start; border: 1px solid #e6e9f0; border-radius: 8px; padding: 6px 8px; background: #fff; word-break: break-word; }
+.m-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: stretch; border: 1px solid #e6e9f0; border-radius: 8px; padding: 6px 8px; background: #fff; word-break: break-word; }
 .m-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #6b7280; min-width: 0; }
 .m-field input, .m-name { padding: 5px 7px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 13px; min-width: 0; width: 100%; box-sizing: border-box; }
-.m-name { padding: 1px 6px; font-size: 12px; line-height: 1.1; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; font-family: inherit; min-height: 15px; }
-.danger-cell { padding: 5px 8px; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: 6px; font-size: 12px; cursor: pointer; height: fit-content; }
+/* 件号/名称/备注 textarea：与数量栏等高（默认单行），字体保持 12px，自动换行并随内容撑高 */
+.m-name { padding: 5px 7px; font-size: 12px; line-height: 1.4; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; font-family: inherit; min-height: 30px; }
+/* 操作按钮组：删除(x)+备注(+) 上下排列，占满卡片高度 */
+.m-ops { display: flex; flex-direction: column; gap: 4px; }
+.m-op { flex: 1; min-width: 26px; min-height: 22px; padding: 0 6px; border: 1px solid #d7dbe4; border-radius: 6px; background: #fff; color: #5a6b85; font-size: 14px; line-height: 1; cursor: pointer; }
+.m-op:hover { background: var(--blue-light); }
+.m-op-del { border-color: #f2cdcd; background: #fdecec; color: #b53a3a; }
+.m-op-del:hover { background: #f9dcdc; }
+/* 备注行：横跨整行 */
+.m-field-note { grid-column: 1 / -1; }
 @media (max-width: 768px) {
   .sub-grid { grid-template-columns: 1fr !important; }
   .item-grid { grid-template-columns: 1fr !important; }
-  .m-item { grid-template-columns: 1fr 1fr; }
+  .m-item { grid-template-columns: 1fr 1fr auto; }
   .m-field-name { grid-column: span 2; }
-  .danger-cell { margin-top: 0; }
+  .m-field-note { grid-column: 1 / -1; }
 }
 </style>

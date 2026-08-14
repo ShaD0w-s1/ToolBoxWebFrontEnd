@@ -295,6 +295,8 @@ export interface ToolItem {
   qty: number;
   /** 航材物品的件号；工具清单不使用该字段。 */
   partNo?: string;
+  /** 航材物品的备注（默认无，物品卡片「+」按钮新增，另起一行显示）。 */
+  note?: string;
 }
 
 export interface ToolState {
@@ -339,7 +341,7 @@ export interface ToolboxApp {
   standardLibraries: Record<StandardLibKey, StandardLib>;
 }
 
-export interface SectionItemPayload { name: string; quantity: number; partNo?: string }
+export interface SectionItemPayload { name: string; quantity: number; partNo?: string; note?: string }
 export interface WorkPayload { name: string; items: SectionItemPayload[] }
 export interface SectionPayload { name: string; notes: string; works: WorkPayload[] }
 export interface ProjectPayload {
@@ -556,7 +558,7 @@ export function stateFromSections(sections: SectionPayload[] = [], useCart = fal
     if (section.notes) notes[cat] = section.notes;
     for (const work of section.works || []) {
       for (const entry of work.items || []) {
-        items.push({ id: id++, cat, sub: String(work.name || ""), name: String(entry.name || ""), qty: Math.max(0, Number(entry.quantity) || 0), partNo: entry.partNo != null ? String(entry.partNo) : "" });
+        items.push({ id: id++, cat, sub: String(work.name || ""), name: String(entry.name || ""), qty: Math.max(0, Number(entry.quantity) || 0), partNo: entry.partNo != null ? String(entry.partNo) : "", note: entry.note != null ? String(entry.note) : "" });
       }
     }
   }
@@ -578,7 +580,7 @@ export function sectionsFromState(state: ToolState): SectionPayload[] {
       notes: state.notes[cat] || "",
       works: subNames.map((sub) => ({
         name: sub,
-        items: state.items.filter((item) => item.cat === cat && item.sub === sub).map((item) => ({ name: item.name, quantity: item.qty, ...(item.partNo ? { partNo: item.partNo } : {}) })),
+        items: state.items.filter((item) => item.cat === cat && item.sub === sub).map((item) => ({ name: item.name, quantity: item.qty, ...(item.partNo ? { partNo: item.partNo } : {}), ...(item.note ? { note: item.note } : {}) })),
       })),
     };
   });
