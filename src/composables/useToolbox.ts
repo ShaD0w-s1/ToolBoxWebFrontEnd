@@ -85,6 +85,8 @@ export function useToolbox() {
   // 一级页面日期筛选框：默认显示当日（输入 type=date 直接展示当天），清空后退回“全部”
   const searchDay = ref(formatDay(Date.now()));
   const teamFilter = ref("");
+  // 一级页面按项目名称搜索（模糊、忽略大小写）。
+  const nameQuery = ref("");
   const cloud = reactive<{ text: string; state: CloudState; available: boolean }>({ text: "连接中…", state: "warn", available: false });
   const toast = reactive({ message: "", visible: false });
   const shared = ref(false);
@@ -183,8 +185,10 @@ export function useToolbox() {
   });
   const filteredProjects = computed(() => {
     const query = parseDay(searchDay.value);
+    const name = nameQuery.value.trim().toLowerCase();
     return app.value.projects.filter((project) => {
       if (teamFilter.value && project.team !== teamFilter.value) return false;
+      if (name && !project.name.toLowerCase().includes(name)) return false;
       if (!query) return true;
       const delta = Math.abs(new Date(project.createdAt).setHours(0, 0, 0, 0) - query.setHours(0, 0, 0, 0));
       return delta <= 5 * 86400000;
@@ -2118,7 +2122,7 @@ export function useToolbox() {
     app, screen, listTab, detailTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
     active, materialActive, materialCategories, standardMaterialCategories, mStandardSubs,
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep,
-    searchDay, teamFilter, filteredProjects, cloud, toast, shared,
+    searchDay, teamFilter, nameQuery, filteredProjects, cloud, toast, shared,
     notify, persist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
     createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
     itemsOf, subsOf, subTotal, catTotal, allTotal, isCartDuplicate,

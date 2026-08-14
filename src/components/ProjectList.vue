@@ -152,12 +152,13 @@ function cancelEditAnnouncement(): void {
         <button @click="emit('share')">分享本页</button>
         <button @click="store.refresh()">刷新</button>
         <span class="spacer" />
+        <input v-model="store.nameQuery.value" class="project-name-input" placeholder="搜索项目名称" aria-label="按项目名称搜索" />
         <select v-model="store.teamFilter.value" aria-label="按班组筛选">
           <option value="">班组：全部</option>
           <option v-for="team in TEAMS" :key="team">{{ team }}</option>
         </select>
         <input type="date" v-model="store.searchDay.value" class="date-search" aria-label="按日期筛选" />
-        <button @click="store.searchDay.value = ''; store.teamFilter.value = ''">清除</button>
+        <button @click="store.searchDay.value = ''; store.teamFilter.value = ''; store.nameQuery.value = ''">清除</button>
       </div>
 
       <p class="list-status">共 {{ store.filteredProjects.value.length }} 个工作项目</p>
