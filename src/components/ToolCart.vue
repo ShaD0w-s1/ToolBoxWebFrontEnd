@@ -20,6 +20,17 @@ function importFile(event: Event): void {
   if (file) emit("import-sheet", file);
   input.value = "";
 }
+
+/** 数据库页内"完成"：保存到云端并提示后返回列表（替代原一级卡片上的完成按钮）。 */
+async function finishCart(): Promise<void> {
+  try {
+    await props.store.saveCartNow();
+    props.store.notify("工具车数据库已完成保存");
+  } catch {
+    props.store.notify("保存失败，但已留存本地");
+  }
+  props.store.backToList();
+}
 </script>
 
 <template>
@@ -33,6 +44,9 @@ function importFile(event: Event): void {
       <button class="primary" @click="add">+ 添加物品</button>
       <label class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
       <button @click="emit('share')">分享本页</button>
+      <button @click="store.refresh()">刷新</button>
+      <span class="spacer" />
+      <button class="ghost" @click="finishCart">完成</button>
     </div>
     <div class="table-wrap">
       <table>

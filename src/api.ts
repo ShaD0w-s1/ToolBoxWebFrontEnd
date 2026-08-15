@@ -75,12 +75,38 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const backend = {
   status: () => request<ApiEnvelope>("/api/cloudbase/status/"),
+  verifyAirnav: (password: string) => request<{ ok: boolean; verified?: boolean; token?: string; expires_in?: number }>("/api/airnav-verify/", { method: "POST", body: { password } }),
+  getConfig: () => request<ApiEnvelope<{ watch_enabled?: boolean; watch_max_users?: number }>>("/api/config/"),
+  getAircraftNumbers: () => request<ApiEnvelope<string[]>>("/api/aircraft-numbers/"),
+  listControlDocs: () => request<ApiEnvelope<Array<{ _id: string; type: string; fileName: string; cloudObjectId: string; uploadedAt?: string }>>>("/api/control-docs/"),
+  uploadControlDoc: (payload: { type: string; fileName: string; content: string }) =>
+    request<ApiEnvelope<{ _id: string; type: string; fileName: string; cloudObjectId: string }>>("/api/control-docs/", { method: "POST", body: payload }),
+  getControlDocUrl: (id: string) => request<ApiEnvelope<{ downloadUrl: string; fileName?: string }>>(`/api/control-docs/${encodeURIComponent(id)}/`),
+  deleteControlDoc: (id: string) => request<ApiEnvelope>(`/api/control-docs/${encodeURIComponent(id)}/`, { method: "DELETE" }),
   listProjects: () => request<ApiEnvelope<unknown>>("/api/projects/?limit=100"),
   createProject: (project: ProjectPayload) => request<ApiEnvelope<Record<string, unknown>>>("/api/projects/", { method: "POST", body: project }),
-  updateProject: (id: string, project: ProjectPayload) => request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "PATCH", body: project }),
+  updateProject: (id: string, project: ProjectPayload | Partial<ProjectPayload>, expectedVersion?: number) =>
+    request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "PATCH", body: { ...project, expected_version: expectedVersion } }),
+  applyWorkcard: (id: string, payload: { 机号?: string; 工作内容?: string; 地点?: string; cards?: Array<{ 项次: string; 工卡号: string; 工卡名称: string }>; aircraft_type?: string }) =>
+    request<ApiEnvelope<{ written: number; aircraft_type: string; tool_deleted: number; tool_added: number; material_deleted: number; material_added: number }>>(
+      `/api/projects/${encodeURIComponent(id)}/apply-workcard/`,
+      { method: "POST", body: payload },
+    ),
   deleteProject: (id: string) => request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "DELETE" }),
+  poll: (revision?: string) =>
+    request<ApiEnvelope<{ revision: string; changed: boolean; poll_after_ms?: number }>>(
+      `/api/poll/${revision ? `?revision=${encodeURIComponent(revision)}` : ""}`,
+    ),
   getTemplate: (type: string) => request<ApiEnvelope<unknown>>(`/api/templates/${encodeURIComponent(type)}/`),
   saveTemplate: (type: string, sections: SectionPayload[]) => request<ApiEnvelope>(`/api/templates/${encodeURIComponent(type)}/`, { method: "PUT", body: { sections } }),
+  getMaterialTemplate: (type: string) => request<ApiEnvelope<unknown>>(`/api/material-templates/${encodeURIComponent(type)}/`),
+  saveMaterialTemplate: (type: string, sections: SectionPayload[]) => request<ApiEnvelope>(`/api/material-templates/${encodeURIComponent(type)}/`, { method: "PUT", body: { sections } }),
   getToolCart: () => request<ApiEnvelope<unknown>>("/api/tool-cart/"),
   saveToolCart: (items: Array<{ name: string; quantity: number }>) => request<ApiEnvelope>("/api/tool-cart/", { method: "PUT", body: { items } }),
+  getStandardLibrary: (key: string, token?: string) =>
+    request<ApiEnvelope<unknown>>(`/api/standard-libraries/${encodeURIComponent(key)}/`, token ? { headers: { "X-Airnav-Token": token } } : {}),
+  saveStandardLibrary: (key: string, rows: Record<string, string>[], token?: string) =>
+    request<ApiEnvelope>(`/api/standard-libraries/${encodeURIComponent(key)}/`, { method: "PUT", body: { rows }, ...(token ? { headers: { "X-Airnav-Token": token } } : {}) }),
+  getAnnouncement: () => request<ApiEnvelope<unknown>>("/api/announcement/"),
+  saveAnnouncement: (content: string) => request<ApiEnvelope>("/api/announcement/", { method: "PUT", body: { content } }),
 };

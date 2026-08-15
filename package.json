@@ -11,6 +11,7 @@
     "check": "npm run type-check && vite build"
   },
   "dependencies": {
+    "@cloudbase/js-sdk": "^3.7.1",
     "html2canvas": "^1.4.1",
     "vue": "^3.5.41",
     "xlsx": "^0.18.5"

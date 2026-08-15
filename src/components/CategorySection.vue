@@ -6,14 +6,19 @@ import { sectionHex, sectionRgba } from "../utils/sectionColor";
 import ItemEditor from "./ItemEditor.vue";
 import StandardPicker from "./StandardPicker.vue";
 
-const props = defineProps<{ store: ToolboxStore; category: string }>();
+const props = defineProps<{ store: ToolboxStore; category: string; highlighted?: boolean }>();
 const collapsed = ref(false);
-// 部位配色：左侧实色边条覆盖整块，抬头底色为该色 50%
+// 部位配色：左侧实色边条覆盖整块，抬头底色为该色 50%，整卡底色 20%（80% 透明）
 const barColor = computed(() => sectionHex(props.category));
 const headBg = computed(() => sectionRgba(props.category, 0.5));
+const cardBg = computed(() => sectionRgba(props.category, 0.2));
 const subNames = computed(() => props.store.subsOf(props.category));
-// 导出图片时强制展开（forceExpandAll），否则跟随本地 collapsed 状态
-const showBody = computed(() => !collapsed.value || props.store.forceExpandAll.value);
+// highlighted 由父组件工作查询控制：有查询时 highlighted 部位强制展开，非 highlighted 强制折叠
+const showBody = computed(() => {
+  if (props.highlighted === true) return true;
+  if (props.highlighted === false) return false;
+  return !collapsed.value || props.store.forceExpandAll.value;
+});
 // 工作卡片每行数量由页面宽度决定（1–3），见 useResponsiveGrid；layoutIsMobile 用于区分移动端
 const { workCols, layoutIsMobile } = useWorkColumns();
 
@@ -57,15 +62,41 @@ const categoryNote = computed({
     if (props.store.active.value) props.store.active.value.notes[props.category] = value;
   },
 });
+/** 工作名联想源：合并「工具标准库 ∪ 航材标准库」的 部位||工作 键（共享检索；不跨库取物品）。 */
 const standardSubs = computed(() => {
-  const type = props.store.currentProject.value?.aircraftType || props.store.editingLibrary.value || "A320";
-  const library = props.store.app.value.libraries[type];
-  return [...new Set(library.items.map((item) => `${item.cat}||${item.sub}`))];
+  const type = props.store.editingLibrary.value || props.store.effectiveAircraftType.value;
+  const keys = new Set<string>();
+  if (!type) return [...keys];
+  for (const item of props.store.app.value.libraries[type]?.items || []) keys.add(`${item.cat}||${item.sub}`);
+  for (const item of props.store.app.value.materialLibraries[type]?.items || []) keys.add(`${item.cat}||${item.sub}`);
+  return [...keys];
+});
+/** 部位名模糊搜索/选择的数据源：项目模式合并「工具标准库 ∪ 航材标准库」的部位名（部位名称共享，
+ *  搜索可命中任一标准库里已有的部位）；库模式用当前库自身部位。 */
+const stdCats = computed<string[]>(() => {
+  if (props.store.editingLibrary.value) return props.store.active.value?.categories || [];
+  const set = new Set<string>([...props.store.standardCategories.value, ...props.store.standardMaterialCategories.value]);
+  return [...set];
 });
 
-function renameCategory() {
-  const name = window.prompt("部位名称：", props.category);
-  if (name?.trim()) props.store.renameCategory(props.category, name.trim());
+/** 部位名输入框：失焦/回车时改名。
+ *  项目模式：仅当名称命中本机型「工具标准库」部位名时，才整体替换为该标准部位并导入其物品；
+ *  其它情况（含仅航材标准库有的部位名）仅改名、不跨标准库取。库模式仅改名。 */
+function onRenameCat(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const name = input.value.trim();
+  if (!name || name === props.category) { input.value = props.category; return; }
+  if (props.store.editingLibrary.value) {
+    props.store.renameCategory(props.category, name);
+    return;
+  }
+  const toolStd = props.store.standardCategories.value;
+  if (toolStd.includes(name)) {
+    if (!window.confirm(`将部位“${props.category}”替换为标准部位“${name}”并导入工具标准库中的物品？\n（原有物品将被替换）`)) { input.value = props.category; return; }
+    props.store.replaceCategoryFromStandard(props.category, name);
+  } else {
+    props.store.renameCategory(props.category, name);
+  }
 }
 
 function deleteCategory() {
@@ -79,16 +110,27 @@ function renameSub(oldName: string, event: Event): void {
 function deleteSub(sub: string): void {
   if (window.confirm(`确认删除工作“${sub}”？`)) props.store.deleteSub(props.category, sub);
 }
+
+/** 工具清单工作卡片“补充标准库”：确认后将本工作卡片物品补充/删减到对应机型标准库，并立即推送云端。 */
+async function supplementStdLib(sub: string): Promise<void> {
+  if (!window.confirm(`确认将“${props.category} / ${sub}”工作卡片的物品补充/删减到对应标准库？`)) return;
+  try {
+    const type = await props.store.syncSubToLibrary(props.category, sub);
+    props.store.notify(type ? `已补充「${sub}」到 ${type} 工具标准库` : "标准库未找到，补充失败");
+  } catch {
+    props.store.notify("补充标准库失败，请重试");
+  }
+}
 </script>
 
 <template>
-  <article class="category-card" :style="{ borderLeft: `6px solid ${barColor}` }">
+  <article class="category-card" :style="{ borderLeft: `6px solid ${barColor}`, background: cardBg }">
     <header class="category-head" :style="{ background: headBg }" @click.self="collapsed = !collapsed">
       <button class="collapse" :aria-label="collapsed ? '展开' : '收起'" @click="collapsed = !collapsed">{{ collapsed ? '›' : '⌄' }}</button>
-      <strong>{{ category }}</strong>
+      <input class="cat-name" :value="category" list="cat-std-list" aria-label="部位名称" @change="onRenameCat" />
+      <datalist id="cat-std-list"><option v-for="c in stdCats" :key="c" :value="c" /></datalist>
       <span>合计 {{ store.catTotal(category) }}</span>
       <div class="spacer" />
-      <button @click="renameCategory">改名</button>
       <button @click="store.addSub(category)">+ 工作</button>
       <button class="danger" @click="deleteCategory">删除</button>
     </header>
@@ -103,24 +145,25 @@ function deleteSub(sub: string): void {
           :style="workSpanStyle(sub)"
         >
           <header class="sub-head">
-            <input :value="sub" aria-label="工作名称" @change="renameSub(sub, $event)" />
-            <span>合计 {{ store.subTotal(category, sub) }}</span>
+            <StandardPicker
+              v-if="!store.editingLibrary.value"
+              :options="standardSubs"
+              :category="category"
+              :sub="sub"
+              :store="store"
+            />
+            <input v-else :value="sub" aria-label="工作名称" @change="renameSub(sub, $event)" />
             <div class="spacer" />
+            <button v-if="!store.editingLibrary.value" class="ghost" @click="supplementStdLib(sub)">补充标准库</button>
             <button @click="store.addItem(category, sub)">+ 物品</button>
             <button class="danger" @click="deleteSub(sub)">删除</button>
           </header>
-          <StandardPicker
-            v-if="!store.editingLibrary.value"
-            :options="standardSubs"
-            :category="category"
-            :sub="sub"
-            :store="store"
-          />
           <div class="item-grid" :style="{ gridTemplateColumns: `repeat(${itemColsFor(sub)}, minmax(0, 1fr))` }">
             <ItemEditor
               v-for="item in store.itemsOf(category, sub)"
               :key="item.id"
               :item="item"
+              :class="{ 'flash-update': store.isFlashing(item) }"
               :duplicate="store.isCartDuplicate(item.name)"
               :same-name="sameNameColors.get(item.name.trim().toLowerCase()) || null"
               @save="store.persist"
@@ -132,3 +175,32 @@ function deleteSub(sub: string): void {
     </div>
   </article>
 </template>
+
+<style scoped>
+/* 部位名行内输入框（与“工作”名输入栏一致：透明底、悬停/聚焦显边框、加粗） */
+.cat-name { flex: 0 1 auto; min-width: 90px; max-width: 220px; padding: 4px 7px; border: 1px solid transparent; border-radius: 6px; background: transparent; font-weight: 700; font-size: 15px; color: inherit; }
+.cat-name:hover, .cat-name:focus { border-color: #8eaadb; background: #fff; }
+/* 合并后：StandardPicker 在 sub-head 内作为工作名输入框，占满可用宽度 */
+.sub-head :deep(.standard-combo) {
+  flex: 1 1 140px;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+.sub-head :deep(.standard-input) {
+  width: 100%;
+  margin: 0;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-weight: 700;
+  font-size: 14px;
+  color: inherit;
+}
+.sub-head :deep(.standard-input:hover),
+.sub-head :deep(.standard-input:focus) {
+  border-color: #8eaadb;
+  background: #fff;
+}
+</style>

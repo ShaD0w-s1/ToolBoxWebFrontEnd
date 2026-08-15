@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, nextTick, ref } from "vue";
+import { onMounted, onUnmounted, nextTick, ref } from "vue";
 import html2canvas from "html2canvas";
 import AppHeader from "./components/AppHeader.vue";
 import ProjectList from "./components/ProjectList.vue";
 import ProjectDetail from "./components/ProjectDetail.vue";
 import ToolCart from "./components/ToolCart.vue";
+import StandardLibraryTable from "./components/StandardLibraryTable.vue";
 import {
   AIRCRAFT_TYPES,
   normalizeApp,
@@ -18,8 +19,8 @@ import {
 import { useToolbox } from "./composables/useToolbox";
 import { setForceDesktop } from "./composables/useResponsiveGrid";
 import { exportJson, exportState, importCart, importState } from "./services/spreadsheet";
-import { copyText, createShareUrl, readSharePayload, type SharePayload } from "./services/sharing";
-import { download, formatDay } from "./utils/format";
+import { copyText, createShareUrl, readSharePayload, projectShareUrl, type SharePayload } from "./services/sharing";
+import { download, exportFileName, formatDay } from "./utils/format";
 
 const store = useToolbox();
 
@@ -29,6 +30,7 @@ function errorMessage(error: unknown): string {
 
 const previewImage = ref<string | null>(null);
 let previewUrl: string | null = null;
+let lastImageName = "导出图片.jpg";
 
 function closePreview(): void {
   previewImage.value = null;
@@ -39,17 +41,27 @@ function downloadPreview(): void {
   if (!previewUrl) return;
   const anchor = document.createElement("a");
   anchor.href = previewUrl;
-  anchor.download = `${store.detailTitle.value}_集中显示.jpg`;
+  anchor.download = lastImageName;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
 }
 
-async function exportImage(element: HTMLElement | null): Promise<void> {
+async function exportImage(element: HTMLElement | null, subPageName = ""): Promise<void> {
   if (!element) return;
+  lastImageName = `${exportFileName(store.currentProject.value?.name || store.detailTitle.value, subPageName)}.jpg`;
   // 移动端按网页宽屏（1100px、3 列）重排后再截，得到“网页宽屏长截图”
   const isMobile = window.innerWidth < 768;
   const prevOverflow = document.body.style.overflow;
+  const cleanup = (): void => {
+    element.classList.remove("exporting");
+    store.forceExpandAll.value = false;
+    if (isMobile) {
+      setForceDesktop(false);
+      element.style.width = "";
+      document.body.style.overflow = prevOverflow;
+    }
+  };
   try {
     store.notify("正在生成图片…");
     // 导出前强制展开所有部位卡片，保证长图完整
@@ -65,38 +77,63 @@ async function exportImage(element: HTMLElement | null): Promise<void> {
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 150))));
     // 导出时让返回栏 + 功能按钮行脱离 sticky，稳定停在长图最上方（不被吸顶/重叠干扰）
     element.classList.add("exporting");
-    // 手机端用 scale=1 避免画布尺寸超限导致生成失败；windowWidth 让媒体查询按 1100 渲染
-    const scale = isMobile ? 1 : Math.min(2, window.devicePixelRatio || 1);
-    const canvas = await html2canvas(element, {
-      backgroundColor: "#f4f6fb",
-      scale,
-      useCORS: true,
-      windowWidth: isMobile ? 1100 : window.innerWidth,
-    });
-    element.classList.remove("exporting");
-    store.forceExpandAll.value = false;
+
+    // 渲染循环：iOS 对超限 canvas（任一边长 > ~4096）调 toBlob/drawImage 会抛
+    // SecurityError("the operation is insecure")，且超限 canvas 在 iOS 上连 drawImage 读取都抛错，
+    // 无法事后缩放。故必须保证 html2canvas 生成的 canvas 不超限：
+    // 先按内容高度估 scale，渲染后若实际 canvas 仍超限（或渲染本身抛错）则按真实尺寸缩小 scale 重试。
+    const SAFE = 4096;
+    let scale: number;
     if (isMobile) {
-      setForceDesktop(false);
-      element.style.width = "";
-      document.body.style.overflow = prevOverflow;
+      const w = element.scrollWidth || element.offsetWidth || 1100;
+      const h = element.scrollHeight || element.offsetHeight || 0;
+      scale = Math.max(w, h) > SAFE ? SAFE / Math.max(w, h) : 1;
+    } else {
+      scale = Math.min(2, window.devicePixelRatio || 1);
     }
-    canvas.toBlob((blob) => {
-      if (!blob) { store.notify("生成图片失败"); return; }
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = URL.createObjectURL(blob);
-      previewImage.value = previewUrl;
-      // 电脑端（非 iOS）直接触发下载；iOS 不支持 blob 下载，靠预览层长按保存
-      const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent);
-      if (!isIOS) download(blob, `${store.detailTitle.value}_集中显示.jpg`);
-    }, "image/jpeg", 0.92);
+    const baseOpts = { backgroundColor: "#f4f6fb", useCORS: true, windowWidth: isMobile ? 1100 : window.innerWidth };
+    let canvas: HTMLCanvasElement | null = null;
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 4 && !canvas; attempt++) {
+      try {
+        const c = await html2canvas(element, { ...baseOpts, scale });
+        if (c.width > SAFE || c.height > SAFE) {
+          // 实际画布仍超限：按真实尺寸反算更小 scale 后重试
+          scale = (scale * SAFE) / Math.max(c.width, c.height);
+          lastErr = null;
+          continue;
+        }
+        canvas = c;
+      } catch (renderErr) {
+        // 渲染本身抛错（多为 iOS 无法创建超限 canvas）：缩小 scale 后重试
+        lastErr = renderErr;
+        scale *= 0.5;
+      }
+    }
+    if (!canvas) {
+      cleanup();
+      const m = lastErr instanceof Error ? `${lastErr.name} ${lastErr.message}` : (lastErr ? String(lastErr) : "画布尺寸超限，无法生成");
+      store.notify(`导出失败(渲染): ${m}`);
+      return;
+    }
+    cleanup();
+    // 导出：iOS 对受污染/超限 canvas 调 toBlob 会同步抛 SecurityError，单独捕获并附带画布尺寸便于定位
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) { store.notify(`生成图片失败：blob 为空 | canvas=${canvas!.width}x${canvas!.height}`); return; }
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(blob);
+        previewImage.value = previewUrl;
+        // 电脑端（非 iOS）直接触发下载；iOS 不支持 blob 下载，靠预览层长按保存
+        const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent);
+        if (!isIOS) download(blob, lastImageName);
+      }, "image/jpeg", 0.92);
+    } catch (blobErr) {
+      const m = blobErr instanceof Error ? `${blobErr.name} ${blobErr.message}` : String(blobErr);
+      store.notify(`导出失败(toBlob): ${m} | canvas=${canvas.width}x${canvas.height}`);
+    }
   } catch (error) {
-    element.classList.remove("exporting");
-    store.forceExpandAll.value = false;
-    if (isMobile) {
-      setForceDesktop(false);
-      element.style.width = "";
-      document.body.style.overflow = prevOverflow;
-    }
+    cleanup();
     store.notify(errorMessage(error) || "生成图片失败");
   }
 }
@@ -130,10 +167,6 @@ async function importToolCart(file: File): Promise<void> {
 /** 一级页面（列表）分享链接：直接用裸域名，列表数据来自后端共享，无需内联。 */
 function baseUrl(): string {
   return location.origin + location.pathname.replace(/index\.html$/i, "");
-}
-/** 二级页面（某个工作项目）分享链接：base/?p=工作项目名称/日期（查询格式，零配置、不触发 404）。 */
-function projectShareUrl(project: Project): string {
-  return `${baseUrl()}?p=${encodeURIComponent(project.name)}/${formatDay(project.createdAt)}`;
 }
 
 async function share(scope: SharePayload["scope"]): Promise<void> {
@@ -235,15 +268,34 @@ onMounted(async () => {
     await store.loadRemote();
     openFromQuery();
   }
+  // 启动每 2 秒自动同步（推送本地变更到云端，不覆盖本地编辑）
+  store.startAutoSync(2000);
+  // 根据远端配置启动 watch 实时推送或轮询（loadRemote 成功后内部已按配置启动，
+  // 此处兜底：若 loadRemote 因故未成功，确保至少轮询在跑）。幂等，可安全重复调用。
+  store.syncRealtimeMode();
 });
 
-function exportCurrentState(): void {
-  if (store.active.value) exportState(store.active.value, store.detailTitle.value);
+onUnmounted(() => {
+  store.stopPolling();
+  store.stopWatch();
+});
+
+function exportCurrentState(displayCats?: string[]): void {
+  if (!store.active.value) return;
+  const active = store.active.value;
+  // 仅导出集中显示页面上(displayCats)的工具，删除非显示部位数据
+  const cats = displayCats && displayCats.length ? displayCats : active.categories;
+  const filtered: ToolState = {
+    ...active,
+    categories: cats.filter((c) => active.categories.includes(c)),
+    items: active.items.filter((it) => cats.includes(it.cat)),
+  };
+  exportState(filtered, exportFileName(store.currentProject.value?.name || store.detailTitle.value, "工具清单"));
 }
 </script>
 
 <template>
-  <AppHeader :cloud="store.cloud" />
+  <AppHeader :cloud="store.cloud" :watch-active="store.watchActive.value" />
   <main>
     <ProjectList
       v-if="store.screen.value === 'list'"
@@ -260,8 +312,17 @@ function exportCurrentState(): void {
       @import-new-sections="importNewSections"
       @share="share('detail')"
     />
+    <StandardLibraryTable v-else-if="store.screen.value === 'stdlib'" :store="store" />
     <ToolCart v-else :store="store" @import-sheet="importToolCart" @share="share('cart')" />
   </main>
+
+  <div v-if="store.syncing.value" class="sync-overlay">
+    <div class="sync-overlay-card">
+      <div class="sync-spinner" aria-hidden="true"></div>
+      <p>加载中，正在同步数据…</p>
+      <button class="ghost" @click="store.backToList()">返回</button>
+    </div>
+  </div>
 
   <aside v-if="store.shared.value" class="share-banner">
     <span>你正在查看通过链接分享的内容（尚未保存到本地）。</span>
@@ -282,3 +343,43 @@ function exportCurrentState(): void {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 全屏「加载中」冻结遮罩：仅允许操作其中的「返回」按钮 */
+.sync-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(2px);
+}
+.sync-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 36px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+.sync-overlay-card p {
+  margin: 0;
+  color: #333;
+  font-size: 15px;
+}
+.sync-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: sync-spin 0.8s linear infinite;
+}
+@keyframes sync-spin {
+  to { transform: rotate(360deg); }
+}
+</style>
