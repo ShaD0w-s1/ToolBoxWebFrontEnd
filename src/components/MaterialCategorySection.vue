@@ -92,7 +92,7 @@ const catNote = computed({
 });
 // 类型名联想源：合并「航材标准库 ∪ 工具标准库」的 部位||类型 键（共享检索；不跨库取物品）。
 const matStdSubs = computed(() => {
-  const type = props.store.editingMaterialLibrary.value ?? props.store.aircraftTypeFromPrep.value;
+  const type = props.store.editingMaterialLibrary.value ?? props.store.effectiveAircraftType.value;
   const keys = new Set<string>();
   if (!type) return [...keys];
   for (const it of props.store.app.value.materialLibraries[type]?.items || []) keys.add(`${it.cat}||${it.sub}`);

@@ -88,7 +88,7 @@ export const backend = {
   updateProject: (id: string, project: ProjectPayload | Partial<ProjectPayload>, expectedVersion?: number) =>
     request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "PATCH", body: { ...project, expected_version: expectedVersion } }),
   applyWorkcard: (id: string, payload: { 机号?: string; 工作内容?: string; 地点?: string; cards?: Array<{ 项次: string; 工卡号: string; 工卡名称: string }>; aircraft_type?: string }) =>
-    request<ApiEnvelope<{ written: number; tool_deleted: number; tool_added: number; material_deleted: number; material_added: number }>>(
+    request<ApiEnvelope<{ written: number; aircraft_type: string; tool_deleted: number; tool_added: number; material_deleted: number; material_added: number }>>(
       `/api/projects/${encodeURIComponent(id)}/apply-workcard/`,
       { method: "POST", body: payload },
     ),

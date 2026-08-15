@@ -3,7 +3,6 @@ import { backend, ApiError, type ApiEnvelope } from "../api";
 import { startWatchRevision, stopWatchRevision } from "../services/realtime";
 import {
   AIRCRAFT_TYPES,
-  DEFAULT_CATEGORIES,
   defaultApp,
   defaultPrepSheet,
   defaultStandardLibraries,
@@ -148,9 +147,18 @@ export function useToolbox() {
     if (raw.includes("320") || raw.includes("321")) return "A320";
     return null;
   });
+  /** 生效机型：优先工作准备单/单项准备单机型字段推断；单独项目无机型信息时回退到项目手动选择的机型
+   *  （currentProject.aircraftType，单独项目允许在工具/航材清单子页手动指定）。 */
+  const effectiveAircraftType = computed<AircraftType | null>(() => {
+    const inferred = aircraftTypeFromPrep.value;
+    if (inferred) return inferred;
+    const p = currentProject.value;
+    if (p && p.type === "单独项目" && AIRCRAFT_TYPES.includes(p.aircraftType)) return p.aircraftType;
+    return null;
+  });
   /** “添加部位”下拉里可选择的“来自标准数据库”的部位列表（当前机型的全部标准部位）。 */
   const standardCategories = computed<string[]>(() => {
-    const type = editingLibrary.value ?? aircraftTypeFromPrep.value;
+    const type = editingLibrary.value ?? effectiveAircraftType.value;
     if (!type) return [];
     return app.value.libraries[type]?.categories || [];
   });
@@ -161,25 +169,18 @@ export function useToolbox() {
   });
   /** 航材标准库的部位列表（用于航材清单“添加部位”下拉与标准库替换）。 */
   const standardMaterialCategories = computed<string[]>(() => {
-    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
+    const type = editingMaterialLibrary.value ?? effectiveAircraftType.value;
     if (!type) return [];
     return app.value.materialLibraries[type]?.categories || [];
   });
   /** 航材清单的部位列表：库模式用航材库自身 categories；项目模式用航材清单自身 categories
-   *  （与工具清单解耦，不再共享 data.categories）；A检 默认显示 ENG/AV CB/FC/LG/通用/接机（= DEFAULT_CATEGORIES）。 */
-  const MATERIAL_DEFAULT_CATS = [...DEFAULT_CATEGORIES];
+   *  （与工具清单解耦，不再共享 data.categories）。项目模式不强制展示默认部位：
+   *  仅显示已登记的部位 + 有物品的部位（无数据时不展示默认部位卡片）。 */
   const materialCategories = computed<string[]>(() => {
     if (editingMaterialLibrary.value) return app.value.materialLibraries[editingMaterialLibrary.value]?.categories || [];
     const p = currentProject.value;
     if (!p) return [];
-    // A检 默认显示 6 个部位 + 已有部位；单独项目/其他用航材清单自身 categories（无默认）
-    let base: string[];
-    if (p.type === "A检") {
-      base = [...MATERIAL_DEFAULT_CATS];
-      for (const c of p.materialList.categories) if (!base.includes(c)) base.push(c);
-    } else {
-      base = [...p.materialList.categories];
-    }
+    const base = [...p.materialList.categories];
     // 兜底：物品里出现但未登记的部位也显示（兼容旧数据 / categories 尚未回填）
     for (const it of p.materialList.items) if (it.cat && !base.includes(it.cat)) base.push(it.cat);
     return base;
@@ -453,7 +454,7 @@ export function useToolbox() {
       prepSheet: defaultPrepSheet(),
       workcardAssignment: defaultWorkcardAssignment(),
       standalonePrepSheet: defaultStandalonePrepSheet(),
-      materialList: normalizeState(projectType === "A检" ? { categories: [...DEFAULT_CATEGORIES] } : {}),
+      materialList: normalizeState(),
       version: 0,
     };
     if (cloud.available) {
@@ -513,13 +514,18 @@ export function useToolbox() {
 
   function setAircraftType(type: AircraftType): void {
     if (!currentProject.value || !AIRCRAFT_TYPES.includes(type)) return;
+    const previous = currentProject.value.aircraftType;
     currentProject.value.aircraftType = type;
-    // 单独项目工具清单/航材清单不随机型整体覆盖（用户自建部位）；仅同步航材清单机型标记。
+    // 机型改变：非单独项目先自动清空工具/航材清单数据（旧机型数据失效），再按新机型重新匹配
+    // （机号回填 / 工卡导入 / 标准库引用均指向新机型）。
+    // 单独项目工具/航材清单为用户自建部位，不随机型清空；仅同步工具/航材清单的机型标记（两子页同步）。
     if (currentProject.value.type !== "单独项目") {
-      currentProject.value.data = deepCopy(app.value.libraries[type]);
+      currentProject.value.data = normalizeState({ aircraftType: type });
+      currentProject.value.materialList = normalizeState({ aircraftType: type });
+    } else {
       currentProject.value.data.aircraftType = type;
+      currentProject.value.materialList.aircraftType = type;
     }
-    currentProject.value.materialList.aircraftType = type;
     // 同时影响 meta / data / materialList 三个字段
     localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
     markField("meta");
@@ -527,6 +533,14 @@ export function useToolbox() {
     markField("materialList");
     clearTimeout(saveTimer);
     if (cloud.available) saveTimer = setTimeout(saveRemote, 450);
+    // 机型切换提示：非单独项目会清空工具/航材清单，需明确告知；单独项目仅同步机型标记。
+    if (previous !== type) {
+      if (currentProject.value.type === "单独项目") {
+        notify(`机型已切换为 ${type}`);
+      } else {
+        notify(`机型已由 ${previous} 切换为 ${type}，工具/航材清单已清空`);
+      }
+    }
   }
 
   function itemsOf(cat: string, sub: string): ToolItem[] { return active.value?.items.filter((item) => item.cat === cat && item.sub === sub) || []; }
@@ -556,7 +570,7 @@ export function useToolbox() {
    *  目标库 = 正在编辑的标准库（若有），否则当前项目的机型对应库（A320 / B787）。
    *  写完内存后立即 await saveLibraryNow 推送云端（不依赖 persist 的 setTimeout / dirty tracking），确保可靠同步。 */
   async function syncSubToLibrary(cat: string, sub: string): Promise<AircraftType | null> {
-    const type: AircraftType | null = editingLibrary.value ?? aircraftTypeFromPrep.value;
+    const type: AircraftType | null = editingLibrary.value ?? effectiveAircraftType.value;
     if (!type) return null;
     const lib = app.value.libraries[type];
     if (!lib) return null;
@@ -600,7 +614,7 @@ export function useToolbox() {
   function addCategoryFromStandard(name: string): void {
     const state = requireActive();
     if (!state || !name) return;
-    const aircraftType = editingLibrary.value ?? aircraftTypeFromPrep.value;
+    const aircraftType = editingLibrary.value ?? effectiveAircraftType.value;
     if (!aircraftType) return;
     const lib = app.value.libraries[aircraftType];
     const libItems = (lib?.items || []).filter((item) => item.cat === name);
@@ -637,7 +651,7 @@ export function useToolbox() {
   function replaceCategoryFromStandard(oldCat: string, standardName: string): void {
     const state = requireActive();
     if (!state || !standardName) return;
-    const type = editingLibrary.value ?? aircraftTypeFromPrep.value;
+    const type = editingLibrary.value ?? effectiveAircraftType.value;
     const lib = type ? app.value.libraries[type] : null;
     const hasStd = !!(lib && lib.categories.includes(standardName));
     // 先把旧部位改名并入 standardName（不依赖 renameCategory 的 includes 守卫，兼容目标已存在的情形）
@@ -706,7 +720,7 @@ export function useToolbox() {
     const state = requireActive();
     if (!state || !key) return;
     const [sourceCat, sourceSub] = key.split("||");
-    const type = aircraftTypeFromPrep.value;
+    const type = effectiveAircraftType.value;
     const sourceItems = type ? app.value.libraries[type].items.filter((item) => item.cat === sourceCat && item.sub === sourceSub) : [];
     // 本库（工具标准库）无该工作名对应物品：仅带入名称（改名），不删除卡片、不清空物品
     if (sourceItems.length === 0) {
@@ -806,6 +820,32 @@ export function useToolbox() {
     persist();
   }
 
+  /** 清空工具清单（保留机型标记）并立即同步后端。 */
+  async function clearToolListNow(): Promise<void> {
+    const project = currentProject.value;
+    if (!project) return;
+    project.data = normalizeState({ aircraftType: project.aircraftType });
+    markField("data");
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+    clearTimeout(saveTimer);
+    if (cloud.available) {
+      try { await saveRemote(); } catch { /* saveRemote 内部已 notify */ }
+    }
+  }
+
+  /** 清空航材清单（保留机型标记）并立即同步后端。 */
+  async function clearMaterialListNow(): Promise<void> {
+    const project = currentProject.value;
+    if (!project) return;
+    project.materialList = normalizeState({ aircraftType: project.aircraftType });
+    markField("materialList");
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+    clearTimeout(saveTimer);
+    if (cloud.available) {
+      try { await saveRemote(); } catch { /* saveRemote 内部已 notify */ }
+    }
+  }
+
   function setToolCart(items: ToolCartItem[]): void {
     app.value.toolCart = items;
     persist();
@@ -856,7 +896,7 @@ export function useToolbox() {
   function mAddCategoryFromStandard(name: string): void {
     const state = requireMaterial();
     if (!state || !name) return;
-    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
+    const type = editingMaterialLibrary.value ?? effectiveAircraftType.value;
     if (!type) return;
     const lib = app.value.materialLibraries[type];
     if (!lib) return;
@@ -870,7 +910,7 @@ export function useToolbox() {
   function mReplaceCategoryFromStandard(oldCat: string, standardName: string): void {
     const state = requireMaterial();
     if (!state || !standardName) return;
-    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
+    const type = editingMaterialLibrary.value ?? effectiveAircraftType.value;
     const lib = type ? app.value.materialLibraries[type] : null;
     const hasStd = !!(lib && lib.categories.includes(standardName));
     if (oldCat !== standardName) mRenameCategory(oldCat, standardName);
@@ -947,7 +987,7 @@ export function useToolbox() {
   }
   /** 航材标准库里的 (部位||类型) 选项，供类型下拉模糊匹配/替换。 */
   const mStandardSubs = computed<string[]>(() => {
-    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
+    const type = editingMaterialLibrary.value ?? effectiveAircraftType.value;
     const lib = type ? app.value.materialLibraries[type] : null;
     return lib ? [...new Set(lib.items.map((it) => `${it.cat}||${it.sub}`))] : [];
   });
@@ -955,7 +995,7 @@ export function useToolbox() {
   function mImportStandardSub(cat: string, currentSub: string, key: string): void {
     const state = requireMaterial();
     if (!state || !key) return;
-    const type = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
+    const type = editingMaterialLibrary.value ?? effectiveAircraftType.value;
     const [sourceCat, sourceSub] = key.split("||");
     const source = type ? app.value.materialLibraries[type].items.filter((it) => it.cat === sourceCat && it.sub === sourceSub) : [];
     // 本库（航材标准库）无该类型名对应物品：仅带入名称（改名），不删除卡片、不清空物品
@@ -971,7 +1011,7 @@ export function useToolbox() {
   }
   /** 航材清单"补充标准库"：把当前 (cat,sub) 物品整体写入对应机型航材标准库，并立即推送。 */
   async function mSyncSubToMaterialLib(cat: string, sub: string): Promise<AircraftType | null> {
-    const type: AircraftType | null = editingMaterialLibrary.value ?? aircraftTypeFromPrep.value;
+    const type: AircraftType | null = editingMaterialLibrary.value ?? effectiveAircraftType.value;
     if (!type) return null;
     const lib = app.value.materialLibraries[type];
     if (!lib) return null;
@@ -1600,13 +1640,13 @@ export function useToolbox() {
   return {
     app, screen, listTab, detailTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
     active, materialActive, materialCategories, standardMaterialCategories, mStandardSubs,
-    detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep,
+    detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
     searchDay, teamFilter, nameQuery, filteredProjects, cloud, toast, shared,
     notify, persist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
     createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
     itemsOf, subsOf, subTotal, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
-    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearActive, clearProjectAllData, setToolCart, loadRemote, refresh, forceSync, saveNow,
+    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearActive, clearProjectAllData, clearToolListNow, clearMaterialListNow, setToolCart, loadRemote, refresh, forceSync, saveNow,
     syncSubToLibrary,
     mSubsOf, mItemsOf, mSubTotal, mCatTotal, mAllTotal, mCategoryList,
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,
