@@ -186,6 +186,27 @@ function clearProjectAll(): void {
   props.store.clearProjectAllData();
 }
 
+/** 工具清单子页「清空清单」：弹窗确认后清空工具清单所有数据并立即同步后端。 */
+async function clearToolList(): Promise<void> {
+  const project = props.store.currentProject.value;
+  if (!project) return;
+  if (!window.confirm("确认清空工具清单的所有部位与物品？此操作不可撤销！")) return;
+  await props.store.clearToolListNow();
+  props.store.notify("工具清单已清空并同步");
+}
+
+/** 单独项目 + 无机型信息时，开放工具/航材清单机型选择（两子页同步手动选机型）。 */
+const canEditAircraft = computed(() => {
+  const project = props.store.currentProject.value;
+  return Boolean(project) && project!.type === "单独项目" && !props.store.aircraftTypeFromPrep.value;
+});
+function onAircraftChange(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  const type = select.value as (typeof AIRCRAFT_TYPES)[number];
+  if (!AIRCRAFT_TYPES.includes(type)) return;
+  props.store.setAircraftType(type);
+}
+
 /** 工具清单子页「下载现场管控单」：按当前项目类型下载云端对应文件。 */
 async function downloadControlDoc(): Promise<void> {
   const project = props.store.currentProject.value;
@@ -244,7 +265,8 @@ async function applyWorkCardListFile(event: Event): Promise<void> {
       aircraft_type: props.store.aircraftTypeFromPrep.value ?? undefined,
     });
     const d = res.data;
-    let msg = `已写入 ${d?.written ?? 0} 条工卡，并填充工作准备单/工卡分配清单`;
+    const typeText = d?.aircraft_type ? `识别机型：${d.aircraft_type}` : "未识别机型";
+    let msg = `共解析 ${parsed.cards.length} 条工卡，已写入 ${d?.written ?? 0} 条，${typeText}，并填充工作准备单/工卡分配清单`;
     const parts: string[] = [];
     if (d?.tool_deleted) parts.push(`工具删除 ${d.tool_deleted} 个`);
     if (d?.tool_added) parts.push(`工具补充 ${d.tool_added} 个`);
@@ -343,6 +365,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
             <button v-if="!isLibrary" class="ghost" @click="downloadControlDoc">下载现场管控单</button>
             <button class="ghost" @click="emit('export-image', capture, isLibrary ? '工具标准库' : '工具清单')">导出图片</button>
             <button class="ghost" @click="emit('export-sheet', displayCats)">导出表格</button>
+            <button v-if="!isLibrary" class="danger" @click="clearToolList">清空清单</button>
           </div>
         </div>
         <div class="toolbar">
@@ -357,7 +380,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
             </template>
           </select>
           <label v-if="store.currentProject.value" class="field">机型
-            <select :value="store.aircraftTypeFromPrep.value ?? ''" disabled aria-label="机型（由工作准备单推断）"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
+            <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
           </label>
           <label v-if="store.editingLibrary.value" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
           <label v-if="store.editingLibrary.value" class="button">导入新部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importNewSectionsFile" /></label>

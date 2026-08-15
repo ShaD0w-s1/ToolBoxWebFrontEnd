@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES } from "../domain/toolbox";
+import { AIRCRAFT_TYPES } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import MaterialCategorySection from "./MaterialCategorySection.vue";
 import { exportMaterialList, importMaterialList } from "../services/spreadsheet";
@@ -20,8 +20,7 @@ const addCatValue = ref("");
 const typeQuery = ref("");
 watch(() => props.store.editingMaterialLibrary.value, () => { typeQuery.value = ""; });
 watch(() => props.store.currentProject.value?.id, () => { typeQuery.value = ""; });
-// 项目模式默认只显示 DEFAULT_CATEGORIES 六个部位；其它部位需手动选入(revealed)或有物品才显示。
-const defaultMatSet = new Set<string>(DEFAULT_CATEGORIES);
+// 项目模式：仅显示有物品的部位 + 手动选入(revealed)的部位；无数据时不展示默认部位卡片。
 const revealed = ref<string[]>([]);
 watch(() => props.store.currentProject.value?.id, () => { revealed.value = []; });
 const shownCats = computed(() => {
@@ -29,12 +28,9 @@ const shownCats = computed(() => {
   let list: string[];
   if (isLibrary.value) {
     list = all;
-  } else if (props.store.currentProject.value?.type === "A检") {
-    // A检 严格仅显示 6 部位 + 手动选入的（不因有物品自动显示非默认部位）
-    list = all.filter((c) => defaultMatSet.has(c) || revealed.value.includes(c));
   } else {
     const hasItems = new Set((props.store.materialActive.value?.items || []).map((it) => it.cat));
-    list = all.filter((c) => defaultMatSet.has(c) || revealed.value.includes(c) || hasItems.has(c));
+    list = all.filter((c) => hasItems.has(c) || revealed.value.includes(c));
   }
   // 类型查询：只显示包含匹配类型名的部位
   const tq = typeQuery.value.trim().toLowerCase();
@@ -154,6 +150,27 @@ async function onImportSupplement(event: Event): Promise<void> {
   } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
 }
 
+/** 航材清单子页「清空清单」：弹窗确认后清空航材清单所有数据并立即同步后端。 */
+async function clearMaterialList(): Promise<void> {
+  const project = props.store.currentProject.value;
+  if (!project) return;
+  if (!window.confirm("确认清空航材清单的所有部位与航材？此操作不可撤销！")) return;
+  await props.store.clearMaterialListNow();
+  props.store.notify("航材清单已清空并同步");
+}
+
+/** 单独项目 + 无机型信息时，开放航材清单机型选择（两子页同步手动选机型）。 */
+const canEditAircraft = computed(() => {
+  const project = props.store.currentProject.value;
+  return Boolean(project) && project!.type === "单独项目" && !props.store.aircraftTypeFromPrep.value;
+});
+function onAircraftChange(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  const type = select.value as (typeof AIRCRAFT_TYPES)[number];
+  if (!AIRCRAFT_TYPES.includes(type)) return;
+  props.store.setAircraftType(type);
+}
+
 /** 航材清单子页「按卡筛选」按钮：调后端筛选模式（不传 cards），再拉取权威结果。 */
 async function runMaterialFilterByWorkcard(): Promise<void> {
   if (isLibrary.value) return;
@@ -184,6 +201,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <button class="ghost" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTableXlsx">导出表格</button>
         <button v-if="isLibrary" class="ghost" @click="finishLibrary">完成</button>
+        <button v-if="!isLibrary" class="danger" @click="clearMaterialList">清空清单</button>
       </div>
     </div>
 
@@ -194,7 +212,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <option v-for="o in addOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
       <label v-if="!isLibrary" class="field">机型
-        <select :value="store.aircraftTypeFromPrep.value ?? ''" disabled aria-label="机型（由工作准备单推断）"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
+        <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
       </label>
       <label v-if="isLibrary" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportFile" /></label>
       <label v-if="isLibrary" class="button">导入部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportNewSections" /></label>
