@@ -174,7 +174,8 @@ function ganttRows(chart: GanttChart): Record<string, number> {
 function addChart(): void {
   const s = state.value; if (!s) return;
   const last = s.charts[s.charts.length - 1];
-  const day = s.charts.length + 1;
+  // 用「最大 DAY 编号 + 1」而非「数组长度 + 1」，避免删除/导入过 DAY 后编号不连续时产生重复或错乱编号
+  const day = s.charts.reduce((m, c) => Math.max(m, typeof c.day === "number" ? c.day : 0), 0) + 1;
   const chart: GanttChart = {
     id: genId(), title: `DAY ${day}`, date: nextDate(), day, collapsed: false,
     responsibilities: (last?.responsibilities?.length ? last.responsibilities : DEFAULT_RESP.map((l) => ({ id: genId(), label: l, name: "" })))
@@ -192,8 +193,10 @@ function addDayAfter(chartId: string): void {
   const base = s.charts[idx];
   const chart: GanttChart = {
     id: genId(), title: `DAY ${idx + 2}`, date: nextDate(), day: idx + 2, collapsed: false,
-    responsibilities: base.responsibilities.map((r) => ({ id: genId(), label: r.label, name: r.name })),
-    stages: base.stages.map((st) => ({ id: genId(), name: st.name })),
+    responsibilities: (base.responsibilities?.length ? base.responsibilities : DEFAULT_RESP.map((l) => ({ id: genId(), label: l, name: "" })))
+      .map((r) => ({ id: genId(), label: r.label, name: r.name })),
+    // 阶段兜底：当前 DAY 阶段为空时用默认阶段，避免新增 DAY 无阶段卡片
+    stages: base.stages?.length ? base.stages.map((st) => ({ id: genId(), name: st.name })) : DEFAULT_STAGES.map((n) => ({ id: genId(), name: n })),
     lanes: [], cards: [], parts: [],
   };
   s.charts.splice(idx + 1, 0, chart);
@@ -204,13 +207,18 @@ function deleteChart(chartId: string): void {
   const s = state.value; if (!s) return;
   if (!window.confirm("确认删除本天？")) return;
   s.charts = s.charts.filter((c) => c.id !== chartId);
-  s.charts.forEach((c, i) => { c.day = i + 1; });
+  s.charts.forEach((c, i) => { c.day = i + 1; c.title = `DAY ${i + 1}`; });
   save();
 }
 function toggleCollapse(chartId: string): void {
   const s = state.value; if (!s) return;
   const c = s.charts.find((x) => x.id === chartId); if (!c) return;
   c.collapsed = !c.collapsed;
+  save();
+}
+/** DAY 编号输入校验：不允许 < 1（避免手动填出 DAY 0/负数）。 */
+function normalizeDay(chart: GanttChart): void {
+  if (!chart || !Number.isFinite(chart.day) || chart.day < 1) chart.day = 1;
   save();
 }
 function addStage(chartId: string): void {
@@ -1300,10 +1308,10 @@ async function importAllXlsx(event: Event): Promise<void> {
         const participants = String(row[4] || "").trim();
         const note = String(row[5] || "").trim();
         if (!content) return;
-        // DAY 解析：行内 DAY 列优先（"DAY 1"/"DAY1"），无则回退 sheet 名
+        // DAY 解析：行内 DAY 列优先（"DAY 1"/"DAY1"），无则回退 sheet 名；均要求 ≥ 1（防 DAY 0/负数）
         const dm = dayText.match(/DAY\s*(\d+)/i);
         let dayNum = dm ? Number(dm[1]) : NaN;
-        if (!Number.isFinite(dayNum) || dayNum < 1) dayNum = Number.isFinite(sheetDay) ? sheetDay : NaN;
+        if (!Number.isFinite(dayNum) || dayNum < 1) dayNum = (Number.isFinite(sheetDay) && sheetDay >= 1) ? sheetDay : NaN;
         let chart = Number.isFinite(dayNum) ? s.charts.find((c) => c.day === dayNum) : undefined;
         if (!chart && Number.isFinite(dayNum)) {
           // 导入数据含新 DAY：自动新建 DAY 卡片（结构与 addChart 一致）
@@ -1474,7 +1482,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <div class="chart-title-row">
                 <button class="collapse-btn" @click="toggleCollapse(chart.id)" :title="chart.collapsed ? '展开本天' : '收起本天'">{{ chart.collapsed ? '▶' : '▼' }}</button>
                 <input class="date-input" type="date" v-model="chart.date" @change="save" title="日期(日历选择)" />
-                <span class="day-label">DAY</span><input v-model.number="chart.day" class="day-input" @change="save" title="DAY 计数" />
+                <span class="day-label">DAY</span><input v-model.number="chart.day" class="day-input" @change="normalizeDay(chart)" title="DAY 计数" />
                 <input v-model="chart.title" class="chart-title-input" @change="save" title="标题" />
               </div>
               <div class="chart-toolbar">
@@ -1570,7 +1578,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <div class="chart-title-row">
                 <button class="collapse-btn" @click="toggleCollapse(chart.id)" :title="chart.collapsed ? '展开本天' : '收起本天'">{{ chart.collapsed ? '▶' : '▼' }}</button>
                 <input class="date-input" type="date" v-model="chart.date" @change="save" />
-                <span class="day-label">DAY</span><input v-model.number="chart.day" class="day-input" @change="save" />
+                <span class="day-label">DAY</span><input v-model.number="chart.day" class="day-input" @change="normalizeDay(chart)" />
                 <input v-model="chart.title" class="chart-title-input" @change="save" />
               </div>
               <div class="chart-toolbar">
