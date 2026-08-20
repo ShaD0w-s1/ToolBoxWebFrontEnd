@@ -343,6 +343,26 @@ export interface GanttPartListItem {
   note?: string;
 }
 export interface GanttPartList { id: string; name: string; items: GanttPartListItem[] }
+/** 串件安排的执行阶段引用：跨 DAY（chartId + 该 DAY 内阶段索引）；null = 未分配。 */
+export interface GanttSpStageRef { chartId: string; stageIdx: number }
+/** 串件安排的一行（拆/装 两行独立数据）。 */
+export interface GanttSpRow {
+  id: string;
+  tag: "拆" | "装" | "";   // 负责人输入框前标识
+  owner: string;
+  participants: string;
+  note: string;
+  executeStage: GanttSpStageRef | null;
+}
+/** 串件安排（全局统筹，不跟随 DAY）：串件类型含拆/装两行，其他类型一行。 */
+export interface GanttSpArrangement {
+  id: string;
+  type: string;          // 无/串件/单拆/单装/领新件
+  content: string;       // 串件内容
+  jc: string;            // 工卡号（手册清单串件工卡共用）
+  name: string;          // 工卡名称
+  rows: GanttSpRow[];
+}
 /** 换发/APU 甘特准备单完整 state（对应 gantt-web 的 state，localStorage key toolbox-gantt-v4）。 */
 export interface GanttPrepState {
   version: number;
@@ -353,6 +373,7 @@ export interface GanttPrepState {
   docs: { wp: unknown[]; eng: unknown[]; sp: unknown[] };
   airParts: GanttPartList[];
   toolParts: GanttPartList[];
+  spArrangements: GanttSpArrangement[];
   meta: Record<string, unknown>;
 }
 
@@ -367,6 +388,7 @@ export function defaultGanttPrep(): GanttPrepState {
     docs: { wp: [], eng: [], sp: [] },
     airParts: [],
     toolParts: [],
+    spArrangements: [],
     meta: {},
   };
 }
@@ -839,6 +861,7 @@ function ganttPrepFromDoc(doc: Record<string, unknown>): GanttPrepState {
       : { wp: [], eng: [], sp: [] },
     airParts: Array.isArray(raw.airParts) ? (raw.airParts as GanttPartList[]) : [],
     toolParts: Array.isArray(raw.toolParts) ? (raw.toolParts as GanttPartList[]) : [],
+    spArrangements: Array.isArray(raw.spArrangements) ? (raw.spArrangements as GanttSpArrangement[]) : [],
     meta: raw.meta && typeof raw.meta === "object" ? (raw.meta as Record<string, unknown>) : {},
   };
 }

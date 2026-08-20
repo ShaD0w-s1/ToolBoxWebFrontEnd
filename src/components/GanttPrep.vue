@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
-import type { GanttPrepState, GanttChart, GanttCard, GanttPart, GanttPartList, GanttPartListItem } from "../domain/toolbox";
+import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
 import { backend } from "../api";
 import NameSuggest from "./NameSuggest.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 
 const DEFAULT_RESP = ["现场负责人", "工具负责", "持卡", "必检", "拆装记录人"];
-const DEFAULT_PARTS_TYPES = ["N/A", "普查", "串件", "单拆", "单装", "装新件"];
+const DEFAULT_PARTS_TYPES = ["无", "串件", "单拆", "单装", "领新件"];
 
 function genId(): string {
   return (globalThis.crypto?.randomUUID?.() || `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`).slice(0, 20);
@@ -77,7 +77,10 @@ function collectChartParticipants(chart: GanttChart): string[] {
   const add = (s: string) => splitNames(s).forEach((t) => { const c = cleanDetectedName(t); if (c) set.add(c); });
   (chart.responsibilities || []).forEach((r) => add(r.name));
   (chart.cards || []).forEach((card) => { add(card.owner); add(card.participants); });
-  (chart.parts || []).forEach((p) => { add(p.owner); add(p.participants); });
+  // 全局串件安排（该 DAY 已分配的串件行 + 未分配串件行都计入参与人）
+  getSpArrangements().forEach((a) => a.rows.forEach((r) => {
+    if (!r.executeStage || r.executeStage.chartId === chart.id) { add(r.owner); add(r.participants); }
+  }));
   return Array.from(set).sort((a, b) => a.localeCompare(b, "zh-CN"));
 }
 // 全部 DAY 自动检测名单
@@ -158,13 +161,14 @@ function computeRows(chart: GanttChart): Record<string, number> {
   });
   const colMax = Array(n).fill(-1);
   cards.forEach((c) => { for (let s = c.startStage; s <= c.endStage; s++) colMax[s] = Math.max(colMax[s], rows[c.id]); });
-  const assigned = (chart.parts || []).filter((p) => typeof p.executeStage === "number" && p.executeStage >= 0);
-  assigned.sort((a, b) => (a.executeStage !== b.executeStage ? a.executeStage! - b.executeStage! : (a.order ?? 0) - (b.order ?? 0)));
+  const assigned = getSpArrangements().flatMap((arr) => arr.rows.map((row) => ({ arr, row })))
+    .filter((x) => x.row.executeStage && x.row.executeStage.chartId === chart.id)
+    .sort((a, b) => (a.row.executeStage!.stageIdx - b.row.executeStage!.stageIdx) || 0);
   const colCursor = colMax.map((m) => m + 1);
-  assigned.forEach((p) => {
-    const s = p.executeStage!;
+  assigned.forEach((x) => {
+    const s = x.row.executeStage!.stageIdx;
     const r = colCursor[s];
-    rows["part:" + p.id] = r;
+    rows["sp:" + x.row.id] = r;
     maxRow = Math.max(maxRow, r);
     colCursor[s]++;
   });
@@ -240,6 +244,10 @@ function deleteChart(chartId: string): void {
   const s = state.value; if (!s) return;
   if (!window.confirm("确认删除本天？")) return;
   s.charts = s.charts.filter((c) => c.id !== chartId);
+  // 清除串件安排中指向被删 DAY 的执行阶段（变回未分配）
+  (Array.isArray(s.spArrangements) ? s.spArrangements : []).forEach((a) => {
+    a.rows.forEach((r) => { if (r.executeStage && r.executeStage.chartId === chartId) r.executeStage = null; });
+  });
   // 存在小数/负数 DAY 时不重编号（避免破坏编号语义）
   if (!hasSpecialDays(s.charts)) s.charts.forEach((c, i) => { c.day = i + 1; c.title = `DAY ${i + 1}`; });
   save();
@@ -271,9 +279,14 @@ function removeStage(chartId: string, idx: number): void {
     if (card.endStage > idx) card.endStage--;
     return card;
   });
-  c.parts = c.parts.filter((p) => p.executeStage !== idx).map((p) => {
-    if (typeof p.executeStage === "number" && p.executeStage > idx) p.executeStage--;
-    return p;
+  // 全局串件安排：删除落在该阶段的分配，其后阶段索引前移
+  getSpArrangements().forEach((a) => {
+    a.rows.forEach((r) => {
+      if (r.executeStage && r.executeStage.chartId === chartId) {
+        if (r.executeStage.stageIdx === idx) r.executeStage = null;
+        else if (r.executeStage.stageIdx > idx) r.executeStage.stageIdx--;
+      }
+    });
   });
   save();
 }
@@ -288,19 +301,6 @@ function deleteCard(chartId: string, cardId: string): void {
   const s = state.value; if (!s) return;
   const c = s.charts.find((x) => x.id === chartId); if (!c) return;
   c.cards = c.cards.filter((x) => x.id !== cardId);
-  save();
-}
-function addPart(chartId: string): void {
-  const s = state.value; if (!s) return;
-  const c = s.charts.find((x) => x.id === chartId); if (!c) return;
-  c.parts.push({ id: genId(), type: "串件", content: "", owner: "", participants: "", note: "", executeStage: null, order: c.parts.length });
-  save();
-}
-function deletePart(chartId: string, partId: string): void {
-  const s = state.value; if (!s) return;
-  const c = s.charts.find((x) => x.id === chartId); if (!c) return;
-  c.parts = c.parts.filter((x) => x.id !== partId);
-  renormalizePartOrders(c);
   save();
 }
 function addResp(chartId: string): void {
@@ -318,11 +318,101 @@ function removeResp(chartId: string, respId: string): void {
 function cardsOfStage(chart: GanttChart, stageIdx: number): GanttCard[] {
   return chart.cards.filter((c) => c.startStage === stageIdx).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
-function partsOfStage(chart: GanttChart, stageIdx: number): GanttPart[] {
-  return chart.parts.filter((p) => p.executeStage === stageIdx);
+
+// —— 全局串件安排（跨 DAY 统筹，不再跟随 DAY 卡片） ——
+function ensureSpArrangements(s: GanttPrepState): GanttSpArrangement[] {
+  if (Array.isArray(s.spArrangements)) return s.spArrangements;
+  // 一次性迁移旧数据：charts[].parts → spArrangements（parts 字段保留作兼容，UI 不再使用）
+  const d = ensureDocs(s);
+  const spList = d.sp as Array<Record<string, string>>;
+  const arr: GanttSpArrangement[] = [];
+  (s.charts || []).forEach((c) => {
+    (c.parts || []).forEach((p) => {
+      const ext = p.content ? spList.find((x) => x.content === p.content) : undefined;
+      const rows: GanttSpRow[] = [{
+        id: genId(), tag: p.type === "串件" || p.type === "单拆" ? "拆" : p.type === "单装" ? "装" : "",
+        owner: p.owner || "", participants: p.participants || "", note: p.note || "",
+        executeStage: (typeof p.executeStage === "number" && p.executeStage >= 0) ? { chartId: c.id, stageIdx: p.executeStage } : null,
+      }];
+      if (p.type === "串件") rows.push({ id: genId(), tag: "装", owner: "", participants: "", note: "", executeStage: null });
+      arr.push({ id: genId(), type: p.type || "串件", content: p.content || "", jc: ext?.jc || "", name: ext?.name || "", rows });
+    });
+  });
+  s.spArrangements = arr;
+  return arr;
 }
-function isPartUnassigned(p: GanttPart): boolean {
-  return !(typeof p.executeStage === "number" && p.executeStage >= 0);
+function getSpArrangements(): GanttSpArrangement[] {
+  const s = state.value; if (!s) return [];
+  return Array.isArray(s.spArrangements) ? s.spArrangements : ensureSpArrangements(s);
+}
+function addSpArrangement(): void {
+  const s = state.value; if (!s) return;
+  const list = ensureSpArrangements(s);
+  list.push({
+    id: genId(), type: "串件", content: "", jc: "", name: "",
+    rows: [
+      { id: genId(), tag: "拆", owner: "", participants: "", note: "", executeStage: null },
+      { id: genId(), tag: "装", owner: "", participants: "", note: "", executeStage: null },
+    ],
+  });
+  save();
+}
+function removeSpArrangement(id: string): void {
+  const s = state.value; if (!s) return;
+  s.spArrangements = (Array.isArray(s.spArrangements) ? s.spArrangements : []).filter((a) => a.id !== id);
+  save();
+}
+/** 类型切换：串件 → 补齐拆/装两行；其他类型 → 裁剪为一行（tag 按类型）。保留第一行数据。 */
+function changeSpType(a: GanttSpArrangement, type: string): void {
+  a.type = type;
+  if (type === "串件") {
+    if (!a.rows.length) a.rows.push({ id: genId(), tag: "拆", owner: "", participants: "", note: "", executeStage: null });
+    a.rows[0].tag = "拆";
+    if (a.rows.length < 2) a.rows.push({ id: genId(), tag: "装", owner: "", participants: "", note: "", executeStage: null });
+    else a.rows[1].tag = "装";
+  } else {
+    if (a.rows.length > 1) a.rows = a.rows.slice(0, 1);
+    if (a.rows[0]) a.rows[0].tag = type === "单拆" ? "拆" : type === "单装" ? "装" : "";
+  }
+  save();
+}
+/** 执行阶段下拉选项：跨所有 DAY 的阶段（DAY n · 阶段名）。 */
+function allStageOptions(): Array<{ value: string; label: string }> {
+  const opts: Array<{ value: string; label: string }> = [];
+  const s = state.value; if (!s) return opts;
+  s.charts.forEach((c) => {
+    c.stages.forEach((st, si) => opts.push({ value: `${c.id}::${si}`, label: `DAY ${c.day} · ${st.name || "阶段" + (si + 1)}` }));
+  });
+  return opts;
+}
+/** 某 DAY 某阶段的串件行（展示用）。 */
+function spRowsOfStage(chartId: string, stageIdx: number): Array<{ arr: GanttSpArrangement; row: GanttSpRow }> {
+  return getSpArrangements().flatMap((arr) =>
+    arr.rows.map((row) => ({ arr, row })).filter((x) => x.row.executeStage && x.row.executeStage.chartId === chartId && x.row.executeStage.stageIdx === stageIdx));
+}
+/** 所有未分配执行阶段的串件行（甘特图 DAY 卡片未分配区展示 + 拖拽分配）。 */
+function unassignedSpRows(): Array<{ arr: GanttSpArrangement; row: GanttSpRow }> {
+  return getSpArrangements().flatMap((arr) =>
+    arr.rows.map((row) => ({ arr, row })).filter((x) => !x.row.executeStage));
+}
+/** 清除某串件行的执行阶段（阶段中串件卡片 X：删除原分配的阶段，不删记录）。 */
+function clearSpStage(arrId: string, rowId: string): void {
+  const s = state.value; if (!s) return;
+  const arr = (Array.isArray(s.spArrangements) ? s.spArrangements : []).find((a) => a.id === arrId);
+  const row = arr?.rows.find((r) => r.id === rowId);
+  if (row) { row.executeStage = null; save(); }
+}
+/** 设置某串件行的执行阶段（下拉 "chartId::stageIdx" 或空 = 未分配）。 */
+function setSpRowStage(row: GanttSpRow, value: string): void {
+  if (!value) row.executeStage = null;
+  else { const [chartId, si] = value.split("::"); row.executeStage = { chartId, stageIdx: Number(si) }; }
+  save();
+}
+/** 某 DAY 已分配的串件行（甘特图阶段列渲染）。 */
+function spCardsOfChart(chart: GanttChart): Array<{ arr: GanttSpArrangement; row: GanttSpRow; stageIdx: number }> {
+  return getSpArrangements().flatMap((arr) =>
+    arr.rows.map((row) => ({ arr, row })).filter((x) => x.row.executeStage && x.row.executeStage.chartId === chart.id)
+      .map((x) => ({ arr: x.arr, row: x.row, stageIdx: x.row.executeStage!.stageIdx })));
 }
 
 // —— 飞机信息 / 项目安排 / 部件 CRUD ——
@@ -396,102 +486,6 @@ function removeDoc(list: "wp" | "eng" | "sp", idx: number): void {
   save();
 }
 
-// —— 串件工卡（合并视图：表单串件 auto 行 + 手动记录 manual 行）——
-interface SpRow {
-  uid: string;
-  partId: string | null; // 非空 = 自动行（来自表单串件卡片）
-  spId: string | null;   // 非空 = 手动行在 docs.sp 的记录 id
-  content: string;
-  type: string;
-  jc: string;
-  name: string;
-  jc2: string;  // 串件/拆装类型额外一行的独立工卡号
-  name2: string; // 串件/拆装类型额外一行的独立工卡名称
-  source: "auto" | "manual";
-}
-function findPartById(partId: string): GanttPart | null {
-  for (const c of state.value?.charts || []) {
-    const p = (c.parts || []).find((x) => x.id === partId);
-    if (p) return p;
-  }
-  return null;
-}
-function findSpById(id: string): Record<string, string> | null {
-  const s = state.value; if (!s) return null;
-  return (ensureDocs(s).sp as Array<Record<string, string>>).find((x) => x.id === id) || null;
-}
-function findOrCreateSpByContent(content: string): Record<string, string> {
-  const s = state.value!;
-  const d = ensureDocs(s);
-  const spList = d.sp as Array<Record<string, string>>;
-  let rec = spList.find((x) => x.content === content);
-  if (!rec) { rec = { id: genId(), type: "", content, jc: "", name: "" }; spList.push(rec); }
-  return rec;
-}
-function getSpRows(): SpRow[] {
-  const s = state.value; if (!s) return [];
-  const d = ensureDocs(s);
-  const spList = d.sp as Array<Record<string, string>>;
-  const partContents = new Set<string>();
-  s.charts.forEach((c) => (c.parts || []).forEach((p) => { if (p.content) partContents.add(p.content); }));
-  const rows: SpRow[] = [];
-  s.charts.forEach((c) => (c.parts || []).forEach((p) => {
-    const ext = p.content ? spList.find((x) => x.content === p.content) : undefined;
-    rows.push({ uid: "auto:" + p.id, partId: p.id, spId: null, content: p.content || "", type: p.type || "", jc: ext ? (ext.jc || "") : "", name: ext ? (ext.name || "") : "", jc2: ext ? (ext.jc2 || "") : "", name2: ext ? (ext.name2 || "") : "", source: "auto" });
-  }));
-  spList.forEach((x, idx) => {
-    if (x.content && partContents.has(x.content)) return; // 已被自动行匹配（同内容）
-    rows.push({ uid: "manual:" + (x.id || ("sp" + idx)), partId: null, spId: String(x.id || ("sp" + idx)), content: x.content || "", type: x.type || "", jc: x.jc || "", name: x.name || "", jc2: x.jc2 || "", name2: x.name2 || "", source: "manual" });
-  });
-  return rows;
-}
-// 串件/拆装类型：下方附「工卡号+工卡名称」汇总行，且类型/内容上下行合并单元格
-function isCombineType(t: string): boolean { return t === "串件" || t === "拆装"; }
-// 编辑串件工卡类型：auto→同步串件卡片(part.type)；manual→写 docs.sp
-function editSpRowType(row: SpRow, value: string): void {
-  if (row.partId) { const p = findPartById(row.partId); if (p) { p.type = value; save(); } }
-  else { const rec = findSpById(row.spId || ""); if (rec) { rec.type = value; save(); } }
-}
-// 编辑串件工卡内容：auto→同步串件卡片(part.content)+docs.sp 键；manual→写 docs.sp
-function editSpRowContent(row: SpRow, value: string): void {
-  if (row.partId) {
-    const p = findPartById(row.partId); if (!p) return;
-    const old = p.content;
-    p.content = value;
-    const s = state.value; if (s) {
-      const rec = (ensureDocs(s).sp as Array<Record<string, string>>).find((x) => x.content === old);
-      if (rec) rec.content = value;
-    }
-    save();
-  } else {
-    const rec = findSpById(row.spId || ""); if (rec) { rec.content = value; save(); }
-  }
-}
-// 编辑工卡号：auto 行写入与串件内容匹配的 docs.sp 记录；manual 行直接改
-function editSpRowJc(row: SpRow, value: string): void {
-  if (row.partId) { const p = findPartById(row.partId); if (p) { findOrCreateSpByContent(p.content).jc = value; save(); } }
-  else { const rec = findSpById(row.spId || ""); if (rec) { rec.jc = value; save(); } }
-}
-function editSpRowName(row: SpRow, value: string): void {
-  if (row.partId) { const p = findPartById(row.partId); if (p) { findOrCreateSpByContent(p.content).name = value; save(); } }
-  else { const rec = findSpById(row.spId || ""); if (rec) { rec.name = value; save(); } }
-}
-// 编辑额外行工卡号：写入 docs.sp 的 jc2（独立于原行 jc）
-function editSpRowJc2(row: SpRow, value: string): void {
-  if (row.partId) { const p = findPartById(row.partId); if (p) { findOrCreateSpByContent(p.content).jc2 = value; save(); } }
-  else { const rec = findSpById(row.spId || ""); if (rec) { rec.jc2 = value; save(); } }
-}
-// 编辑额外行工卡名称：写入 docs.sp 的 name2（独立于原行 name）
-function editSpRowName2(row: SpRow, value: string): void {
-  if (row.partId) { const p = findPartById(row.partId); if (p) { findOrCreateSpByContent(p.content).name2 = value; save(); } }
-  else { const rec = findSpById(row.spId || ""); if (rec) { rec.name2 = value; save(); } }
-}
-function removeSpDoc(row: SpRow): void {
-  const s = state.value; if (!s) return;
-  const d = ensureDocs(s);
-  if (row.spId) d.sp = (d.sp as Array<Record<string, string>>).filter((x) => x.id !== row.spId);
-  save();
-}
 // 依据工卡清单：B列(索引1)含 JC 为工卡号；SMJC/ZBJC 读 E列(4)，其他 JC 读 G列(6) 为名称(取 ## 前)
 function parseWorkDocRows(rows: unknown[][]): number {
   const s = state.value; if (!s) return 0;
@@ -532,21 +526,21 @@ function ensurePartLists(s: GanttPrepState) {
   if (!Array.isArray(s.airParts)) s.airParts = [];
   if (!Array.isArray(s.toolParts)) s.toolParts = [];
 }
-// 串件内容候选（卡片名联想：来自表单各 DAY 串件 content）
+// 串件内容候选（卡片名联想：来自串件安排 content）
 const partContentSuggestions = computed<string[]>(() => {
   const set = new Set<string>();
-  state.value?.charts.forEach((c) => (c.parts || []).forEach((p) => { if (p.content) set.add(p.content); }));
+  getSpArrangements().forEach((a) => { if (a.content) set.add(a.content); });
   return Array.from(set).sort((a, b) => a.localeCompare(b, "zh-CN"));
 });
-// 把表单串件内容同步成串件清单卡片（该内容尚无卡片时补一张空卡片）
+// 把串件安排内容同步成串件清单卡片（该内容尚无卡片时补一张空卡片）
 function syncPartCardsFromCharts(kind: "airParts" | "toolParts"): void {
   const s = state.value; if (!s) return;
   ensurePartLists(s);
   const list = s[kind] as GanttPartList[];
   const seen = new Set(list.map((x) => x.name));
-  s.charts.forEach((c) => (c.parts || []).forEach((p) => {
-    if (p.content && !seen.has(p.content)) { list.push({ id: genId(), name: p.content, items: [] }); seen.add(p.content); }
-  }));
+  getSpArrangements().forEach((a) => {
+    if (a.content && !seen.has(a.content)) { list.push({ id: genId(), name: a.content, items: [] }); seen.add(a.content); }
+  });
 }
 function addPartList(kind: "airParts" | "toolParts"): void {
   const s = state.value; if (!s) return;
@@ -648,24 +642,6 @@ function setCardOrder(chart: GanttChart, card: GanttCard, newOrder: number): voi
   chart.cards = others;
   syncLanes(chart);
 }
-function renormalizePartOrders(chart: GanttChart): void {
-  const groups: Record<string, GanttPart[]> = {};
-  chart.parts.forEach((p) => {
-    const k = (typeof p.executeStage === "number" && p.executeStage >= 0) ? String(p.executeStage) : "unassigned";
-    (groups[k] = groups[k] || []).push(p);
-  });
-  Object.values(groups).forEach((g) => {
-    g.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    g.forEach((p, i) => { p.order = i; });
-  });
-}
-function setPartOrder(chart: GanttChart, part: GanttPart, newOrder: number): void {
-  const group = chart.parts.filter((p) => p.executeStage === part.executeStage);
-  const others = group.filter((p) => p.id !== part.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const idx = clamp(newOrder, 0, others.length);
-  others.splice(idx, 0, part);
-  others.forEach((p, i) => { p.order = i; });
-}
 // 阶段列换序：把 fromIdx 移到 toIdx，重映射卡片 start/end 与串件 executeStage
 function moveStage(chartId: string, fromIdx: number, toIdx: number): void {
   const chart = findChart(chartId); if (!chart) return;
@@ -683,8 +659,11 @@ function moveStage(chartId: string, fromIdx: number, toIdx: number): void {
     c.endStage = remap(c.endStage);
     if (c.startStage > c.endStage) { const t = c.startStage; c.startStage = c.endStage; c.endStage = t; }
   });
-  chart.parts.forEach((p) => {
-    if (typeof p.executeStage === "number" && p.executeStage >= 0) p.executeStage = remap(p.executeStage);
+  // 全局串件安排中该 DAY 的行同步重映射阶段
+  getSpArrangements().forEach((a) => {
+    a.rows.forEach((r) => {
+      if (r.executeStage && r.executeStage.chartId === chartId) r.executeStage.stageIdx = remap(r.executeStage.stageIdx);
+    });
   });
 }
 
@@ -759,31 +738,29 @@ function startCardDrag(e: PointerEvent, mode: "move" | "resize-left" | "resize-r
   window.addEventListener("pointerup", onCardDragEnd);
 }
 
-// —— 串件卡片拖曳（换阶段 / 调行序） ——
-interface PartDrag { mode: "move" | "resize-left" | "resize-right"; chartId: string; partId: string; el: HTMLElement; startX: number; startY: number; n: number; colW: number; rowH: number; origStage: number; origOrder: number; curStage: number; curOrder: number }
+// —— 串件卡片拖曳（已分配串件：同 DAY 内换阶段） ——
+function findSpRow(arrId: string, rowId: string): GanttSpRow | null {
+  const s = state.value; if (!s) return null;
+  const arr = (Array.isArray(s.spArrangements) ? s.spArrangements : []).find((a) => a.id === arrId);
+  return arr?.rows.find((r) => r.id === rowId) || null;
+}
+interface PartDrag { chartId: string; arrId: string; rowId: string; el: HTMLElement; startX: number; n: number; colW: number; origStage: number; curStage: number }
 let partDrag: PartDrag | null = null;
 function onPartDragMove(e: PointerEvent): void {
   if (!partDrag) return;
   const d = partDrag;
-  const dx = e.clientX - d.startX;
-  const dy = e.clientY - d.startY;
-  const ds = Math.round(dx / d.colW);
-  const dr = Math.round(dy / d.rowH);
+  const ds = Math.round((e.clientX - d.startX) / d.colW);
   const chart = findChart(d.chartId);
   d.curStage = clamp(d.origStage + ds, 0, d.n - 1);
-  const maxOrder = (chart?.parts || []).filter((x) => x.id !== d.partId && x.executeStage === d.curStage).length;
-  d.curOrder = clamp(d.origOrder + dr, 0, maxOrder);
-  d.el.style.transform = `translate(${ds * d.colW}px, ${dr * d.rowH}px)`;
-  d.el.title = `阶段「${chart?.stages[d.curStage]?.name ?? ""}」 · 行 ${d.curOrder + 1}`;
+  d.el.style.transform = `translate(${ds * d.colW}px, 0px)`;
+  d.el.title = `阶段「${chart?.stages[d.curStage]?.name ?? ""}」`;
 }
 function onPartDragEnd(): void {
   if (partDrag) {
     const d = partDrag;
-    const chart = findChart(d.chartId);
-    const p = chart?.parts.find((x) => x.id === d.partId);
-    if (chart && p) {
-      p.executeStage = d.curStage;
-      setPartOrder(chart, p, d.curOrder);
+    const row = findSpRow(d.arrId, d.rowId);
+    if (row && row.executeStage && row.executeStage.chartId === d.chartId) {
+      row.executeStage.stageIdx = d.curStage;
     }
     d.el.style.opacity = "";
     d.el.style.zIndex = "";
@@ -795,17 +772,16 @@ function onPartDragEnd(): void {
   window.removeEventListener("pointerup", onPartDragEnd);
   partDrag = null;
 }
-function startPartDrag(e: PointerEvent, chartId: string, partId: string): void {
+function startPartDrag(e: PointerEvent, chartId: string, arrId: string, rowId: string): void {
   e.preventDefault();
   const chart = findChart(chartId); if (!chart) return;
-  const p = chart.parts.find((x) => x.id === partId); if (!p) return;
+  const row = findSpRow(arrId, rowId); if (!row || !row.executeStage || row.executeStage.chartId !== chartId) return;
   const el = (e.currentTarget as HTMLElement).closest(".gantt-card") as HTMLElement;
   const n = chart.stages.length;
   const grid = el.closest(".gantt-grid") as HTMLElement | null;
   const colW = grid ? grid.getBoundingClientRect().width / n : 160;
-  const rowH = el.offsetHeight || 60;
-  const origStage = (typeof p.executeStage === "number" && p.executeStage >= 0) ? p.executeStage : 0;
-  partDrag = { mode: "move", chartId, partId, el, startX: e.clientX, startY: e.clientY, n, colW, rowH, origStage, origOrder: p.order ?? 0, curStage: origStage, curOrder: p.order ?? 0 };
+  const origStage = row.executeStage.stageIdx;
+  partDrag = { chartId, arrId, rowId, el, startX: e.clientX, n, colW, origStage, curStage: origStage };
   document.body.style.userSelect = "none";
   el.style.opacity = "0.85";
   el.style.zIndex = "999";
@@ -813,8 +789,8 @@ function startPartDrag(e: PointerEvent, chartId: string, partId: string): void {
   window.addEventListener("pointerup", onPartDragEnd);
 }
 
-// —— 未分配串件拖到甘特图阶段列（分配） ——
-let unassignedDrag: { chartId: string; partId: string; el: HTMLElement; n: number; over: boolean; targetStage: number; grid: HTMLElement | null } | null = null;
+// —— 未分配串件拖到甘特图阶段列（分配 chartId + stageIdx） ——
+let unassignedDrag: { chartId: string; arrId: string; rowId: string; el: HTMLElement; n: number; over: boolean; targetStage: number; grid: HTMLElement | null } | null = null;
 function onUnassignedDragMove(e: PointerEvent): void {
   if (!unassignedDrag) return;
   const d = unassignedDrag;
@@ -829,11 +805,9 @@ function onUnassignedDragMove(e: PointerEvent): void {
 function onUnassignedDragEnd(): void {
   if (unassignedDrag) {
     const d = unassignedDrag;
-    const chart = findChart(d.chartId);
-    const p = chart?.parts.find((x) => x.id === d.partId);
-    if (chart && p && d.over && d.targetStage >= 0) {
-      p.executeStage = d.targetStage;
-      p.order = chart.parts.filter((x) => x.id !== p.id && x.executeStage === d.targetStage).length;
+    const row = findSpRow(d.arrId, d.rowId);
+    if (row && d.over && d.targetStage >= 0) {
+      row.executeStage = { chartId: d.chartId, stageIdx: d.targetStage };
     }
     d.el.style.opacity = "";
     save();
@@ -843,13 +817,13 @@ function onUnassignedDragEnd(): void {
   window.removeEventListener("pointerup", onUnassignedDragEnd);
   unassignedDrag = null;
 }
-function startUnassignedDrag(e: PointerEvent, chartId: string, partId: string): void {
+function startUnassignedDrag(e: PointerEvent, chartId: string, arrId: string, rowId: string): void {
   e.preventDefault();
   const chart = findChart(chartId); if (!chart) return;
-  const p = chart.parts.find((x) => x.id === partId); if (!p) return;
+  const row = findSpRow(arrId, rowId); if (!row) return;
   const el = (e.currentTarget as HTMLElement).closest(".gantt-card") as HTMLElement;
   const grid = el.closest(".gp-card")?.querySelector(".gantt-grid") as HTMLElement | null;
-  unassignedDrag = { chartId, partId, el, n: chart.stages.length, over: false, targetStage: -1, grid };
+  unassignedDrag = { chartId, arrId, rowId, el, n: chart.stages.length, over: false, targetStage: -1, grid };
   document.body.style.userSelect = "none";
   el.style.opacity = "0.85";
   el.style.zIndex = "999";
@@ -900,8 +874,10 @@ function insertStage(chartId: string, idx: number): void {
     if (c.startStage >= idx) c.startStage++;
     if (c.endStage >= idx) c.endStage++;
   });
-  chart.parts.forEach((p) => {
-    if (typeof p.executeStage === "number" && p.executeStage >= idx) p.executeStage++;
+  getSpArrangements().forEach((a) => {
+    a.rows.forEach((r) => {
+      if (r.executeStage && r.executeStage.chartId === chartId && r.executeStage.stageIdx >= idx) r.executeStage.stageIdx++;
+    });
   });
   save();
 }
@@ -1146,9 +1122,11 @@ function buildPrintableHtml(): string {
     body += "</tbody></table>";
     body += "<h3>串件</h3>";
     body += '<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-size:12px;font-family:Microsoft YaHei,sans-serif"><thead><tr><th>类型</th><th>内容</th><th>负责人</th><th>参与人</th><th>备注</th><th>执行阶段</th></tr></thead><tbody>';
-    chart.parts.forEach((p) => {
-      const st = (typeof p.executeStage === "number" && p.executeStage >= 0 && chart.stages[p.executeStage]) ? chart.stages[p.executeStage].name : "未分配";
-      body += `<tr><td>${esc(p.type)}</td><td>${esc(p.content)}</td><td>${esc(p.owner)}</td><td>${esc(p.participants)}</td><td>${esc(p.note)}</td><td>${esc(st)}</td></tr>`;
+    getSpArrangements().forEach((a) => {
+      a.rows.forEach((r) => {
+        const st = r.executeStage ? (() => { const c = s.charts.find((x) => x.id === r.executeStage!.chartId); return c && c.stages[r.executeStage!.stageIdx] ? `DAY ${c.day} · ${c.stages[r.executeStage!.stageIdx].name}` : "已删除"; })() : "未分配";
+        body += `<tr><td>${esc((r.tag ? `（${r.tag}）` : "") + (a.type || ""))}</td><td>${esc(a.content)}</td><td>${esc(r.owner)}</td><td>${esc(r.participants)}</td><td>${esc(r.note)}</td><td>${esc(st)}</td></tr>`;
+      });
     });
     body += "</tbody></table>";
   });
@@ -1199,12 +1177,12 @@ async function exportAllXlsx(): Promise<void> {
     const ws1 = XLSX.utils.aoa_to_sheet(workRows);
     ws1["!cols"] = [{ wch: 8 }, { wch: 14 }, { wch: 42 }, { wch: 14 }, { wch: 22 }, { wch: 30 }];
     XLSX.utils.book_append_sheet(wb, ws1, "工序");
-    // 串件 sheet：所有 DAY 串件合并
+    // 串件 sheet：全局串件安排（每行一条，串件类型拆/装两行）
     const partRows: unknown[][] = [["DAY", "类型", "内容", "负责人", "参与人", "备注", "执行阶段"]];
-    s.charts.forEach((chart) => {
-      chart.parts.forEach((p) => {
-        const st = (typeof p.executeStage === "number" && chart.stages[p.executeStage]) ? chart.stages[p.executeStage].name : "未分配";
-        partRows.push([`DAY ${chart.day}`, p.type || "", p.content || "", p.owner || "", p.participants || "", p.note || "", st]);
+    getSpArrangements().forEach((a) => {
+      a.rows.forEach((r) => {
+        const st = r.executeStage ? (() => { const c = s.charts.find((x) => x.id === r.executeStage!.chartId); return c && c.stages[r.executeStage!.stageIdx] ? `DAY ${c.day} · ${c.stages[r.executeStage!.stageIdx].name}` : "已删除"; })() : "未分配";
+        partRows.push([r.executeStage ? `DAY ${s.charts.find((x) => x.id === r.executeStage!.chartId)?.day ?? ""}` : "", (r.tag ? `（${r.tag}）` : "") + (a.type || ""), a.content || "", r.owner || "", r.participants || "", r.note || "", st]);
       });
     });
     const ws2 = XLSX.utils.aoa_to_sheet(partRows);
@@ -1230,20 +1208,21 @@ async function exportDocsXlsx(): Promise<void> {
   [...(d.wp as Array<Record<string, string>>), ...(d.eng as Array<Record<string, string>>)].forEach((x, i) => {
     wpEng.push([i + 1, x.jc || "", x.name || "", ""]);
   });
-  const spRows = getSpRows();
+  const spList = getSpArrangements();
   const sp: unknown[][] = [["序号", "类型", "串件内容", "工卡号", "工卡名称", "领用人"]];
-  spRows.forEach((x, i) => {
-    sp.push([i + 1, x.type || "", x.content || "", x.jc || "", x.name || "", ""]);
-    if (isCombineType(x.type)) sp.push(["", "工卡号+工卡名称", "", x.jc2 || "", x.name2 || "", ""]);
+  spList.forEach((a, i) => {
+    a.rows.forEach((_r, ri) => {
+      sp.push(ri === 0 ? [i + 1, a.type || "", a.content || "", a.jc || "", a.name || "", ""] : ["", "", "", "", "", ""]);
+    });
   });
-  if (!wpEng.length && !spRows.length) { props.store.notify("手册清单暂无数据"); return; }
+  if (!wpEng.length && !spList.length) { props.store.notify("手册清单暂无数据"); return; }
   try {
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
     const ws1 = XLSX.utils.aoa_to_sheet(wpEng);
     ws1["!cols"] = [{ wch: 6 }, { wch: 24 }, { wch: 50 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws1, "手册清单");
-    if (spRows.length) {
+    if (spList.length) {
       const ws2 = XLSX.utils.aoa_to_sheet(sp);
       ws2["!cols"] = [{ wch: 6 }, { wch: 10 }, { wch: 26 }, { wch: 24 }, { wch: 40 }, { wch: 12 }];
       XLSX.utils.book_append_sheet(wb, ws2, "串件工卡");
@@ -1509,6 +1488,39 @@ async function importAllXlsx(event: Event): Promise<void> {
             <button class="gp-add" @click="addComponent">+ 新增部件卡片</button>
           </section>
 
+          <section class="gp-section">
+            <div class="gp-sec-title">串件安排</div>
+            <div class="part-rule">全局统筹所有串件安排（不再跟随 DAY 卡片）：类型「串件」含拆/装两行（负责人前带（拆）（装）标识，数据独立）；执行阶段可跨所有 DAY 选择，未分配项显示在甘特图「未分配串件」区并可拖曳分配。</div>
+            <table class="parts-table sp-arr-table">
+              <thead><tr><th style="width:80px">类型</th><th style="width:24%">串件内容</th><th style="width:120px">负责人</th><th style="width:130px">参与人</th><th>备注</th><th style="width:170px">执行阶段</th><th class="col-act">×</th></tr></thead>
+              <tbody>
+                <template v-for="a in getSpArrangements()" :key="a.id">
+                  <tr v-for="(r, ri) in a.rows" :key="r.id">
+                    <td v-if="ri === 0" :rowspan="a.rows.length">
+                      <select :value="a.type" @change="changeSpType(a, ($event.target as HTMLSelectElement).value)">
+                        <option v-for="t in DEFAULT_PARTS_TYPES" :key="t" :value="t">{{ t }}</option>
+                        <option v-if="a.type && !DEFAULT_PARTS_TYPES.includes(a.type)" :value="a.type">{{ a.type }}</option>
+                      </select>
+                    </td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save"></textarea></td>
+                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><NameSuggest :model-value="r.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="r.owner = $event; save()" /></td>
+                    <td><NameSuggest :model-value="r.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="r.participants = $event; save()" /></td>
+                    <td><textarea class="textwrap" rows="1" v-model="r.note" placeholder="备注" @input="save"></textarea></td>
+                    <td>
+                      <select :value="r.executeStage ? r.executeStage.chartId + '::' + r.executeStage.stageIdx : ''" @change="setSpRowStage(r, ($event.target as HTMLSelectElement).value)">
+                        <option value="">未选择</option>
+                        <option v-for="o in allStageOptions()" :key="o.value" :value="o.value">{{ o.label }}</option>
+                      </select>
+                    </td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length"><button class="icon-btn" title="删除整条串件安排" @click="removeSpArrangement(a.id)">×</button></td>
+                  </tr>
+                </template>
+                <tr v-if="!getSpArrangements().length"><td colspan="7" style="color:var(--muted);text-align:center;padding:12px">暂无串件安排 — 点击下方"新增串件安排"</td></tr>
+              </tbody>
+            </table>
+            <button class="gp-add" @click="addSpArrangement">+ 新增串件安排</button>
+          </section>
+
           <!-- 每个 DAY 的表单卡片 -->
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card" :id="'day-' + chart.id">
             <div class="chart-header">
@@ -1556,48 +1568,19 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <span v-if="card.endStage > card.startStage" class="fc-span">持续至「{{ chart.stages[card.endStage]?.name }}」</span>
                       <button class="icon-btn" @click="deleteCard(chart.id, card.id)">×</button>
                     </div>
-                    <div v-for="p in partsOfStage(chart, si)" :key="'p' + p.id" class="form-card-row part-form-row">
-                      <span class="part-form-tag">{{ p.type }}</span>
-                      <textarea class="textwrap" rows="1" v-model="p.content" placeholder="串件内容" @input="save"></textarea>
-                      <NameSuggest :model-value="p.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="p.owner = $event; save()" />
-                      <NameSuggest :model-value="p.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="p.participants = $event; save()" />
-                      <textarea class="textwrap" rows="1" v-model="p.note" placeholder="备注" @input="save"></textarea>
-                      <button class="icon-btn" @click="deletePart(chart.id, p.id)">×</button>
+                    <div v-for="x in spRowsOfStage(chart.id, si)" :key="'sp' + x.row.id" class="form-card-row part-form-row">
+                      <span class="part-form-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
+                      <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
+                      <span class="sp-view-field" :title="x.row.owner">{{ x.row.owner }}</span>
+                      <span class="sp-view-field" :title="x.row.participants">{{ x.row.participants }}</span>
+                      <span class="sp-view-note" :title="x.row.note">{{ x.row.note }}</span>
+                      <button class="icon-btn" title="删除原分配的阶段（串件仍在串件安排中）" @click="clearSpStage(x.arr.id, x.row.id)">×</button>
                     </div>
-                    <div v-if="!cardsOfStage(chart, si).length && !partsOfStage(chart, si).length" class="stage-empty">无工序</div>
+                    <div v-if="!cardsOfStage(chart, si).length && !spRowsOfStage(chart.id, si).length" class="stage-empty">无工序</div>
                   </div>
                   <button class="add-form-card-btn" @click="addCard(chart.id, si)">+ 添加工序卡片</button>
                 </div>
               </div>
-
-              <div class="gp-sec-title">串件 (工卡签署)</div>
-              <div class="part-rule">执行阶段列：选择串件要执行的阶段，选中后该串件作为工序卡片显示在对应阶段列；未选择 = 未分配(橘黄色)。</div>
-              <table class="parts-table">
-                <thead><tr><th style="width:80px">类型</th><th>内容</th><th style="width:90px">负责人</th><th style="width:110px">参与人</th><th>备注</th><th style="width:130px">执行阶段</th><th class="col-act">×</th></tr></thead>
-                <tbody>
-                  <tr v-for="p in chart.parts" :key="p.id" :class="{ unassigned: isPartUnassigned(p) }">
-                    <td>
-                      <select :value="p.type" @change="p.type = ($event.target as HTMLSelectElement).value; save()">
-                        <option v-for="t in DEFAULT_PARTS_TYPES" :key="t">{{ t }}</option>
-                        <option v-if="!DEFAULT_PARTS_TYPES.includes(p.type)">{{ p.type }}</option>
-                      </select>
-                    </td>
-                    <td><textarea class="textwrap" rows="1" v-model="p.content" placeholder="内容" @input="save"></textarea></td>
-                    <td><NameSuggest :model-value="p.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="p.owner = $event; save()" /></td>
-                    <td><NameSuggest :model-value="p.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="p.participants = $event; save()" /></td>
-                    <td><textarea class="textwrap" rows="1" v-model="p.note" placeholder="备注" @input="save"></textarea></td>
-                    <td>
-                      <select :value="p.executeStage ?? ''" @change="p.executeStage = ($event.target as HTMLSelectElement).value === '' ? null : Number(($event.target as HTMLSelectElement).value); save()">
-                        <option value="">未选择</option>
-                        <option v-for="(s, si) in chart.stages" :key="s.id" :value="si">{{ s.name }}</option>
-                      </select>
-                    </td>
-                    <td><button class="icon-btn" @click="deletePart(chart.id, p.id)">×</button></td>
-                  </tr>
-                  <tr v-if="!chart.parts.length"><td colspan="7" style="color:var(--muted);text-align:center;padding:12px">暂无串件 — 点击下方"新增串件"</td></tr>
-                </tbody>
-              </table>
-              <button class="gp-add" @click="addPart(chart.id)">+ 新增串件</button>
             </template>
           </section>
 
@@ -1656,36 +1639,36 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="card-foot"><button class="icon-btn danger" @click="deleteCard(chart.id, card.id)">×</button></div>
                     </div>
                   </div>
-                  <div v-for="p in chart.parts.filter(x => !isPartUnassigned(x))" :key="'p' + p.id" class="card-slot" :style="{ gridColumn: `${(p.executeStage ?? 0) + 1}/${(p.executeStage ?? 0) + 2}`, gridRow: (ganttRows(chart)['part:' + p.id] ?? 0) + 2 }">
+                  <div v-for="x in spCardsOfChart(chart)" :key="'sp' + x.row.id" class="card-slot" :style="{ gridColumn: `${x.stageIdx + 1}/${x.stageIdx + 2}`, gridRow: (ganttRows(chart)['sp:' + x.row.id] ?? 0) + 2 }">
                     <div class="gantt-card part-item">
-                      <span class="part-tag">{{ p.type }}</span>
-                      <div class="card-grip" title="拖动: 换阶段 / 调行序" @pointerdown="startPartDrag($event, chart.id, p.id)">⠿</div>
+                      <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
+                      <div class="card-grip" title="拖动: 同 DAY 内换阶段" @pointerdown="startPartDrag($event, chart.id, x.arr.id, x.row.id)">⠿</div>
                       <div class="card-body">
-                        <textarea class="f-content" v-model="p.content" placeholder="串件内容" @input="save" rows="1"></textarea>
-                        <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="p.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="p.owner = $event; save()" /></div>
-                        <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="p.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="p.participants = $event; save()" /></div>
-                        <textarea class="f-note" v-model="p.note" placeholder="备注(红色提示)" @input="save" rows="1"></textarea>
+                        <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
+                        <div class="people-row"><span class="pl">负责</span><span class="sp-view-field">{{ x.row.owner || '未指派' }}</span></div>
+                        <div class="people-row"><span class="pl">参与</span><span class="sp-view-field">{{ x.row.participants }}</span></div>
+                        <span v-if="x.row.note" class="sp-view-note">{{ x.row.note }}</span>
                       </div>
-                      <div class="card-foot"><button class="icon-btn danger" @click="deletePart(chart.id, p.id)">×</button></div>
+                      <div class="card-foot"><button class="icon-btn danger" title="删除原分配的阶段（串件仍在串件安排中）" @click="clearSpStage(x.arr.id, x.row.id)">×</button></div>
                     </div>
                   </div>
                 </div>
                 <div class="stage-edge" title="拖拽增减阶段数（右加左减）" @pointerdown="startStageDrag($event, chart.id)">⋮</div>
               </div>
-              <div v-if="chart.parts.some(p => isPartUnassigned(p))" class="unassigned-banner">
+              <div v-if="unassignedSpRows().length" class="unassigned-banner">
                 <div class="unassigned-banner-h">
-                  <span>▲ 未分配串件 ({{ chart.parts.filter(p => isPartUnassigned(p)).length }})</span>
-                  <span class="part-rule">未选择执行阶段的串件，在表单子页选择执行阶段即可分配</span>
+                  <span>▲ 未分配串件 ({{ unassignedSpRows().length }})</span>
+                  <span class="part-rule">拖拽到本 DAY 的阶段列即可分配</span>
                 </div>
                 <div class="unassigned-grid">
-                  <div v-for="p in chart.parts.filter(x => isPartUnassigned(x))" :key="'u' + p.id" class="gantt-card unassigned">
+                  <div v-for="x in unassignedSpRows()" :key="'u' + x.row.id" class="gantt-card unassigned">
                     <span class="card-warn">▲</span>
-                    <div class="card-grip" title="拖动到甘特图阶段列以分配" @pointerdown="startUnassignedDrag($event, chart.id, p.id)">⠿</div>
+                    <div class="card-grip" title="拖动到甘特图阶段列以分配" @pointerdown="startUnassignedDrag($event, chart.id, x.arr.id, x.row.id)">⠿</div>
                     <div class="card-body">
-                      <input class="f-content" v-model="p.content" :placeholder="p.type + ' · (空)'" @input="save" />
-                      <div class="people-row"><span class="pl">负责</span><span>{{ p.owner || '未指派' }}</span></div>
-                      <div class="people-row"><span class="pl">参与</span><span>{{ p.participants || '' }}</span></div>
-                      <input v-if="p.note" class="f-note" v-model="p.note" @input="save" />
+                      <span class="f-content sp-view-content" :title="x.arr.content">{{ x.arr.content || (x.arr.type + ' · (空)') }}</span>
+                      <div class="people-row"><span class="pl">负责</span><span>{{ x.row.owner || '未指派' }}</span></div>
+                      <div class="people-row"><span class="pl">参与</span><span>{{ x.row.participants }}</span></div>
+                      <span v-if="x.row.note" class="sp-view-note">{{ x.row.note }}</span>
                     </div>
                   </div>
                 </div>
@@ -1730,32 +1713,22 @@ async function importAllXlsx(event: Event): Promise<void> {
           </section>
           <section class="gp-card">
             <div class="gp-sec-title">串件工卡</div>
+            <div class="part-rule">数据与「表单录入 → 串件安排」一致（行数一致）：类型「串件」含拆/装两行，工卡号/工卡名称与串件安排共用（任一处填写联动）。</div>
             <table class="parts-table sp-table">
               <thead><tr><th style="width:14%">类型</th><th style="width:26%">串件内容</th><th style="width:24%">工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
               <tbody>
-                <template v-for="x in getSpRows()" :key="x.uid">
-                  <tr :class="{ 'sp-auto': x.source === 'auto' }">
-                    <td :rowspan="isCombineType(x.type) ? 2 : 1">
-                      <select :value="x.type" @change="editSpRowType(x, ($event.target as HTMLSelectElement).value)">
-                        <option v-for="t in DEFAULT_PARTS_TYPES" :key="t" :value="t">{{ t }}</option>
-                        <option v-if="x.type && !DEFAULT_PARTS_TYPES.includes(x.type)" :value="x.type">{{ x.type }}</option>
-                      </select>
-                    </td>
-                    <td :rowspan="isCombineType(x.type) ? 2 : 1"><textarea class="sp-content" rows="1" :value="x.content" placeholder="串件内容" @input="editSpRowContent(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
-                    <td><input :value="x.jc" placeholder="工卡号" @input="editSpRowJc(x, ($event.target as HTMLInputElement).value)" /></td>
-                    <td><textarea class="sp-name" rows="1" :value="x.name" placeholder="工卡名称" @input="editSpRowName(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
-                    <td><button v-if="x.source === 'manual'" class="icon-btn" @click="removeSpDoc(x)">×</button></td>
-                  </tr>
-                  <tr v-if="isCombineType(x.type)" class="sp-combine-row">
-                    <td><input :value="x.jc2" placeholder="工卡号" @input="editSpRowJc2(x, ($event.target as HTMLInputElement).value)" /></td>
-                    <td><textarea class="sp-name" rows="1" :value="x.name2" placeholder="工卡名称" @input="editSpRowName2(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
-                    <td></td>
+                <template v-for="a in getSpArrangements()" :key="a.id">
+                  <tr v-for="(r, ri) in a.rows" :key="r.id">
+                    <td :rowspan="a.rows.length">{{ ri === 0 ? a.type : '' }}<span v-if="ri === 0 && r.tag" class="sp-tag">（{{ r.tag }}）</span></td>
+                    <td :rowspan="a.rows.length">{{ ri === 0 ? a.content : '' }}</td>
+                    <td><input v-if="ri === 0" :value="a.jc" placeholder="工卡号" @input="a.jc = ($event.target as HTMLInputElement).value; save()" /></td>
+                    <td><textarea v-if="ri === 0" class="sp-name" rows="1" :value="a.name" placeholder="工卡名称" @input="a.name = ($event.target as HTMLTextAreaElement).value; save()"></textarea></td>
+                    <td :rowspan="a.rows.length"><button class="icon-btn" title="删除整条串件安排" @click="removeSpArrangement(a.id)">×</button></td>
                   </tr>
                 </template>
+                <tr v-if="!getSpArrangements().length"><td colspan="5" style="color:var(--muted);text-align:center;padding:12px">暂无串件安排 — 请到「表单录入 → 串件安排」添加</td></tr>
               </tbody>
             </table>
-            <div class="sp-table-note">橙底行 = 表单串件自动同步（类型/内容可改，改动同步到串件卡片）；白底行 = 手动添加（仅串件工卡使用，不影响串件卡片）；串件/拆装类型下方附独立「工卡号+工卡名称」可填行（与原行数据独立）。</div>
-            <button class="gp-add" @click="addDoc('sp')">+ 添加</button>
           </section>
         </div>
 
@@ -2074,6 +2047,13 @@ textarea.textwrap {
 .sp-table select { width: 100%; height: 28px; border: 1px solid var(--line, #dde2ec); border-radius: 7px; padding: 0 4px; font-size: 12.5px; background: #fff; }
 .sp-table-note { font-size: 11.5px; color: var(--muted, #697386); margin: 6px 0 2px; }
 .sp-combine-row td { background: #f2f6fd; }
+/* 串件安排表：拆/装标签 + 只读展示 */
+.sp-tag { color: #b45309; font-weight: 700; font-size: 12px; margin-right: 2px; white-space: nowrap; }
+.sp-view-content { flex: 1.5; min-width: 90px; padding: 3px 6px; font-size: 12.5px; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+.sp-view-field { flex: 1; min-width: 70px; padding: 3px 6px; font-size: 12.5px; line-height: 1.4; word-break: break-word; }
+.sp-view-note { flex: 1; min-width: 70px; padding: 3px 6px; font-size: 12.5px; color: #c0392b; word-break: break-word; }
+.gantt-card .sp-view-content, .gantt-card .sp-view-field, .gantt-card .sp-view-note { flex: none; width: 100%; padding: 0 2px; }
+.sp-arr-table td { vertical-align: top; }
 
 /* ===== 串件航材/工具清单（pt-card） ===== */
 .pt-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: linear-gradient(90deg, #edf2fc, #fff); border-radius: 11px 11px 0 0; border-bottom: 1px solid var(--line, #dde2ec); margin: -14px -16px 6px; }

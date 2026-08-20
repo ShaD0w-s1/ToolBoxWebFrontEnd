@@ -1471,6 +1471,7 @@ export function useToolbox() {
       charts,
       airParts: mergeById(local.airParts, remote.airParts),
       toolParts: mergeById(local.toolParts, remote.toolParts),
+      spArrangements: mergeById(local.spArrangements || [], remote.spArrangements || []),
     };
   }
 
