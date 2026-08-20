@@ -306,10 +306,19 @@ export function useToolbox() {
       dirtyFields.delete(project.id);
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        const current = (error.payload as { current_version?: number } | null)?.current_version;
-        if (typeof current === "number") project.version = current;
-        notify("检测到并发修改，将以你的修改为准重新保存");
-        dirtyProjects.add(project.id);
+        const p = error.payload as { current_version?: number; details?: { current_version?: number } } | null;
+        const current = typeof p?.current_version === "number"
+          ? p.current_version
+          : (typeof p?.details?.current_version === "number" ? p.details.current_version : undefined);
+        if (typeof current === "number") {
+          project.version = current;
+          notify("检测到并发修改，将以你的修改为准重新保存");
+          dirtyProjects.add(project.id);
+        } else {
+          // 拿不到远端版本号：拉取最新避免用旧 version 无限重试
+          dirtyProjects.add(project.id);
+          loadRemote(true, false).catch(() => {});
+        }
         return;
       }
       dirtyProjects.add(project.id);
