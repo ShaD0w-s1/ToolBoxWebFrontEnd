@@ -5,6 +5,7 @@ import {
   STANDARD_LIB_KEYS,
   STANDARD_LIB_META,
   TEAMS,
+  defaultGanttPrep,
   defaultStandalonePrepSheet,
   type AircraftType,
   type GanttPrepState,
@@ -153,7 +154,21 @@ async function duplicateEngTemplate(t: { _id: string; name: string }): Promise<v
 /** 模板库「编辑」：打开一个类项目页面（新建换发/APU 项目预载模板内容），调整内容后「保存模板→覆盖」写回。 */
 function editEngTemplate(t: { name: string; state: GanttPrepState }): void {
   showEngTemplates.value = false;
-  props.store.openEngTemplateForEdit(t.name, t.state);
+  props.store.openEngTemplateForEdit(t.name, t.state, "edit");
+}
+const newEngTplName = ref("");
+/** 新增换发/APU 模板：命名后新建空白模板并打开编辑页（编辑完「保存为新模板」创建）。 */
+function addEngTemplate(): void {
+  const name = newEngTplName.value.trim();
+  if (!name) { props.store.notify("请输入模板名称"); return; }
+  showEngTemplates.value = false;
+  newEngTplName.value = "";
+  props.store.openEngTemplateForEdit(name, defaultGanttPrep());
+}
+/** 调取模板：用模板创建实际项目（预载内容），填写基础信息即可用。 */
+function applyEngTemplate(t: { name: string; state: GanttPrepState }): void {
+  showEngTemplates.value = false;
+  props.store.openEngTemplateForEdit(t.name, t.state, "apply");
 }
 
 /** 单项工作模板库（单独项目）：拉取模板列表并打开弹窗。 */
@@ -404,6 +419,10 @@ function cancelEditAnnouncement(): void {
           <h3>换发/APU 模板库</h3>
           <button @click="showEngTemplates = false">关闭</button>
         </div>
+        <div class="site-admin-newtpl">
+          <input v-model="newEngTplName" placeholder="新模板名称" @keydown.enter="addEngTemplate" />
+          <button class="primary" @click="addEngTemplate">新增模板</button>
+        </div>
         <p v-if="engTemplatesLoading" class="site-admin-empty">加载中…</p>
         <template v-else-if="engTemplates.length">
           <div v-for="t in engTemplates" :key="t._id" class="eng-tpl-row">
@@ -412,6 +431,7 @@ function cancelEditAnnouncement(): void {
               <span>{{ templateSummary(t.state) }}</span>
             </div>
             <div class="eng-tpl-actions">
+              <button @click="applyEngTemplate(t)">调取</button>
               <button @click="editEngTemplate(t)">编辑</button>
               <button @click="duplicateEngTemplate(t)">复制</button>
               <button class="danger" @click="deleteEngTemplate(t)">删除</button>

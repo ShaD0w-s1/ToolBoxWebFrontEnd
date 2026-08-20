@@ -1790,17 +1790,19 @@ export function useToolbox() {
     saveGantt();
   }
 
-  /** 一级页模板库「编辑」：新建一个「换发/APU」项目并预载模板内容后打开（类项目页面调整模板），
-   *  改完在甘特页「保存模板 → 覆盖」写回原模板。 */
-  async function openEngTemplateForEdit(name: string, state: GanttPrepState): Promise<void> {
+  /** 模板库入口：新建「换发/APU」项目预载模板内容。mode="edit" 打开模板编辑页（改完「保存模板 → 覆盖」写回）；
+   *  mode="apply" 用模板创建实际项目（不挂模板名，避免误覆盖）。 */
+  async function openEngTemplateForEdit(name: string, state: GanttPrepState, mode: "edit" | "apply" = "edit"): Promise<void> {
     await createProject(name, "A320", "换发/APU");
     const project = currentProject.value;
     if (!project) return;
     project.ganttPrep = deepCopy(state);
-    project.ganttPrep.currentTemplateName = name;
+    project.ganttPrep.currentTemplateName = mode === "edit" ? name : "";
     markField("ganttPrep");
     persist();
-    notify(`已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`);
+    notify(mode === "edit"
+      ? `已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`
+      : `已用模板「${name}」创建项目，请完善内容`);
   }
 
   /** 模板库入口：新建单独项目预载模板内容。mode="edit" 打开模板编辑页（改完「保存模板 → 覆盖」写回）；mode="apply" 用模板创建实际项目。 */
