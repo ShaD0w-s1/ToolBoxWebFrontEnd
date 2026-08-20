@@ -35,6 +35,7 @@ import {
   type ProjectField,
   type ProjectType,
   type SectionPayload,
+  type StandalonePrepSheet,
   type StandardLib,
   type StandardLibKey,
   type StandardLibRow,
@@ -1802,6 +1803,51 @@ export function useToolbox() {
     notify(`已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`);
   }
 
+  /** 模板库「编辑」：新建单独项目预载模板内容，调整后在二级页「保存模板 → 覆盖」写回原模板。 */
+  async function openStandaloneTemplateForEdit(name: string, state: StandalonePrepSheet): Promise<void> {
+    await createProject(name, "A320", "单独项目");
+    const project = currentProject.value;
+    if (!project) return;
+    project.standalonePrepSheet = deepCopy(state);
+    markField("standalonePrepSheet");
+    persist();
+    notify(`已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`);
+  }
+
+  /** 把当前项目的单项准备单保存为「单项工作模板」（不含 base 基础信息，base 属项目特有）。
+   *  传 templateId 时覆盖已有模板；返回模板 _id 供后续覆盖保存用。 */
+  async function saveStandaloneTemplate(name: string, templateId?: string): Promise<string | null> {
+    const p = currentProject.value; if (!p) return null;
+    const snapshot = deepCopy(p.standalonePrepSheet) as StandalonePrepSheet;
+    snapshot.base = defaultStandalonePrepSheet().base;
+    try {
+      if (templateId) {
+        await backend.updateStandaloneTemplate(templateId, { name, state: snapshot });
+        notify(`已覆盖模板：${name}`);
+        return templateId;
+      }
+      const res = await backend.createStandaloneTemplate({ name, state: snapshot });
+      const doc = res.data as { _id?: string } | undefined;
+      notify(`已保存模板：${name}`);
+      return doc?._id ?? null;
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "模板保存失败");
+      return null;
+    }
+  }
+
+  /** 把「单项工作模板」灌入当前项目的单项准备单：深拷贝、保留当前项目 base、重算 nextId 防 id 冲突。 */
+  function applyStandaloneTemplate(state: StandalonePrepSheet): void {
+    const p = currentProject.value; if (!p) return;
+    const snapshot = deepCopy(state) as StandalonePrepSheet;
+    if (p.standalonePrepSheet?.base) snapshot.base = p.standalonePrepSheet.base;
+    p.standalonePrepSheet = snapshot;
+    markField("standalonePrepSheet");
+    computeNextId();
+    persist();
+    notify("已加载模板");
+  }
+
   return {
     app, screen, listTab, detailTab, ganttTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
     active, materialActive, materialCategories, standardMaterialCategories, mStandardSubs,
@@ -1829,6 +1875,7 @@ export function useToolbox() {
     saveLibraryNow, saveCartNow, saveStdLibNow,
     identityName, identityReady, setIdentity, unlockSiteAdmin,
     saveGantt, applyGanttTemplate, openEngTemplateForEdit,
+    saveStandaloneTemplate, applyStandaloneTemplate, openStandaloneTemplateForEdit,
   };
 }
 

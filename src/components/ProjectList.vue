@@ -8,6 +8,7 @@ import {
   type AircraftType,
   type GanttPrepState,
   type Project,
+  type StandalonePrepSheet,
 } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { backend } from "../api";
@@ -36,6 +37,10 @@ const accountsLoading = ref(false);
 const showEngTemplates = ref(false);
 const engTemplates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: GanttPrepState }>>([]);
 const engTemplatesLoading = ref(false);
+// 单项工作模板库（单独项目）：模板列表弹窗。
+const showStandaloneTemplates = ref(false);
+const standaloneTemplates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: StandalonePrepSheet }>>([]);
+const standaloneTemplatesLoading = ref(false);
 
 async function startNew(): Promise<void> {
   showCreateModal.value = true;
@@ -148,6 +153,56 @@ async function duplicateEngTemplate(t: { _id: string; name: string }): Promise<v
 function editEngTemplate(t: { name: string; state: GanttPrepState }): void {
   showEngTemplates.value = false;
   props.store.openEngTemplateForEdit(t.name, t.state);
+}
+
+/** 单项工作模板库（单独项目）：拉取模板列表并打开弹窗。 */
+async function openStandaloneTemplates(): Promise<void> {
+  standaloneTemplatesLoading.value = true;
+  showStandaloneTemplates.value = true;
+  try {
+    const res = await backend.listStandaloneTemplates();
+    standaloneTemplates.value = Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "模板列表加载失败");
+  } finally {
+    standaloneTemplatesLoading.value = false;
+  }
+}
+
+function standaloneTemplateSummary(state: StandalonePrepSheet | undefined): string {
+  const groups = state?.processGroups?.length ?? 0;
+  const rows = (state?.processGroups || []).reduce((n, g) => n + (g.rows?.length ?? 0), 0);
+  return `${groups} 工序组 · ${rows} 工序行`;
+}
+
+async function deleteStandaloneTemplate(t: { _id: string; name: string }): Promise<void> {
+  if (!window.confirm(`确认删除模板“${t.name}”？`)) return;
+  try {
+    await backend.deleteStandaloneTemplate(t._id);
+    standaloneTemplates.value = standaloneTemplates.value.filter((x) => x._id !== t._id);
+    props.store.notify("模板已删除");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "删除失败");
+  }
+}
+
+async function duplicateStandaloneTemplate(t: { _id: string; name: string }): Promise<void> {
+  try {
+    const res = await backend.duplicateStandaloneTemplate(t._id);
+    const doc = res.data;
+    if (doc && typeof doc === "object") {
+      standaloneTemplates.value.unshift(doc as { _id: string; id: string; name: string; savedAt: string; state: StandalonePrepSheet });
+    }
+    props.store.notify("模板已复制");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "复制失败");
+  }
+}
+
+/** 单项工作模板「编辑」：新建单独项目预载模板内容，调整后「保存模板→覆盖」写回。 */
+function editStandaloneTemplate(t: { name: string; state: StandalonePrepSheet }): void {
+  showStandaloneTemplates.value = false;
+  props.store.openStandaloneTemplateForEdit(t.name, t.state);
 }
 
 /** 公告栏编辑。 */
@@ -292,6 +347,12 @@ function cancelEditAnnouncement(): void {
                 <button class="primary" @click="openEngTemplates">打开模板库</button>
               </div>
             </article>
+            <article class="library-card compare-card">
+              <div><strong>单项工作模板库</strong><span>单独项目工作准备单模板</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="openStandaloneTemplates">打开模板库</button>
+              </div>
+            </article>
           </div>
         </section>
       </template>
@@ -338,6 +399,30 @@ function cancelEditAnnouncement(): void {
               <button @click="editEngTemplate(t)">编辑</button>
               <button @click="duplicateEngTemplate(t)">复制</button>
               <button class="danger" @click="deleteEngTemplate(t)">删除</button>
+            </div>
+          </div>
+        </template>
+        <p v-else class="site-admin-empty">暂无模板。</p>
+      </div>
+    </div>
+
+    <div v-if="showStandaloneTemplates" class="site-admin-modal" @click.self="showStandaloneTemplates = false">
+      <div class="site-admin-card">
+        <div class="site-admin-head">
+          <h3>单项工作模板库</h3>
+          <button @click="showStandaloneTemplates = false">关闭</button>
+        </div>
+        <p v-if="standaloneTemplatesLoading" class="site-admin-empty">加载中…</p>
+        <template v-else-if="standaloneTemplates.length">
+          <div v-for="t in standaloneTemplates" :key="t._id" class="eng-tpl-row">
+            <div class="eng-tpl-info">
+              <strong>{{ t.name }}</strong>
+              <span>{{ standaloneTemplateSummary(t.state) }}</span>
+            </div>
+            <div class="eng-tpl-actions">
+              <button @click="editStandaloneTemplate(t)">编辑</button>
+              <button @click="duplicateStandaloneTemplate(t)">复制</button>
+              <button class="danger" @click="deleteStandaloneTemplate(t)">删除</button>
             </div>
           </div>
         </template>

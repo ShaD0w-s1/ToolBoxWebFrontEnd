@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
+import { backend } from "../api";
+import type { StandalonePrepSheet } from "../domain/toolbox";
 import { exportStandalonePrep } from "../services/spreadsheet";
 import { exportFileName } from "../utils/format";
 
@@ -43,6 +45,64 @@ function exportTableXlsx(): void {
   props.store.notify("表格已导出");
 }
 
+// ===== 单项工作模板（调取/保存，模板不含 base 基础信息） =====
+const showTplModal = ref(false);
+const templates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: StandalonePrepSheet }>>([]);
+const templatesLoading = ref(false);
+const saveTplName = ref("");
+const saveTplInputRef = ref<HTMLInputElement | null>(null);
+async function openTplModal(focusSave = false): Promise<void> {
+  showTplModal.value = true;
+  templatesLoading.value = true;
+  try {
+    const res = await backend.listStandaloneTemplates();
+    templates.value = Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "模板加载失败");
+  } finally {
+    templatesLoading.value = false;
+    if (focusSave) nextTick(() => saveTplInputRef.value?.focus());
+  }
+}
+function applyTemplate(t: { name: string; state: StandalonePrepSheet }): void {
+  if (!sheet.value) return;
+  if (!window.confirm(`确认加载模板“${t.name}”？将覆盖当前单项准备单内容（保留基础信息）。`)) return;
+  props.store.applyStandaloneTemplate(t.state);
+  showTplModal.value = false;
+}
+async function saveAsTemplate(): Promise<void> {
+  if (!sheet.value) return;
+  const name = saveTplName.value.trim();
+  if (!name) { props.store.notify("请输入模板名称"); return; }
+  const id = await props.store.saveStandaloneTemplate(name);
+  if (id) { saveTplName.value = ""; await openTplModal(); }
+}
+async function overwriteTemplate(t: { _id: string; name: string }): Promise<void> {
+  if (!sheet.value) return;
+  if (!window.confirm(`确认覆盖模板“${t.name}”？当前单项准备单内容将写入该模板。`)) return;
+  const id = await props.store.saveStandaloneTemplate(t.name, t._id);
+  if (id) await openTplModal();
+}
+async function deleteTemplate(t: { _id: string; name: string }): Promise<void> {
+  if (!window.confirm(`确认删除模板“${t.name}”？`)) return;
+  try {
+    await backend.deleteStandaloneTemplate(t._id);
+    templates.value = templates.value.filter((x) => x._id !== t._id);
+    props.store.notify("模板已删除");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "模板删除失败");
+  }
+}
+async function duplicateTemplate(t: { _id: string }): Promise<void> {
+  try {
+    await backend.duplicateStandaloneTemplate(t._id);
+    props.store.notify("模板已复制");
+    await openTplModal();
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "模板复制失败");
+  }
+}
+
 /** 表格单元格 textarea 自动撑高并持久化（需求：表单内容自动换行）。 */
 function onRowInput(event: Event): void {
   const el = event.target as HTMLTextAreaElement;
@@ -72,6 +132,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       <input v-else class="sp-title-input" v-model="titleDraft" @blur="commitRenameTitle" @keydown.enter.prevent="commitRenameTitle" @keydown.esc.prevent="cancelRenameTitle" autofocus />
       <div class="subpage-actions">
         <label v-if="!titleEditing" class="ghost" @click="startRenameTitle">改名称</label>
+        <button class="ghost" @click="openTplModal(false)">调取模板</button>
+        <button class="ghost" @click="openTplModal(true)">保存模板</button>
         <button class="ghost" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTableXlsx">导出表格</button>
       </div>
@@ -194,6 +256,30 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       </table></div>
       <div class="prep-block-actions"><button class="ghost" @click="store.spAddSigningRow">+ 新增行</button></div>
     </section>
+
+    <!-- 单项工作模板弹窗（调取/保存共用） -->
+    <div v-if="showTplModal" class="tpl-modal" @click.self="showTplModal = false">
+      <div class="tpl-modal-card">
+        <div class="tpl-modal-head"><h3>单项工作模板库</h3><button class="icon-btn" @click="showTplModal = false">×</button></div>
+        <div class="tpl-save-row">
+          <input ref="saveTplInputRef" v-model="saveTplName" placeholder="新模板名称" @keydown.enter="saveAsTemplate" />
+          <button class="primary" @click="saveAsTemplate">保存为新模板</button>
+        </div>
+        <p v-if="templatesLoading" class="tpl-empty">加载中…</p>
+        <template v-else-if="templates.length">
+          <div v-for="t in templates" :key="t._id" class="tpl-row">
+            <div class="tpl-info" @click="applyTemplate(t)"><strong>{{ t.name }}</strong><span>工序 {{ (t.state.processGroups || []).length }} 组 · 签署 {{ (t.state.signingRows || []).length }} 行</span></div>
+            <div class="tpl-actions">
+              <button class="ghost" @click="applyTemplate(t)">加载</button>
+              <button class="ghost" @click="overwriteTemplate(t)">覆盖</button>
+              <button class="ghost" @click="duplicateTemplate(t)">复制</button>
+              <button class="ghost danger" @click="deleteTemplate(t)">删除</button>
+            </div>
+          </div>
+        </template>
+        <p v-else class="tpl-empty">暂无模板。</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -243,6 +329,19 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-group-name:hover, .sp-group-name:focus { border-color: #8eaadb; background: #fff; }
 .sp-part-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; font-weight: 600; font-size: 14px; color: #4a5160; }
 .sp-part-name:hover, .sp-part-name:focus { border-color: #8eaadb; background: #fff; }
+/* 单项工作模板弹窗 */
+.tpl-modal { position: fixed; inset: 0; z-index: 300; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.tpl-modal-card { background: #fff; border-radius: 12px; padding: 18px 20px; width: 520px; max-width: 100%; max-height: 78vh; overflow-y: auto; box-shadow: 0 8px 30px rgba(0, 0, 0, .18); }
+.tpl-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.tpl-modal-head h3 { font-size: 16px; margin: 0; color: #222; }
+.tpl-save-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.tpl-save-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid #d7dbe4; border-radius: 7px; font-size: 13px; }
+.tpl-empty { color: #697386; font-size: 13px; text-align: center; padding: 14px 0; }
+.tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid #e6e9f0; border-radius: 8px; margin-bottom: 8px; }
+.tpl-info { flex: 1; min-width: 0; cursor: pointer; }
+.tpl-info strong { display: block; font-size: 14px; color: #222; }
+.tpl-info span { font-size: 12px; color: #697386; }
+.tpl-actions { display: flex; gap: 6px; flex-shrink: 0; }
 @media (max-width: 768px) {
   .prep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .prep-personnel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
