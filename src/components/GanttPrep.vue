@@ -8,7 +8,6 @@ import NameSuggest from "./NameSuggest.vue";
 const props = defineProps<{ store: ToolboxStore }>();
 
 const DEFAULT_RESP = ["现场负责人", "工具负责", "持卡", "必检", "拆装记录人"];
-const DEFAULT_STAGES = ["前期准备", "构型准备", "外围拆除", "短舱拆除", "上下发", "上发准备", "交接"];
 const DEFAULT_PARTS_TYPES = ["N/A", "普查", "串件", "单拆", "单装", "装新件"];
 
 function genId(): string {
@@ -171,17 +170,36 @@ function ganttRows(chart: GanttChart): Record<string, number> {
 }
 
 // —— DAY / 阶段 / 工序 / 串件 / 责任 CRUD ——
+/** 新建 DAY 卡片的默认日期：
+ *  - 首个 DAY（DAY1）→ 项目执行日期（executeDate），无则今天；
+ *  - 小数 DAY（0.5/1.5/2.5）→ 向下取整对应的整数 DAY 卡片日期（如 1.5 → DAY1 日期），对应整数卡片不存在则沿用 nextDate；
+ *  - 其余 → 最后一张 DAY 日期 +1。 */
+function chartDateFor(day: number): string {
+  const s = state.value; if (!s) return "";
+  if (s.charts.length === 0 || day === 1) {
+    return props.store.currentProject.value?.executeDate || new Date().toISOString().slice(0, 10);
+  }
+  if (!Number.isInteger(day)) {
+    const baseDay = Math.floor(day);
+    const base = s.charts.find((c) => c.day === baseDay && Number.isInteger(c.day));
+    if (base?.date) return base.date;
+  }
+  return nextDate();
+}
+/** 是否存在需要保留的小数/负数 DAY（此时禁止整体重编号，避免破坏编号语义）。 */
+function hasSpecialDays(charts: GanttChart[]): boolean {
+  return charts.some((c) => !Number.isInteger(c.day) || c.day < 0);
+}
 function addChart(): void {
   const s = state.value; if (!s) return;
   const last = s.charts[s.charts.length - 1];
   // 用「最大 DAY 编号 + 1」而非「数组长度 + 1」，避免删除/导入过 DAY 后编号不连续时产生重复或错乱编号
-  const day = s.charts.reduce((m, c) => Math.max(m, typeof c.day === "number" ? c.day : 0), 0) + 1;
+  const day = s.charts.reduce((m, c) => Math.max(m, Number.isFinite(c.day) ? c.day : 0), 0) + 1;
   const chart: GanttChart = {
-    id: genId(), title: `DAY ${day}`, date: nextDate(), day, collapsed: false,
+    id: genId(), title: `DAY ${day}`, date: chartDateFor(day), day, collapsed: false,
     responsibilities: (last?.responsibilities?.length ? last.responsibilities : DEFAULT_RESP.map((l) => ({ id: genId(), label: l, name: "" })))
       .map((r) => ({ id: genId(), label: r.label, name: r.name })),
-    stages: DEFAULT_STAGES.map((n) => ({ id: genId(), name: n })),
-    lanes: [], cards: [], parts: [],
+    stages: [], lanes: [], cards: [], parts: [],
   };
   s.charts.push(chart);
   save();
@@ -191,23 +209,34 @@ function addDayAfter(chartId: string): void {
   const idx = s.charts.findIndex((c) => c.id === chartId);
   if (idx < 0) return;
   const base = s.charts[idx];
-  const chart: GanttChart = {
-    id: genId(), title: `DAY ${idx + 2}`, date: nextDate(), day: idx + 2, collapsed: false,
-    responsibilities: (base.responsibilities?.length ? base.responsibilities : DEFAULT_RESP.map((l) => ({ id: genId(), label: l, name: "" })))
-      .map((r) => ({ id: genId(), label: r.label, name: r.name })),
-    // 阶段兜底：当前 DAY 阶段为空时用默认阶段，避免新增 DAY 无阶段卡片
-    stages: base.stages?.length ? base.stages.map((st) => ({ id: genId(), name: st.name })) : DEFAULT_STAGES.map((n) => ({ id: genId(), name: n })),
-    lanes: [], cards: [], parts: [],
-  };
-  s.charts.splice(idx + 1, 0, chart);
-  s.charts.forEach((c, i) => { c.day = i + 1; c.title = `DAY ${i + 1}`; });
+  const responsibilities = (base.responsibilities?.length ? base.responsibilities : DEFAULT_RESP.map((l) => ({ id: genId(), label: l, name: "" })))
+    .map((r) => ({ id: genId(), label: r.label, name: r.name }));
+  if (hasSpecialDays(s.charts)) {
+    // 存在小数/负数 DAY：插入「半天」卡片（base.day + 0.5），按 day 排序、不重编号（保护小数/负数编号）
+    const newDay = base.day + 0.5;
+    const chart: GanttChart = {
+      id: genId(), title: `DAY ${newDay}`, date: chartDateFor(newDay), day: newDay, collapsed: false,
+      responsibilities, stages: [], lanes: [], cards: [], parts: [],
+    };
+    s.charts.push(chart);
+    s.charts.sort((a, b) => a.day - b.day);
+  } else {
+    // 纯整数场景：插入完整一天并重编号 1..n
+    const chart: GanttChart = {
+      id: genId(), title: `DAY ${idx + 2}`, date: chartDateFor(idx + 2), day: idx + 2, collapsed: false,
+      responsibilities, stages: [], lanes: [], cards: [], parts: [],
+    };
+    s.charts.splice(idx + 1, 0, chart);
+    s.charts.forEach((c, i) => { c.day = i + 1; c.title = `DAY ${i + 1}`; });
+  }
   save();
 }
 function deleteChart(chartId: string): void {
   const s = state.value; if (!s) return;
   if (!window.confirm("确认删除本天？")) return;
   s.charts = s.charts.filter((c) => c.id !== chartId);
-  s.charts.forEach((c, i) => { c.day = i + 1; c.title = `DAY ${i + 1}`; });
+  // 存在小数/负数 DAY 时不重编号（避免破坏编号语义）
+  if (!hasSpecialDays(s.charts)) s.charts.forEach((c, i) => { c.day = i + 1; c.title = `DAY ${i + 1}`; });
   save();
 }
 function toggleCollapse(chartId: string): void {
@@ -216,9 +245,9 @@ function toggleCollapse(chartId: string): void {
   c.collapsed = !c.collapsed;
   save();
 }
-/** DAY 编号输入校验：不允许 < 1（避免手动填出 DAY 0/负数）。 */
+/** DAY 编号输入校验：允许 0/负数/小数（0.5 等半天卡），仅拒绝非数字。 */
 function normalizeDay(chart: GanttChart): void {
-  if (!chart || !Number.isFinite(chart.day) || chart.day < 1) chart.day = 1;
+  if (!chart || typeof chart.day !== "number" || !Number.isFinite(chart.day)) chart.day = 0;
   save();
 }
 function addStage(chartId: string): void {
@@ -1296,8 +1325,8 @@ async function importAllXlsx(event: Event): Promise<void> {
       if (!/工序/.test(name)) return;
       const ws = wb.Sheets[name];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
-      // 旧格式兼容：sheet 名可能为「DAY n」（每 DAY 一个 sheet）
-      const sheetDayMatch = name.match(/DAY\s*(\d+)/i);
+      // 旧格式兼容：sheet 名可能为「DAY n」（每 DAY 一个 sheet）；支持负数/小数编号
+      const sheetDayMatch = name.match(/DAY\s*(-?\d+(?:\.\d+)?)/i);
       const sheetDay = sheetDayMatch ? Number(sheetDayMatch[1]) : NaN;
       rows.slice(1).forEach((row) => {
         // 列映射与导出一致：DAY | 阶段 | 内容 | 负责人 | 参与人 | 备注
@@ -1308,20 +1337,19 @@ async function importAllXlsx(event: Event): Promise<void> {
         const participants = String(row[4] || "").trim();
         const note = String(row[5] || "").trim();
         if (!content) return;
-        // DAY 解析：行内 DAY 列优先（"DAY 1"/"DAY1"），无则回退 sheet 名；均要求 ≥ 1（防 DAY 0/负数）
-        const dm = dayText.match(/DAY\s*(\d+)/i);
+        // DAY 解析：行内 DAY 列优先（"DAY 1"/"DAY 0"/"DAY -1"/"DAY 1.5"），无则回退 sheet 名
+        const dm = dayText.match(/DAY\s*(-?\d+(?:\.\d+)?)/i);
         let dayNum = dm ? Number(dm[1]) : NaN;
-        if (!Number.isFinite(dayNum) || dayNum < 1) dayNum = (Number.isFinite(sheetDay) && sheetDay >= 1) ? sheetDay : NaN;
+        if (!Number.isFinite(dayNum)) dayNum = Number.isFinite(sheetDay) ? sheetDay : NaN;
         let chart = Number.isFinite(dayNum) ? s.charts.find((c) => c.day === dayNum) : undefined;
         if (!chart && Number.isFinite(dayNum)) {
-          // 导入数据含新 DAY：自动新建 DAY 卡片（结构与 addChart 一致）
+          // 导入数据含新 DAY：自动新建 DAY 卡片（默认无阶段，日期按 chartDateFor 规则）
           const last = s.charts[s.charts.length - 1];
           chart = {
-            id: genId(), title: `DAY ${dayNum}`, date: nextDate(), day: dayNum, collapsed: false,
+            id: genId(), title: `DAY ${dayNum}`, date: chartDateFor(dayNum), day: dayNum, collapsed: false,
             responsibilities: (last?.responsibilities?.length ? last.responsibilities : DEFAULT_RESP.map((l) => ({ id: genId(), label: l, name: "" })))
               .map((r) => ({ id: genId(), label: r.label, name: r.name })),
-            stages: DEFAULT_STAGES.map((n) => ({ id: genId(), name: n })),
-            lanes: [], cards: [], parts: [],
+            stages: [], lanes: [], cards: [], parts: [],
           };
           s.charts.push(chart);
           s.charts.sort((a, b) => a.day - b.day);
