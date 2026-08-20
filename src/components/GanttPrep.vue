@@ -1571,9 +1571,9 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <div v-for="x in spRowsOfStage(chart.id, si)" :key="'sp' + x.row.id" class="form-card-row part-form-row">
                       <span class="part-form-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
                       <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
-                      <span class="sp-view-field" :title="x.row.owner">{{ x.row.owner }}</span>
-                      <span class="sp-view-field" :title="x.row.participants">{{ x.row.participants }}</span>
-                      <span class="sp-view-note" :title="x.row.note">{{ x.row.note }}</span>
+                      <NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" />
+                      <NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" />
+                      <textarea class="textwrap" rows="1" v-model="x.row.note" placeholder="备注" @input="save"></textarea>
                       <button class="icon-btn" title="删除原分配的阶段（串件仍在串件安排中）" @click="clearSpStage(x.arr.id, x.row.id)">×</button>
                     </div>
                     <div v-if="!cardsOfStage(chart, si).length && !spRowsOfStage(chart.id, si).length" class="stage-empty">无工序</div>
@@ -1645,9 +1645,9 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="card-grip" title="拖动: 同 DAY 内换阶段" @pointerdown="startPartDrag($event, chart.id, x.arr.id, x.row.id)">⠿</div>
                       <div class="card-body">
                         <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
-                        <div class="people-row"><span class="pl">负责</span><span class="sp-view-field">{{ x.row.owner || '未指派' }}</span></div>
-                        <div class="people-row"><span class="pl">参与</span><span class="sp-view-field">{{ x.row.participants }}</span></div>
-                        <span v-if="x.row.note" class="sp-view-note">{{ x.row.note }}</span>
+                        <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" /></div>
+                        <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" /></div>
+                        <textarea class="f-note" v-model="x.row.note" placeholder="备注" @input="save" rows="1"></textarea>
                       </div>
                       <div class="card-foot"><button class="icon-btn danger" title="删除原分配的阶段（串件仍在串件安排中）" @click="clearSpStage(x.arr.id, x.row.id)">×</button></div>
                     </div>
@@ -1665,7 +1665,8 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <span class="card-warn">▲</span>
                     <div class="card-grip" title="拖动到甘特图阶段列以分配" @pointerdown="startUnassignedDrag($event, chart.id, x.arr.id, x.row.id)">⠿</div>
                     <div class="card-body">
-                      <span class="f-content sp-view-content" :title="x.arr.content">{{ x.arr.content || (x.arr.type + ' · (空)') }}</span>
+                      <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
+                      <span class="f-content sp-view-content" :title="x.arr.content">{{ x.arr.content || '（空）' }}</span>
                       <div class="people-row"><span class="pl">负责</span><span>{{ x.row.owner || '未指派' }}</span></div>
                       <div class="people-row"><span class="pl">参与</span><span>{{ x.row.participants }}</span></div>
                       <span v-if="x.row.note" class="sp-view-note">{{ x.row.note }}</span>
@@ -1713,17 +1714,22 @@ async function importAllXlsx(event: Event): Promise<void> {
           </section>
           <section class="gp-card">
             <div class="gp-sec-title">串件工卡</div>
-            <div class="part-rule">数据与「表单录入 → 串件安排」一致（行数一致）：类型「串件」含拆/装两行，工卡号/工卡名称与串件安排共用（任一处填写联动）。</div>
+            <div class="part-rule">数据与「表单录入 → 串件安排」一致（行数一致）：类型「串件」含拆/装两行；工卡号/工卡名称与串件安排共用（任一处填写联动）。</div>
             <table class="parts-table sp-table">
               <thead><tr><th style="width:14%">类型</th><th style="width:26%">串件内容</th><th style="width:24%">工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
               <tbody>
                 <template v-for="a in getSpArrangements()" :key="a.id">
                   <tr v-for="(r, ri) in a.rows" :key="r.id">
-                    <td :rowspan="a.rows.length">{{ ri === 0 ? a.type : '' }}<span v-if="ri === 0 && r.tag" class="sp-tag">（{{ r.tag }}）</span></td>
-                    <td :rowspan="a.rows.length">{{ ri === 0 ? a.content : '' }}</td>
-                    <td><input v-if="ri === 0" :value="a.jc" placeholder="工卡号" @input="a.jc = ($event.target as HTMLInputElement).value; save()" /></td>
-                    <td><textarea v-if="ri === 0" class="sp-name" rows="1" :value="a.name" placeholder="工卡名称" @input="a.name = ($event.target as HTMLTextAreaElement).value; save()"></textarea></td>
-                    <td :rowspan="a.rows.length"><button class="icon-btn" title="删除整条串件安排" @click="removeSpArrangement(a.id)">×</button></td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length">
+                      <select :value="a.type" @change="changeSpType(a, ($event.target as HTMLSelectElement).value)">
+                        <option v-for="t in DEFAULT_PARTS_TYPES" :key="t" :value="t">{{ t }}</option>
+                        <option v-if="a.type && !DEFAULT_PARTS_TYPES.includes(a.type)" :value="a.type">{{ a.type }}</option>
+                      </select>
+                    </td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save"></textarea></td>
+                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><input :value="a.jc" placeholder="工卡号" @input="a.jc = ($event.target as HTMLInputElement).value; save()" /></td>
+                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><textarea class="sp-name" rows="1" :value="a.name" placeholder="工卡名称" @input="a.name = ($event.target as HTMLTextAreaElement).value; save()"></textarea></td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length"><button class="icon-btn" title="删除整条串件安排" @click="removeSpArrangement(a.id)">×</button></td>
                   </tr>
                 </template>
                 <tr v-if="!getSpArrangements().length"><td colspan="5" style="color:var(--muted);text-align:center;padding:12px">暂无串件安排 — 请到「表单录入 → 串件安排」添加</td></tr>
