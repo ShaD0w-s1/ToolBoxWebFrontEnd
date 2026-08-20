@@ -1814,11 +1814,26 @@ export function useToolbox() {
     notify(`已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`);
   }
 
-  /** 把当前项目的单项准备单保存为「单项工作模板」（不含 base 基础信息，base 属项目特有）。
+  /** 模板脱敏：清空所有含人名的字段（人员安排/必检/签署人等），只保留业务内容（工序/部件/工作等）。
+   *  深拷贝后原地清空，避免污染原项目数据。 */
+  function stripNamesFromStandalone(s: StandalonePrepSheet): StandalonePrepSheet {
+    const copy = deepCopy(s) as StandalonePrepSheet;
+    const personKeys = [
+      "项目负责人", "值班组", "主卡签署", "必检", "参与人员", "工具负责", "工具参与",
+      "航材负责", "航材参与", "工卡负责", "工卡打印", "试车人员", "报工/完工反馈", "运输跟踪", "飞机监护",
+    ] as const;
+    for (const k of personKeys) (copy.personnel as unknown as Record<string, string>)[k] = "";
+    if (Array.isArray(copy.personnel.extra)) copy.personnel.extra.forEach((e) => { e.人员 = ""; });
+    copy.processGroups?.forEach((g) => g.rows?.forEach((r) => { r.人员安排 = ""; r["检测&必检"] = ""; }));
+    copy.signingRows?.forEach((r) => { r.签署人 = ""; });
+    return copy;
+  }
+
+  /** 把当前项目的单项准备单保存为「单项工作模板」（不含 base 基础信息、不含人员姓名等。
    *  传 templateId 时覆盖已有模板；返回模板 _id 供后续覆盖保存用。 */
   async function saveStandaloneTemplate(name: string, templateId?: string): Promise<string | null> {
     const p = currentProject.value; if (!p) return null;
-    const snapshot = deepCopy(p.standalonePrepSheet) as StandalonePrepSheet;
+    const snapshot = stripNamesFromStandalone(p.standalonePrepSheet);
     snapshot.base = defaultStandalonePrepSheet().base;
     try {
       if (templateId) {
