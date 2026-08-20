@@ -1669,14 +1669,8 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <td><button v-if="x.source === 'manual'" class="icon-btn" @click="removeSpDoc(x)">×</button></td>
                   </tr>
                   <tr v-if="isCombineType(x.type)" class="sp-combine-row">
-                    <td colspan="2">
-                      <div class="sp-combine-flex">
-                        <span class="sp-combine-label">工卡号+工卡名称</span>
-                        <input class="sp-combine-input sp-combine-jc" :value="x.jc" placeholder="工卡号" @input="editSpRowJc(x, ($event.target as HTMLInputElement).value)" />
-                        <span class="sp-combine-plus">+</span>
-                        <input class="sp-combine-input sp-combine-name" :value="x.name" placeholder="工卡名称" @input="editSpRowName(x, ($event.target as HTMLInputElement).value)" />
-                      </div>
-                    </td>
+                    <td><input :value="x.jc" placeholder="工卡号" @input="editSpRowJc(x, ($event.target as HTMLInputElement).value)" /></td>
+                    <td><textarea class="sp-name" rows="1" :value="x.name" placeholder="工卡名称" @input="editSpRowName(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
                     <td></td>
                   </tr>
                 </template>
@@ -2001,13 +1995,7 @@ textarea.textwrap {
 .sp-content { min-height: 26px; }
 .sp-table select { width: 100%; height: 28px; border: 1px solid var(--line, #dde2ec); border-radius: 7px; padding: 0 4px; font-size: 12.5px; background: #fff; }
 .sp-table-note { font-size: 11.5px; color: var(--muted, #697386); margin: 6px 0 2px; }
-.sp-combine-row td { background: #f2f6fd; font-size: 12px; color: var(--blue-dark, #2f5597); padding: 4px 8px; }
-.sp-combine-flex { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.sp-combine-label { font-weight: 700; color: var(--muted, #697386); white-space: nowrap; }
-.sp-combine-plus { color: var(--muted, #697386); font-weight: 700; }
-.sp-combine-input { height: 26px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; padding: 0 6px; font-size: 12.5px; background: #fff; color: var(--text, #222); min-width: 0; box-sizing: border-box; }
-.sp-combine-jc { flex: 0 0 130px; }
-.sp-combine-name { flex: 1; min-width: 80px; }
+.sp-combine-row td { background: #f2f6fd; }
 
 /* ===== 串件航材/工具清单（pt-card） ===== */
 .pt-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: linear-gradient(90deg, #edf2fc, #fff); border-radius: 11px 11px 0 0; border-bottom: 1px solid var(--line, #dde2ec); margin: -14px -16px 6px; }
