@@ -1502,9 +1502,9 @@ async function importAllXlsx(event: Event): Promise<void> {
                         <option v-if="a.type && !DEFAULT_PARTS_TYPES.includes(a.type)" :value="a.type">{{ a.type }}</option>
                       </select>
                     </td>
-                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save"></textarea></td>
-                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><NameSuggest :model-value="r.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="r.owner = $event; save()" /></td>
-                    <td><NameSuggest :model-value="r.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="r.participants = $event; save()" /></td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save" :class="{ 'sp-empty': !a.content.trim() }"></textarea></td>
+                    <td :class="{ 'sp-empty-cell': !r.owner.trim() }"><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><NameSuggest :model-value="r.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="r.owner = $event; save()" /></td>
+                    <td :class="{ 'sp-empty-cell': !r.participants.trim() }"><NameSuggest :model-value="r.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="r.participants = $event; save()" /></td>
                     <td><textarea class="textwrap" rows="1" v-model="r.note" placeholder="备注" @input="save"></textarea></td>
                     <td>
                       <select :value="r.executeStage ? r.executeStage.chartId + '::' + r.executeStage.stageIdx : ''" @change="setSpRowStage(r, ($event.target as HTMLSelectElement).value)">
@@ -2060,6 +2060,12 @@ textarea.textwrap {
 .sp-view-note { flex: 1; min-width: 70px; padding: 3px 6px; font-size: 12.5px; color: #c0392b; word-break: break-word; }
 .gantt-card .sp-view-content, .gantt-card .sp-view-field, .gantt-card .sp-view-note { flex: none; width: 100%; padding: 0 2px; }
 .sp-arr-table td { vertical-align: top; }
+/* 串件安排表：未填写栏浅红底色 */
+.sp-arr-table textarea.sp-empty { background: #fdeaea; border-color: #f0b9b9; }
+.sp-arr-table td.sp-empty-cell { background: #fdeaea; }
+.sp-arr-table td.sp-empty-cell input,
+.sp-arr-table td.sp-empty-cell textarea,
+.sp-arr-table td.sp-empty-cell .ns-input { background: #fdeaea; border-color: #f0b9b9; }
 
 /* ===== 串件航材/工具清单（pt-card） ===== */
 .pt-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: linear-gradient(90deg, #edf2fc, #fff); border-radius: 11px 11px 0 0; border-bottom: 1px solid var(--line, #dde2ec); margin: -14px -16px 6px; }
