@@ -30,6 +30,11 @@ const templateName = computed<string>({
 });
 
 function save(): void {
+  // DAY 卡片始终按编号从小到大排序（覆盖新增/手动改编号/导入/插入等所有路径）
+  const s = state.value;
+  if (s && Array.isArray(s.charts)) {
+    s.charts = s.charts.slice().sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0));
+  }
   props.store.saveGantt();
 }
 
