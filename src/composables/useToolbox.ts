@@ -497,12 +497,6 @@ export function useToolbox() {
     return true;
   }
 
-  /** 清除身份（切换账号 / 退出）。 */
-  function clearIdentity(): void {
-    identityName.value = "";
-    localStorage.removeItem(IDENTITY_KEY);
-  }
-
   async function createProject(name: string, aircraftType: AircraftType = "A320", projectType: ProjectType | "" = "", executeDate = ""): Promise<void> {
     const project: Project = {
       id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -619,7 +613,6 @@ export function useToolbox() {
     }
     return subs;
   }
-  function subTotal(cat: string, sub: string): number { return itemsOf(cat, sub).reduce((total, item) => total + (+item.qty || 0), 0); }
   function catTotal(cat: string): number { return (active.value?.items || []).filter((item) => item.cat === cat).reduce((total, item) => total + (+item.qty || 0), 0); }
   /** 全部合计；传入 cats 时仅统计指定部位（需求：统计本页显示的工具总数）。 */
   function allTotal(cats?: string[]): number {
@@ -859,13 +852,6 @@ export function useToolbox() {
     persist();
   }
 
-  function clearActive(): void {
-    const state = requireActive();
-    if (!state) return;
-    Object.assign(state, normalizeState());
-    persist();
-  }
-
   /** 清空当前项目的所有数据（工具清单 + 工作准备单 + 工卡分配清单 + 单项准备单 + 航材清单）。 */
   function clearProjectAllData(): void {
     const project = currentProject.value;
@@ -939,7 +925,6 @@ export function useToolbox() {
     const target = (sub && sub.trim()) || "固定";
     return state.items.filter((it) => it.cat === cat && (((it.sub && it.sub.trim()) || "固定") === target));
   }
-  function mSubTotal(cat: string, sub: string): number { return mItemsOf(cat, sub).reduce((t, it) => t + (+it.qty || 0), 0); }
   function mCatTotal(cat: string): number {
     const state = requireMaterial();
     return state ? state.items.filter((it) => it.cat === cat).reduce((t, it) => t + (+it.qty || 0), 0) : 0;
@@ -1315,44 +1300,6 @@ export function useToolbox() {
     return null;
   }
 
-  /** 机号格式校验：仅 "B-"+4 个字母数字字符（如 B-1005、B-226N）视为合法，允许新增到标准库。 */
-  function isValidAircraftReg(regNo: string): boolean {
-    return /^B-[A-Za-z0-9]{4}$/.test((regNo || "").trim());
-  }
-
-  /** 在飞机信息标准库中追加一条新机号行。
-   *  去重：已存在相同机号则返回原行（不新增）。
-   *  格式校验：仅机号满足 "B-"+4字符 且标准库无匹配项才新增；否则不新增（返回 null）。 */
-  function appendAircraftRow(regNo: string, extra: Partial<StandardLibRow> = {}): StandardLibRow | null {
-    const target = (regNo || "").trim();
-    if (!target) return null;
-    const existing = lookupAircraftRow(target);
-    if (existing) return existing;
-    if (!isValidAircraftReg(target)) return null;
-    const cols = STANDARD_LIB_META.aircraft_info.rowKeys;
-    const row: StandardLibRow = {};
-    for (const col of cols) row[col] = "";
-    row["飞机号"] = target;
-    for (const [key, value] of Object.entries(extra || {})) {
-      if (value != null) row[key] = String(value);
-    }
-    app.value.standardLibraries.aircraft_info.rows.push(row);
-    dirtyStdLibs.add("aircraft_info");
-    persist();
-    return row;
-  }
-  /** 飞机信息本地更新（已有机号）：仅更新本地标准库行的 MSN/FSN/机型/发动机/ETOPS/ELT-DT，
-   *  不标脏、不推送云端（机型数据的云端写入统一走「更新机型标准库」弹窗 + 公开接口 upsert，避免无授权 403）。 */
-  function upsertAircraftInfo(regNo: string, fields: Partial<StandardLibRow>): void {
-    const target = (regNo || "").trim();
-    if (!target) return;
-    const existing = lookupAircraftRow(target);
-    if (!existing) return;
-    for (const [key, value] of Object.entries(fields || {})) {
-      if (value != null && value !== "") existing[key] = String(value);
-    }
-  }
-
   /** 机号规范化：支持 B-XXXX（6 字符）或 XXXX（4 字符，自动补 B- 前缀）。非法返回空串。 */
   function normalizeAircraftReg(input: string): string {
     const s = (input || "").trim().toUpperCase();
@@ -1680,16 +1627,6 @@ export function useToolbox() {
     notify("数据已刷新");
   }
 
-  /** 强制同步一次：立即推送本地改动 + 立即拉取合并。
-   *  供「依据工卡清单」等重量级操作后调用——不等 2s autoSync / 5s 轮询，
-   *  本端立刻把改动推上云端，其余端会在下一轮轮询（3s）内拉到。 */
-  async function forceSync(): Promise<void> {
-    if (hasDirtyData()) {
-      try { await saveRemote(); } catch { /* 推送失败也继续拉取 */ }
-    }
-    await loadRemote(true, false);
-  }
-
   /** 立即保存：无视 autoSync 防抖间隔，把本地编辑过的内容立刻推送云端（不拉取）。 */
   async function saveNow(): Promise<void> {
     if (!hasDirtyData()) {
@@ -1872,25 +1809,25 @@ export function useToolbox() {
     searchDay, teamFilter, nameQuery, filteredProjects, cloud, toast, shared,
     notify, persist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
     createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
-    itemsOf, subsOf, subTotal, catTotal, allTotal, isCartDuplicate,
+    itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
-    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearActive, clearProjectAllData, clearToolListNow, clearMaterialListNow, setToolCart, loadRemote, refresh, forceSync, saveNow,
+    importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearProjectAllData, clearToolListNow, clearMaterialListNow, setToolCart, loadRemote, refresh, saveNow,
     syncSubToLibrary,
-    mSubsOf, mItemsOf, mSubTotal, mCatTotal, mAllTotal, mCategoryList,
+    mSubsOf, mItemsOf, mCatTotal, mAllTotal, mCategoryList,
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,
     mImportStandardSub, mSyncSubToMaterialLib, saveMaterialLibraryNow, replaceMaterialActive, mergeMaterialSections, mergeMaterialImport, markNoteDirty,
     spRenameTitle, spOnAircraftChange, spAddWork, spRemoveWork, spAddPart, spRemovePart, spAddArrange, spRemoveArrange,
     spAddProcessGroup, spRemoveProcessGroup, spAddProcessRow, spRemoveProcessRow, spAddSigningRow, spRemoveSigningRow,
     moveCard, moveUnassignedToSection, deleteUnassigned, upsertWorkcardStdLib,
     sortAvCbCards,
-    lookupAircraftRow, fetchAircraftInfo, appendAircraftRow, upsertAircraftInfo,
+    lookupAircraftRow, fetchAircraftInfo,
     normalizeAircraftReg, openAircraftUpdate, closeAircraftUpdate, saveAircraftToLib, maybePromptAircraftUpdate, maybePromptAircraftDiff, aircraftUpdate,
     renamePrepTitle, addPrepItem, removePrepItem,
     startAutoSync, startPolling, stopPolling, setEditingField, isFlashing, syncing,
     unlockAircraftInfo, startWatch, stopWatch, syncRealtimeMode, watchActive,
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
-    identityName, identityReady, setIdentity, clearIdentity, unlockSiteAdmin,
+    identityName, identityReady, setIdentity, unlockSiteAdmin,
     saveGantt, applyGanttTemplate, openEngTemplateForEdit,
   };
 }

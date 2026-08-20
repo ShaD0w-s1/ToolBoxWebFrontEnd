@@ -8,7 +8,6 @@ export const TEAMS = ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3", "外
 /** 项目（二级）页集中显示默认渲染的部位；其余已有部位需手动“新增部位”才显示。
  *  顺序即显示顺序（与 sectionColor 固定配色表一致）。标准库页不受此限制，显示全部。 */
 export const DEFAULT_CATEGORIES = ["ENG", "AV CB", "FC", "LG", "通用", "接机"] as const;
-export type DefaultCategory = (typeof DEFAULT_CATEGORIES)[number];
 
 /** 新建工作项目时可选择的类型。空字符串表示历史遗留项目（仅有工具清单）。 */
 export const PROJECT_TYPES = ["A检", "零散", "单独项目", "换发/APU"] as const;
@@ -30,14 +29,6 @@ export interface StandardLib {
 /** 工卡分配清单四个部位分组（FC=飞控 / LG=起落架 / AV CB=机上客舱 / ENG=发动机）。 */
 export const WORKCARD_SECTIONS = ["FC", "LG", "AV CB", "ENG"] as const;
 export type WorkcardSection = (typeof WORKCARD_SECTIONS)[number];
-/** 标准库“部位”字段 → 工卡分配清单分组的映射（AV/CB 同归“机上客舱”）。 */
-export const SECTION_BY_AREA: Record<string, WorkcardSection> = {
-  FC: "FC",
-  LG: "LG",
-  ENG: "ENG",
-  AV: "AV CB",
-  CB: "AV CB",
-};
 /** 工卡分配清单分组 → 标准库“部位”字段取值（用于把卡片同步回工卡分配标准库）。 */
 export const AREA_BY_SECTION: Record<WorkcardSection, string> = {
   FC: "FC",
@@ -56,18 +47,7 @@ export const WORKCARD_COLUMNS = [
   "必检",
 ] as const;
 
-/** 工作准备单的人员安排角色（旧版 7 角色，仅用于向后兼容迁移）。 */
-export const PREP_ROLES = [
-  "项目经理",
-  "航后及定检整机放行",
-  "发动机区域放行",
-  "起落架区域放行",
-  "飞控区域放行",
-  "电子区域放行",
-  "客舱区域放行",
-] as const;
-
-/** 人员安排 4 列布局：每行描述若干格子，cols 表示该格子占的列宽（总和 = 4）。 */
+/** 工作准备单的人员安排 4 列布局：每行描述若干格子，cols 表示该格子占的列宽（总和 = 4）。 */
 export const PREP_PERSONNEL_LAYOUT: Array<Array<{ key: string; cols: number }>> = [
   [
     { key: "项目经理", cols: 1 },
@@ -124,11 +104,6 @@ export interface PrepSheetItem {
   title: string;
   /** 文本内容。 */
   value: string;
-}
-/** 旧版人员安排角色（主/参与两格）；仅用于向后兼容。 */
-export interface PrepSheetRole {
-  main: string;
-  helper: string;
 }
 export interface PrepSheet {
   /** 卡片标题（可点击重命名）。 */
