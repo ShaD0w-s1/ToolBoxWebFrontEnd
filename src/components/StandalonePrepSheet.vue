@@ -330,8 +330,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-part-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; font-weight: 600; font-size: 14px; color: #4a5160; }
 .sp-part-name:hover, .sp-part-name:focus { border-color: #8eaadb; background: #fff; }
 /* 单项工作模板弹窗 */
-.tpl-modal { position: fixed; inset: 0; z-index: 300; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 20px; }
-.tpl-modal-card { background: #fff; border-radius: 12px; padding: 18px 20px; width: 520px; max-width: 100%; max-height: 78vh; overflow-y: auto; box-shadow: 0 8px 30px rgba(0, 0, 0, .18); }
+.tpl-modal { position: fixed; inset: 0; z-index: 300; background: rgba(15, 23, 42, .45); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px 20px; }
+.tpl-modal-card { background: #fff; border-radius: 12px; padding: 18px 20px; width: 520px; max-width: 100%; margin: 0 auto; box-shadow: 0 8px 30px rgba(0, 0, 0, .18); }
 .tpl-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .tpl-modal-head h3 { font-size: 16px; margin: 0; color: #222; }
 .tpl-save-row { display: flex; gap: 8px; margin-bottom: 12px; }

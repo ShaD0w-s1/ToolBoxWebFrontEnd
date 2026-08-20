@@ -5,6 +5,7 @@ import {
   STANDARD_LIB_KEYS,
   STANDARD_LIB_META,
   TEAMS,
+  defaultStandalonePrepSheet,
   type AircraftType,
   type GanttPrepState,
   type Project,
@@ -202,7 +203,22 @@ async function duplicateStandaloneTemplate(t: { _id: string; name: string }): Pr
 /** 单项工作模板「编辑」：新建单独项目预载模板内容，调整后「保存模板→覆盖」写回。 */
 function editStandaloneTemplate(t: { name: string; state: StandalonePrepSheet }): void {
   showStandaloneTemplates.value = false;
-  props.store.openStandaloneTemplateForEdit(t.name, t.state);
+  props.store.openStandaloneTemplateForEdit(t.name, t.state, "edit");
+}
+
+const newStandaloneTplName = ref("");
+/** 新增单项工作模板：命名后新建空白模板并打开编辑页（编辑完「保存为新模板」创建）。 */
+function addStandaloneTemplate(): void {
+  const name = newStandaloneTplName.value.trim();
+  if (!name) { props.store.notify("请输入模板名称"); return; }
+  showStandaloneTemplates.value = false;
+  newStandaloneTplName.value = "";
+  props.store.openStandaloneTemplateForEdit(name, defaultStandalonePrepSheet());
+}
+/** 调取模板：用模板创建实际项目（预载内容），填写基础信息即可用。 */
+function applyStandaloneTemplate(t: { name: string; state: StandalonePrepSheet }): void {
+  showStandaloneTemplates.value = false;
+  props.store.openStandaloneTemplateForEdit(t.name, t.state, "apply");
 }
 
 /** 公告栏编辑。 */
@@ -412,6 +428,10 @@ function cancelEditAnnouncement(): void {
           <h3>单项工作模板库</h3>
           <button @click="showStandaloneTemplates = false">关闭</button>
         </div>
+        <div class="site-admin-newtpl">
+          <input v-model="newStandaloneTplName" placeholder="新模板名称" @keydown.enter="addStandaloneTemplate" />
+          <button class="primary" @click="addStandaloneTemplate">新增模板</button>
+        </div>
         <p v-if="standaloneTemplatesLoading" class="site-admin-empty">加载中…</p>
         <template v-else-if="standaloneTemplates.length">
           <div v-for="t in standaloneTemplates" :key="t._id" class="eng-tpl-row">
@@ -420,6 +440,7 @@ function cancelEditAnnouncement(): void {
               <span>{{ standaloneTemplateSummary(t.state) }}</span>
             </div>
             <div class="eng-tpl-actions">
+              <button @click="applyStandaloneTemplate(t)">调取</button>
               <button @click="editStandaloneTemplate(t)">编辑</button>
               <button @click="duplicateStandaloneTemplate(t)">复制</button>
               <button class="danger" @click="deleteStandaloneTemplate(t)">删除</button>
@@ -475,8 +496,10 @@ function cancelEditAnnouncement(): void {
 .db-group-title { font-size: 14px; font-weight: 700; color: #2f3b52; margin: 0 0 8px; padding-left: 4px; border-left: 4px solid #378add; }
 .db-group-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .compare-card { border-color: #378add; }
-.site-admin-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; background: rgba(17, 24, 39, 0.45); }
-.site-admin-card { width: min(560px, calc(100% - 48px)); max-height: 80vh; overflow: auto; padding: 20px 24px; background: #fff; border-radius: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
+.site-admin-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; background: rgba(17, 24, 39, 0.45); }
+.site-admin-card { width: min(560px, calc(100% - 48px)); max-height: none; margin: 24px auto; padding: 20px 24px; background: #fff; border-radius: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
+.site-admin-newtpl { display: flex; gap: 8px; margin-bottom: 12px; }
+.site-admin-newtpl input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid #d7dbe4; border-radius: 7px; font-size: 13px; }
 .site-admin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .site-admin-head h3 { margin: 0; font-size: 16px; color: #2f3b52; }
 .site-admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }

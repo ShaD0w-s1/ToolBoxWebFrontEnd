@@ -1803,15 +1803,17 @@ export function useToolbox() {
     notify(`已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`);
   }
 
-  /** 模板库「编辑」：新建单独项目预载模板内容，调整后在二级页「保存模板 → 覆盖」写回原模板。 */
-  async function openStandaloneTemplateForEdit(name: string, state: StandalonePrepSheet): Promise<void> {
+  /** 模板库入口：新建单独项目预载模板内容。mode="edit" 打开模板编辑页（改完「保存模板 → 覆盖」写回）；mode="apply" 用模板创建实际项目。 */
+  async function openStandaloneTemplateForEdit(name: string, state: StandalonePrepSheet, mode: "edit" | "apply" = "edit"): Promise<void> {
     await createProject(name, "A320", "单独项目");
     const project = currentProject.value;
     if (!project) return;
     project.standalonePrepSheet = deepCopy(state);
     markField("standalonePrepSheet");
     persist();
-    notify(`已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`);
+    notify(mode === "edit"
+      ? `已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`
+      : `已用模板「${name}」创建项目，请填写基础信息并完善内容`);
   }
 
   /** 模板脱敏：清空所有含人名的字段（人员安排/必检/签署人等），只保留业务内容（工序/部件/工作等）。
