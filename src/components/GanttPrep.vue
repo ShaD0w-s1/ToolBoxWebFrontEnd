@@ -363,6 +363,8 @@ interface SpRow {
   type: string;
   jc: string;
   name: string;
+  jc2: string;  // 串件/拆装类型额外一行的独立工卡号
+  name2: string; // 串件/拆装类型额外一行的独立工卡名称
   source: "auto" | "manual";
 }
 function findPartById(partId: string): GanttPart | null {
@@ -393,11 +395,11 @@ function getSpRows(): SpRow[] {
   const rows: SpRow[] = [];
   s.charts.forEach((c) => (c.parts || []).forEach((p) => {
     const ext = p.content ? spList.find((x) => x.content === p.content) : undefined;
-    rows.push({ uid: "auto:" + p.id, partId: p.id, spId: null, content: p.content || "", type: p.type || "", jc: ext ? (ext.jc || "") : "", name: ext ? (ext.name || "") : "", source: "auto" });
+    rows.push({ uid: "auto:" + p.id, partId: p.id, spId: null, content: p.content || "", type: p.type || "", jc: ext ? (ext.jc || "") : "", name: ext ? (ext.name || "") : "", jc2: ext ? (ext.jc2 || "") : "", name2: ext ? (ext.name2 || "") : "", source: "auto" });
   }));
   spList.forEach((x, idx) => {
     if (x.content && partContents.has(x.content)) return; // 已被自动行匹配（同内容）
-    rows.push({ uid: "manual:" + (x.id || ("sp" + idx)), partId: null, spId: String(x.id || ("sp" + idx)), content: x.content || "", type: x.type || "", jc: x.jc || "", name: x.name || "", source: "manual" });
+    rows.push({ uid: "manual:" + (x.id || ("sp" + idx)), partId: null, spId: String(x.id || ("sp" + idx)), content: x.content || "", type: x.type || "", jc: x.jc || "", name: x.name || "", jc2: x.jc2 || "", name2: x.name2 || "", source: "manual" });
   });
   return rows;
 }
@@ -431,6 +433,16 @@ function editSpRowJc(row: SpRow, value: string): void {
 function editSpRowName(row: SpRow, value: string): void {
   if (row.partId) { const p = findPartById(row.partId); if (p) { findOrCreateSpByContent(p.content).name = value; save(); } }
   else { const rec = findSpById(row.spId || ""); if (rec) { rec.name = value; save(); } }
+}
+// 编辑额外行工卡号：写入 docs.sp 的 jc2（独立于原行 jc）
+function editSpRowJc2(row: SpRow, value: string): void {
+  if (row.partId) { const p = findPartById(row.partId); if (p) { findOrCreateSpByContent(p.content).jc2 = value; save(); } }
+  else { const rec = findSpById(row.spId || ""); if (rec) { rec.jc2 = value; save(); } }
+}
+// 编辑额外行工卡名称：写入 docs.sp 的 name2（独立于原行 name）
+function editSpRowName2(row: SpRow, value: string): void {
+  if (row.partId) { const p = findPartById(row.partId); if (p) { findOrCreateSpByContent(p.content).name2 = value; save(); } }
+  else { const rec = findSpById(row.spId || ""); if (rec) { rec.name2 = value; save(); } }
 }
 function removeSpDoc(row: SpRow): void {
   const s = state.value; if (!s) return;
@@ -1180,6 +1192,7 @@ async function exportDocsXlsx(): Promise<void> {
   const sp: unknown[][] = [["序号", "类型", "串件内容", "工卡号", "工卡名称", "领用人"]];
   spRows.forEach((x, i) => {
     sp.push([i + 1, x.type || "", x.content || "", x.jc || "", x.name || "", ""]);
+    if (isCombineType(x.type)) sp.push(["", "工卡号+工卡名称", "", x.jc2 || "", x.name2 || "", ""]);
   });
   if (!wpEng.length && !spRows.length) { props.store.notify("手册清单暂无数据"); return; }
   try {
@@ -1669,14 +1682,14 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <td><button v-if="x.source === 'manual'" class="icon-btn" @click="removeSpDoc(x)">×</button></td>
                   </tr>
                   <tr v-if="isCombineType(x.type)" class="sp-combine-row">
-                    <td><input :value="x.jc" placeholder="工卡号" @input="editSpRowJc(x, ($event.target as HTMLInputElement).value)" /></td>
-                    <td><textarea class="sp-name" rows="1" :value="x.name" placeholder="工卡名称" @input="editSpRowName(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
+                    <td><input :value="x.jc2" placeholder="工卡号" @input="editSpRowJc2(x, ($event.target as HTMLInputElement).value)" /></td>
+                    <td><textarea class="sp-name" rows="1" :value="x.name2" placeholder="工卡名称" @input="editSpRowName2(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
                     <td></td>
                   </tr>
                 </template>
               </tbody>
             </table>
-            <div class="sp-table-note">橙底行 = 表单串件自动同步（类型/内容可改，改动同步到串件卡片）；白底行 = 手动添加（仅串件工卡使用，不影响串件卡片）；串件/拆装类型下方附「工卡号+工卡名称」汇总行。</div>
+            <div class="sp-table-note">橙底行 = 表单串件自动同步（类型/内容可改，改动同步到串件卡片）；白底行 = 手动添加（仅串件工卡使用，不影响串件卡片）；串件/拆装类型下方附独立「工卡号+工卡名称」可填行（与原行数据独立）。</div>
             <button class="gp-add" @click="addDoc('sp')">+ 添加</button>
           </section>
         </div>
