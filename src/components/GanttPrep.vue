@@ -401,6 +401,8 @@ function getSpRows(): SpRow[] {
   });
   return rows;
 }
+// 串件/拆装类型：下方附「工卡号+工卡名称」汇总行，且类型/内容上下行合并单元格
+function isCombineType(t: string): boolean { return t === "串件" || t === "拆装"; }
 // 编辑串件工卡类型：auto→同步串件卡片(part.type)；manual→写 docs.sp
 function editSpRowType(row: SpRow, value: string): void {
   if (row.partId) { const p = findPartById(row.partId); if (p) { p.type = value; save(); } }
@@ -1655,19 +1657,27 @@ async function importAllXlsx(event: Event): Promise<void> {
               <tbody>
                 <template v-for="x in getSpRows()" :key="x.uid">
                   <tr :class="{ 'sp-auto': x.source === 'auto' }">
-                    <td>
+                    <td :rowspan="isCombineType(x.type) ? 2 : 1">
                       <select :value="x.type" @change="editSpRowType(x, ($event.target as HTMLSelectElement).value)">
                         <option v-for="t in DEFAULT_PARTS_TYPES" :key="t" :value="t">{{ t }}</option>
                         <option v-if="x.type && !DEFAULT_PARTS_TYPES.includes(x.type)" :value="x.type">{{ x.type }}</option>
                       </select>
                     </td>
-                    <td><textarea class="sp-content" rows="1" :value="x.content" placeholder="串件内容" @input="editSpRowContent(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
+                    <td :rowspan="isCombineType(x.type) ? 2 : 1"><textarea class="sp-content" rows="1" :value="x.content" placeholder="串件内容" @input="editSpRowContent(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
                     <td><input :value="x.jc" placeholder="工卡号" @input="editSpRowJc(x, ($event.target as HTMLInputElement).value)" /></td>
                     <td><textarea class="sp-name" rows="1" :value="x.name" placeholder="工卡名称" @input="editSpRowName(x, ($event.target as HTMLTextAreaElement).value)"></textarea></td>
                     <td><button v-if="x.source === 'manual'" class="icon-btn" @click="removeSpDoc(x)">×</button></td>
                   </tr>
-                  <tr v-if="x.type === '串件' || x.type === '拆装'" class="sp-combine-row">
-                    <td colspan="5"><span class="sp-combine-label">工卡号+工卡名称：</span>{{ x.jc }}<template v-if="x.jc && x.name"> + </template>{{ x.name }}</td>
+                  <tr v-if="isCombineType(x.type)" class="sp-combine-row">
+                    <td colspan="2">
+                      <div class="sp-combine-flex">
+                        <span class="sp-combine-label">工卡号+工卡名称</span>
+                        <input class="sp-combine-input sp-combine-jc" :value="x.jc" placeholder="工卡号" @input="editSpRowJc(x, ($event.target as HTMLInputElement).value)" />
+                        <span class="sp-combine-plus">+</span>
+                        <input class="sp-combine-input sp-combine-name" :value="x.name" placeholder="工卡名称" @input="editSpRowName(x, ($event.target as HTMLInputElement).value)" />
+                      </div>
+                    </td>
+                    <td></td>
                   </tr>
                 </template>
               </tbody>
@@ -1992,7 +2002,12 @@ textarea.textwrap {
 .sp-table select { width: 100%; height: 28px; border: 1px solid var(--line, #dde2ec); border-radius: 7px; padding: 0 4px; font-size: 12.5px; background: #fff; }
 .sp-table-note { font-size: 11.5px; color: var(--muted, #697386); margin: 6px 0 2px; }
 .sp-combine-row td { background: #f2f6fd; font-size: 12px; color: var(--blue-dark, #2f5597); padding: 4px 8px; }
-.sp-combine-label { font-weight: 700; color: var(--muted, #697386); margin-right: 4px; }
+.sp-combine-flex { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sp-combine-label { font-weight: 700; color: var(--muted, #697386); white-space: nowrap; }
+.sp-combine-plus { color: var(--muted, #697386); font-weight: 700; }
+.sp-combine-input { height: 26px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; padding: 0 6px; font-size: 12.5px; background: #fff; color: var(--text, #222); min-width: 0; box-sizing: border-box; }
+.sp-combine-jc { flex: 0 0 130px; }
+.sp-combine-name { flex: 1; min-width: 80px; }
 
 /* ===== 串件航材/工具清单（pt-card） ===== */
 .pt-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: linear-gradient(90deg, #edf2fc, #fff); border-radius: 11px 11px 0 0; border-bottom: 1px solid var(--line, #dde2ec); margin: -14px -16px 6px; }
