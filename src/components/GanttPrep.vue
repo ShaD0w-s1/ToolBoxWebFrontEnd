@@ -1288,19 +1288,43 @@ async function importAllXlsx(event: Event): Promise<void> {
       if (!/工序/.test(name)) return;
       const ws = wb.Sheets[name];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
-      const dayMatch = name.match(/DAY(\d+)/);
-      let chart = dayMatch ? s.charts.find((c) => c.day === Number(dayMatch[1])) : undefined;
-      if (!chart) { chart = s.charts[0]; }
-      if (!chart) return;
-      const stageMap = new Map<string, number>();
-      chart.stages.forEach((st, i) => stageMap.set(st.name, i));
+      // 旧格式兼容：sheet 名可能为「DAY n」（每 DAY 一个 sheet）
+      const sheetDayMatch = name.match(/DAY\s*(\d+)/i);
+      const sheetDay = sheetDayMatch ? Number(sheetDayMatch[1]) : NaN;
       rows.slice(1).forEach((row) => {
-        const stageName = String(row[0] || "").trim();
-        const content = String(row[1] || "").trim();
+        // 列映射与导出一致：DAY | 阶段 | 内容 | 负责人 | 参与人 | 备注
+        const dayText = String(row[0] || "").trim();
+        const stageName = String(row[1] || "").trim();
+        const content = String(row[2] || "").trim();
+        const owner = String(row[3] || "").trim();
+        const participants = String(row[4] || "").trim();
+        const note = String(row[5] || "").trim();
         if (!content) return;
+        // DAY 解析：行内 DAY 列优先（"DAY 1"/"DAY1"），无则回退 sheet 名
+        const dm = dayText.match(/DAY\s*(\d+)/i);
+        let dayNum = dm ? Number(dm[1]) : NaN;
+        if (!Number.isFinite(dayNum) || dayNum < 1) dayNum = Number.isFinite(sheetDay) ? sheetDay : NaN;
+        let chart = Number.isFinite(dayNum) ? s.charts.find((c) => c.day === dayNum) : undefined;
+        if (!chart && Number.isFinite(dayNum)) {
+          // 导入数据含新 DAY：自动新建 DAY 卡片（结构与 addChart 一致）
+          const last = s.charts[s.charts.length - 1];
+          chart = {
+            id: genId(), title: `DAY ${dayNum}`, date: nextDate(), day: dayNum, collapsed: false,
+            responsibilities: (last?.responsibilities?.length ? last.responsibilities : DEFAULT_RESP.map((l) => ({ id: genId(), label: l, name: "" })))
+              .map((r) => ({ id: genId(), label: r.label, name: r.name })),
+            stages: DEFAULT_STAGES.map((n) => ({ id: genId(), name: n })),
+            lanes: [], cards: [], parts: [],
+          };
+          s.charts.push(chart);
+          s.charts.sort((a, b) => a.day - b.day);
+        }
+        if (!chart) chart = s.charts[0];
+        if (!chart) return;
+        const stageMap = new Map<string, number>();
+        chart.stages.forEach((st, i) => stageMap.set(st.name, i));
         let si = stageMap.get(stageName);
-        if (si === undefined) { chart!.stages.push({ id: genId(), name: stageName || "新阶段" }); si = chart!.stages.length - 1; stageMap.set(stageName, si); }
-        chart!.cards.push({ id: genId(), laneId: "", content, owner: String(row[2] || ""), participants: String(row[3] || ""), note: String(row[4] || ""), startStage: si, endStage: si, order: chart!.cards.length });
+        if (si === undefined) { chart.stages.push({ id: genId(), name: stageName || "新阶段" }); si = chart.stages.length - 1; stageMap.set(stageName, si); }
+        chart.cards.push({ id: genId(), laneId: "", content, owner, participants, note, startStage: si, endStage: si, order: chart.cards.length });
         added++;
       });
     });
