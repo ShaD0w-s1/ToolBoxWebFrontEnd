@@ -1634,7 +1634,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <div class="resp-cell resp-add"><button @click="addResp(chart.id)">+ 添加安排</button></div>
               </div>
               <div class="gantt-wrap">
-                <div class="gantt-grid" :style="{ gridTemplateColumns: `repeat(${chart.stages.length}, minmax(40px, 1fr))`, gridTemplateRows: `44px repeat(${rowCountOf(chart)}, auto)` }">
+                <div class="gantt-grid" :style="{ gridTemplateColumns: `repeat(${chart.stages.length}, minmax(40px, min(calc(100% / ${chart.stages.length}), 20%)))`, gridTemplateRows: `44px repeat(${rowCountOf(chart)}, auto)` }">
                   <div v-for="(st, si) in chart.stages" :key="st.id" class="gantt-head" :style="{ gridColumn: si + 1, gridRow: 1 }">
                     <div class="stage-col-drag" title="拖动调整列位置" @pointerdown="startStageColDrag($event, chart.id, si)">⠿</div>
                     <input v-model="st.name" class="stage-name-input" @input="save" />
