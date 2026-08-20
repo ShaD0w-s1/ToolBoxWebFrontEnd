@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, PROJECT_TYPES } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, type Project } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
-import { formatDate } from "../utils/format";
 import CategorySection from "./CategorySection.vue";
 import PrepSheet from "./PrepSheet.vue";
 import WorkcardAssignment from "./WorkcardAssignment.vue";
 import StandalonePrepSheet from "./StandalonePrepSheet.vue";
 import MaterialList from "./MaterialList.vue";
+import GanttPrep from "./GanttPrep.vue";
+import ProjectFormModal from "./ProjectFormModal.vue";
 import { parseWorkCardList } from "../services/workcard";
 import { backend } from "../api";
 
@@ -20,6 +21,8 @@ const emit = defineEmits<{
   share: [];
 }>();
 const capture = ref<HTMLElement | null>(null);
+// 修订弹窗目标项目：null=隐藏，否则为该项目的修订弹窗。
+const editTarget = ref<Project | null>(null);
 
 /** A检项目：二级页拆为 工作准备单 / 工卡分配清单 / 工具清单 三个子页面。 */
 const isAcheck = computed(() => {
@@ -31,17 +34,25 @@ const isStandalone = computed(() => {
   const project = props.store.currentProject.value;
   return Boolean(project) && !props.store.editingLibrary.value && project!.type === "单独项目";
 });
-const subPage = ref<"prep" | "workcard" | "material" | "tools">("prep");
-watch(() => props.store.currentProject.value?.id, () => { subPage.value = "prep"; });
+/** 换发/APU 项目：二级页拆为 工作准备单(甘特) / 航材清单 / 工具清单 三个子页面。 */
+const isEngApu = computed(() => {
+  const project = props.store.currentProject.value;
+  return Boolean(project) && !props.store.editingLibrary.value && project!.type === "换发/APU";
+});
+const subPage = ref<"prep" | "workcard" | "material" | "tools" | "gantt">("prep");
+watch(() => props.store.currentProject.value?.id, () => {
+  subPage.value = props.store.currentProject.value?.type === "换发/APU" ? "gantt" : "prep";
+}, { immediate: true });
 
 // 子页 → 顶层字段映射：切换子页时同步「正在编辑的字段」，供字段级 dirty 追踪 / 合并使用。
-function fieldForSubPage(): "data" | "materialList" | "prepSheet" | "workcardAssignment" | "standalonePrepSheet" {
+function fieldForSubPage(): "data" | "materialList" | "prepSheet" | "workcardAssignment" | "standalonePrepSheet" | "ganttPrep" {
   if (subPage.value === "material") return "materialList";
   if (subPage.value === "tools") return "data";
   if (subPage.value === "workcard") return "workcardAssignment";
+  if (subPage.value === "gantt") return "ganttPrep";
   return isStandalone.value ? "standalonePrepSheet" : "prepSheet";
 }
-watch([subPage, isAcheck, isStandalone], () => props.store.setEditingField(fieldForSubPage()), { immediate: true });
+watch([subPage, isAcheck, isStandalone, isEngApu], () => props.store.setEditingField(fieldForSubPage()), { immediate: true });
 
 // 修复 2：工作准备单机号/机型变化 → 自动切换工具清单机型并覆盖数据（无需弹窗确认）。
 watch(
@@ -163,19 +174,6 @@ function importNewSectionsFile(event: Event): void {
   const file = input.files?.[0];
   input.value = "";
   if (file) emit("import-new-sections", file);
-}
-
-/** 需求 8：修改项目类型，弹窗确认。 */
-function onTypeChange(event: Event): void {
-  const select = event.target as HTMLSelectElement;
-  const newType = select.value as typeof PROJECT_TYPES[number] | "";
-  const project = props.store.currentProject.value;
-  if (!project || project.type === newType) return;
-  if (!window.confirm(`确认将项目类型从"${project.type || "未选择"}"修改为"${newType || "未选择"}"？`)) {
-    select.value = project.type;
-    return;
-  }
-  props.store.updateProjectType(project, newType);
 }
 
 /** 需求 12：清空当前项目所有数据（含工作准备单/工卡分配清单/工具清单）。修复 2：调 clearProjectAllData。 */
@@ -308,21 +306,26 @@ async function runToolFilterByWorkcard(): Promise<void> {
     <div class="detail-sticky">
       <header class="detail-head">
         <button @click="store.backToList">← 返回</button>
-        <div><strong>{{ store.detailTitle.value }}</strong><span>{{ store.currentProject.value ? formatDate(store.currentProject.value.createdAt) : '机型标准数据库' }}</span></div>
+        <div>
+          <strong>{{ store.detailTitle.value }}</strong>
+          <span v-if="store.currentProject.value">{{ store.currentProject.value.aircraftType }} · {{ store.currentProject.value.executeDate || "未设置执行日期" }}</span>
+          <span v-else>机型标准数据库</span>
+        </div>
+        <template v-if="store.currentProject.value">
+          <span class="card-meta">{{ store.currentProject.value.type || "未选择类型" }}</span>
+          <span class="card-meta">{{ store.currentProject.value.team || "未分配班组" }}</span>
+          <button @click="editTarget = store.currentProject.value">修订</button>
+        </template>
       </header>
 
-      <!-- 二级页首行共享按钮（所有项目类型公用，修复 3）。单独项目隐藏「依据工卡清单」（不走工卡流程）。 -->
+      <!-- 二级页首行共享按钮（所有项目类型公用，修复 3）。单独项目/换发·APU 隐藏「依据工卡清单」（不走工卡流程）。 -->
       <div v-if="store.currentProject.value && !store.editingLibrary.value" class="toolbar top-row">
-        <label v-if="!isStandalone" class="button primary">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="applyWorkCardListFile" /></label>
-        <select v-if="store.currentProject.value" :value="store.currentProject.value.type" @change="onTypeChange" aria-label="项目类型" class="type-select" :class="{ 'type-acheck': store.currentProject.value.type === 'A检' }">
-          <option value="">类型：未选择</option>
-          <option v-for="t in PROJECT_TYPES" :key="t" :value="t">{{ t }}</option>
-        </select>
+        <label v-if="!isStandalone && !isEngApu" class="button primary">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="applyWorkCardListFile" /></label>
         <button @click="emit('share')">分享本页</button>
         <button @click="store.saveNow()">保存</button>
         <button @click="store.refresh()">刷新</button>
-        <span class="spacer" />
-        <span class="hint">导入 AMES线控平台-打印其他 中的《例行工卡清单》</span>
+        <span v-if="!isEngApu" class="spacer" />
+        <span v-if="!isEngApu" class="hint">导入 AMES线控平台-打印其他 中的《例行工卡清单》</span>
         <button class="danger" @click="clearProjectAll">清空数据</button>
       </div>
 
@@ -349,6 +352,9 @@ async function runToolFilterByWorkcard(): Promise<void> {
       <StandalonePrepSheet v-if="isStandalone && subPage === 'prep'" :store="store" @export-image="(el) => emit('export-image', el, '单项准备单')" />
       <MaterialList v-else-if="isStandalone && subPage === 'material'" :store="store" @export-image="(el) => emit('export-image', el, '航材清单')" />
 
+      <!-- 换发/APU：甘特准备单直接作为二级页主体（含 表单/甘特/手册/串件航材/串件工具 五子页） -->
+      <GanttPrep v-if="isEngApu" :store="store" />
+
       <!-- A检 航材清单子页面 -->
       <MaterialList v-else-if="isAcheck && subPage === 'material'" :store="store" @export-image="(el) => emit('export-image', el, '航材清单')" />
 
@@ -356,7 +362,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
       <MaterialList v-else-if="store.editingMaterialLibrary.value" :store="store" @export-image="(el) => emit('export-image', el, '航材标准库')" />
 
       <!-- 工具清单子页（统一布局：子页抬头 + 工具栏 + 红色提醒） -->
-      <template v-if="store.active.value && ((!isAcheck && !isStandalone && !store.editingMaterialLibrary.value) || subPage === 'tools')">
+      <template v-if="store.active.value && ((!isAcheck && !isStandalone && !isEngApu && !store.editingMaterialLibrary.value) || subPage === 'tools')">
         <div class="subpage-head">
           <h3>{{ isLibrary ? `${store.editingLibrary.value} 工具标准库` : '工具清单' }}</h3>
           <span v-if="!isLibrary" class="auto-filter-warning">自动模糊筛选，需人工复核</span>
@@ -405,6 +411,8 @@ async function runToolFilterByWorkcard(): Promise<void> {
         </div>
       </template>
     </div>
+
+    <ProjectFormModal v-if="editTarget" :store="store" mode="edit" :project="editTarget" @close="editTarget = null" />
   </section>
 </template>
 

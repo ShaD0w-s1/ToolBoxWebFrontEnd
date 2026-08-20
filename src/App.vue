@@ -6,6 +6,7 @@ import ProjectList from "./components/ProjectList.vue";
 import ProjectDetail from "./components/ProjectDetail.vue";
 import ToolCart from "./components/ToolCart.vue";
 import StandardLibraryTable from "./components/StandardLibraryTable.vue";
+import AircraftUpdateModal from "./components/AircraftUpdateModal.vue";
 import {
   AIRCRAFT_TYPES,
   normalizeApp,
@@ -23,6 +24,21 @@ import { copyText, createShareUrl, readSharePayload, projectShareUrl, type Share
 import { download, exportFileName, formatDay } from "./utils/format";
 
 const store = useToolbox();
+
+// —— 无密码身份标识弹窗 ——
+const showIdentityModal = ref(false);
+const identityDraft = ref("");
+
+async function submitIdentity(): Promise<void> {
+  if (await store.setIdentity(identityDraft.value)) {
+    identityDraft.value = "";
+    showIdentityModal.value = false;
+  }
+}
+function switchIdentity(): void {
+  identityDraft.value = "";
+  showIdentityModal.value = true;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "未知错误";
@@ -268,6 +284,8 @@ onMounted(async () => {
     await store.loadRemote();
     openFromQuery();
   }
+  // 无密码身份标识：首次（或本设备无身份）时弹窗输入姓名
+  if (!store.identityReady.value) showIdentityModal.value = true;
   // 启动每 2 秒自动同步（推送本地变更到云端，不覆盖本地编辑）
   store.startAutoSync(2000);
   // 根据远端配置启动 watch 实时推送或轮询（loadRemote 成功后内部已按配置启动，
@@ -295,8 +313,8 @@ function exportCurrentState(displayCats?: string[]): void {
 </script>
 
 <template>
-  <AppHeader :cloud="store.cloud" :watch-active="store.watchActive.value" />
-  <main>
+  <AppHeader :cloud="store.cloud" :watch-active="store.watchActive.value" :identity-name="store.identityName.value" @switch-identity="switchIdentity" />
+  <main :class="{ 'gantt-full': store.screen.value === 'detail' && store.currentProject.value?.type === '换发/APU' }">
     <ProjectList
       v-if="store.screen.value === 'list'"
       :store="store"
@@ -324,6 +342,18 @@ function exportCurrentState(displayCats?: string[]): void {
     </div>
   </div>
 
+  <div v-if="showIdentityModal" class="identity-modal">
+    <div class="identity-modal-card">
+      <h3>请输入您的姓名</h3>
+      <p class="identity-hint">用于标识操作身份（2-5 个字符），同设备下次自动登录。</p>
+      <input v-model="identityDraft" maxlength="5" placeholder="姓名（2-5 个字符）" autofocus @keydown.enter="submitIdentity" />
+      <div class="identity-actions">
+        <button class="ghost" @click="showIdentityModal = false">跳过</button>
+        <button class="primary" :disabled="identityDraft.trim().length < 2 || identityDraft.trim().length > 5" @click="submitIdentity">进入系统</button>
+      </div>
+    </div>
+  </div>
+
   <aside v-if="store.shared.value" class="share-banner">
     <span>你正在查看通过链接分享的内容（尚未保存到本地）。</span>
     <div class="spacer" />
@@ -331,6 +361,8 @@ function exportCurrentState(displayCats?: string[]): void {
     <button @click="cancelShared">取消</button>
   </aside>
   <div class="toast" :class="{ show: store.toast.visible }">{{ store.toast.message }}</div>
+
+  <AircraftUpdateModal :store="store" />
 
   <div v-if="previewImage" class="img-preview" @click="closePreview">
     <div class="img-preview-inner" @click.stop>
@@ -382,4 +414,28 @@ function exportCurrentState(displayCats?: string[]): void {
 @keyframes sync-spin {
   to { transform: rotate(360deg); }
 }
+.identity-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(2px);
+}
+.identity-modal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px 32px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  width: min(360px, calc(100% - 48px));
+}
+.identity-modal-card h3 { margin: 0; color: #333; font-size: 17px; }
+.identity-hint { margin: 0; color: #888; font-size: 13px; line-height: 1.5; }
+.identity-modal-card input { padding: 8px 12px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 15px; }
+.identity-actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

@@ -35,8 +35,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .status-badge.warn { background: rgb(241 196 15 / 35%); color: #fff; }
 .status-badge.err { background: rgb(231 76 60 / 42%); color: #fff; }
 .status-badge.off { background: rgb(255 255 255 / 18%); color: rgb(255 255 255 / 55%); }
+.identity-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; background: rgb(255 255 255 / 20%); border: 1px solid rgb(255 255 255 / 38%); cursor: pointer; transition: background .25s; }
+.identity-badge:hover { background: rgb(255 255 255 / 32%); }
+.identity-badge .badge-icon { width: 13px; height: 13px; }
 
 main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 48px; }
+/* 换发/APU 甘特页：放宽到全尺寸（参与人名单贴左，甘特图占满剩余）。 */
+main.gantt-full { width: calc(100% - 32px); max-width: none; }
 button, .button, .field, .check, .toolbar select {
   min-height: 36px;
   border: 1px solid #8eaadb;
@@ -113,8 +118,10 @@ button.ghost:hover, .ghost:hover { background: var(--blue-light); }
 .project-main { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; border: 0; padding: 0; color: #222; background: transparent; text-align: left; }
 .project-main:hover { background: transparent; }
 .project-main strong { font-size: 16px; }
-.project-main span, .library-card span, .detail-head span { color: var(--muted); font-size: 12px; }
+.project-main span, .library-card span, .detail-head > div span { color: var(--muted); font-size: 12px; }
 .project-card > select { min-height: 34px; border: 1px solid #8eaadb; border-radius: 8px; padding: 5px 8px; background: #fff; }
+/* 项目卡片/二级页抬头：仅展示的 班组/类型 标签（不可编辑，圆角方形蓝边白底加粗蓝字，最小容纳 4 个中文字符） */
+.card-meta { flex: 0 0 auto; min-width: 4em; text-align: center; padding: 5px 11px; border: 1px solid var(--blue); border-radius: 8px; background: #fff; color: var(--blue-dark); font-size: 12px; font-weight: 650; white-space: nowrap; }
 .actions { display: flex; gap: 7px; }
 .database-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 .library-card { display: flex; align-items: center; gap: 12px; padding: 18px; border: 1px solid #b6d7a8; border-radius: 12px; background: #e2efda; }

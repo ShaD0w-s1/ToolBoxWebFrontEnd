@@ -1,61 +1,49 @@
 <script setup lang="ts">
-import { nextTick, ref } from "vue";
+import { ref } from "vue";
 import {
   AIRCRAFT_TYPES,
-  PROJECT_TYPES,
   STANDARD_LIB_KEYS,
   STANDARD_LIB_META,
   TEAMS,
   type AircraftType,
+  type GanttPrepState,
   type Project,
-  type ProjectType,
 } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
-import { formatDate } from "../utils/format";
+import { backend } from "../api";
 import { projectShareUrl } from "../services/sharing";
 import NameCompare from "./NameCompare.vue";
 import ControlDocMaintain from "./ControlDocMaintain.vue";
+import ProjectFormModal from "./ProjectFormModal.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-all": []; share: [] }>();
-const newType = ref<AircraftType>("A320");
-const newProjectType = ref<ProjectType | "">("A检");
-const newName = ref("");
-const showNew = ref(false);
-const newInput = ref<HTMLInputElement | null>(null);
+// 新建项目弹窗：true=显示。
+const showCreateModal = ref(false);
+// 修订弹窗目标项目：null=隐藏，否则为该项目的修订弹窗。
+const editTarget = ref<Project | null>(null);
 const editingAnnouncement = ref(false);
 const announcementDraft = ref("");
 // 类型工作名称对照页面：null=隐藏，否则为机型（A320/B787）。
 const nameCompareType = ref<AircraftType | null>(null);
 // 现场管控单维护页面：true=显示。
 const showControlDoc = ref(false);
+// 网站管理：登录过的账号目录（需 AIRNAV 密码）。
+const showSiteAdmin = ref(false);
+const accounts = ref<Array<{ name: string; first_seen: string; last_seen: string; login_count: number }>>([]);
+const accountsLoading = ref(false);
+// 换发/APU 模板库：模板列表弹窗。
+const showEngTemplates = ref(false);
+const engTemplates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: GanttPrepState }>>([]);
+const engTemplatesLoading = ref(false);
 
 async function startNew(): Promise<void> {
-  showNew.value = true;
-  await nextTick();
-  newInput.value?.focus();
+  showCreateModal.value = true;
 }
 
-async function createProject(): Promise<void> {
-  const name = newName.value.trim();
-  if (!name) {
-    props.store.notify("请先输入工作项目名称");
-    return;
-  }
-  await props.store.createProject(name, newType.value, newProjectType.value);
-  newName.value = "";
-  newProjectType.value = "A检";
-  showNew.value = false;
-}
-
-function cancelNew(): void {
-  newName.value = "";
-  showNew.value = false;
-}
-
-function rename(project: Project): void {
-  const name = window.prompt("请输入新的项目名称：", project.name);
-  if (name?.trim()) props.store.updateProject(project, { name: name.trim() });
+/** 修订项目（名称 / 执行班组 / 执行日期）。 */
+function editProject(project: Project): void {
+  editTarget.value = project;
 }
 
 function remove(project: Project): void {
@@ -70,15 +58,6 @@ function openInNewTab(project: Project): void {
 /** 复制项目：按当前项目数据新建一个“原名+副本”的工作项目。 */
 function duplicate(project: Project): void {
   props.store.duplicateProject(project);
-}
-
-function updateTeam(project: Project, event: Event): void {
-  props.store.updateProject(project, { team: (event.target as HTMLSelectElement).value });
-}
-
-function updateType(project: Project, event: Event): void {
-  const value = (event.target as HTMLSelectElement).value;
-  props.store.updateProject(project, { type: (value || "") as ProjectType | "" });
 }
 
 /** 编辑标准库/工具车前先确认，避免误触进入大段编辑界面。 */
@@ -102,6 +81,73 @@ async function editStdLib(k: typeof STANDARD_LIB_KEYS[number]): Promise<void> {
 /** 编辑航材标准库前先确认。 */
 function editMaterialLibrary(type: AircraftType): void {
   if (window.confirm("确认维护航材标准库？")) props.store.openMaterialLibrary(type);
+}
+
+/** 网站管理：AIRNAV 密码门校验通过后展示登录过的账号目录。 */
+async function openSiteAdmin(): Promise<void> {
+  const pwd = window.prompt("请输入 AIRNAV 密码：");
+  if (pwd === null) return;
+  if (!pwd) { props.store.notify("请输入 AIRNAV 密码"); return; }
+  accountsLoading.value = true;
+  const list = await props.store.unlockSiteAdmin(pwd);
+  accountsLoading.value = false;
+  if (list === null) {
+    props.store.notify("AIRNAV 密码错误，无法进入");
+    return;
+  }
+  accounts.value = list;
+  showSiteAdmin.value = true;
+}
+
+/** 换发/APU 模板库：拉取模板列表并打开弹窗。 */
+async function openEngTemplates(): Promise<void> {
+  engTemplatesLoading.value = true;
+  showEngTemplates.value = true;
+  try {
+    const res = await backend.listEngTemplates();
+    engTemplates.value = Array.isArray(res.data) ? res.data : [];
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "模板列表加载失败");
+  } finally {
+    engTemplatesLoading.value = false;
+  }
+}
+
+function templateSummary(state: GanttPrepState | undefined): string {
+  const charts = state?.charts?.length ?? 0;
+  const cards = (state?.charts || []).reduce((n, c) => n + (c.cards?.length ?? 0), 0);
+  const parts = (state?.charts || []).reduce((n, c) => n + (c.parts?.length ?? 0), 0);
+  return `${charts} DAY · ${cards} 工序 · ${parts} 串件`;
+}
+
+async function deleteEngTemplate(t: { _id: string; name: string }): Promise<void> {
+  if (!window.confirm(`确认删除模板“${t.name}”？`)) return;
+  try {
+    await backend.deleteEngTemplate(t._id);
+    engTemplates.value = engTemplates.value.filter((x) => x._id !== t._id);
+    props.store.notify("模板已删除");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "删除失败");
+  }
+}
+
+async function duplicateEngTemplate(t: { _id: string; name: string }): Promise<void> {
+  try {
+    const res = await backend.duplicateEngTemplate(t._id);
+    const doc = res.data;
+    if (doc && typeof doc === "object") {
+      engTemplates.value.unshift(doc as { _id: string; id: string; name: string; savedAt: string; state: GanttPrepState });
+    }
+    props.store.notify("模板已复制");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "复制失败");
+  }
+}
+
+/** 模板库「编辑」：打开一个类项目页面（新建换发/APU 项目预载模板内容），调整内容后「保存模板→覆盖」写回。 */
+function editEngTemplate(t: { name: string; state: GanttPrepState }): void {
+  showEngTemplates.value = false;
+  props.store.openEngTemplateForEdit(t.name, t.state);
 }
 
 /** 公告栏编辑。 */
@@ -141,16 +187,7 @@ function cancelEditAnnouncement(): void {
 
     <template v-if="store.listTab.value === 'tools'">
       <div class="toolbar list-toolbar">
-        <button v-if="!showNew" class="primary" @click="startNew">+ 新建工作项目</button>
-        <template v-else>
-          <select v-model="newProjectType" aria-label="工作项目类型">
-            <option value="">类型：不限</option>
-            <option v-for="type in PROJECT_TYPES" :key="type">{{ type }}</option>
-          </select>
-          <input ref="newInput" v-model="newName" class="project-name-input" placeholder="输入工作项目名称" @keydown.enter="createProject" />
-          <button class="primary" @click="createProject">创建</button>
-          <button @click="cancelNew">取消</button>
-        </template>
+        <button class="primary" @click="startNew">+ 新建工作项目</button>
         <button @click="emit('export-all')">导出全部</button>
         <button @click="emit('share')">分享本页</button>
         <button @click="store.refresh()">刷新</button>
@@ -160,7 +197,7 @@ function cancelEditAnnouncement(): void {
           <option value="">班组：全部</option>
           <option v-for="team in TEAMS" :key="team">{{ team }}</option>
         </select>
-        <input type="date" v-model="store.searchDay.value" class="date-search" aria-label="按日期筛选" />
+        <input type="date" v-model="store.searchDay.value" class="date-search" aria-label="按执行日期查询" />
         <button @click="store.searchDay.value = ''; store.teamFilter.value = ''; store.nameQuery.value = ''">清除</button>
       </div>
 
@@ -169,18 +206,12 @@ function cancelEditAnnouncement(): void {
       <article v-for="project in store.filteredProjects.value" :key="project.id" class="project-card">
         <button class="project-main" @click="openInNewTab(project)">
           <strong>{{ project.name }}</strong>
-          <span>{{ project.aircraftType }} · {{ formatDate(project.createdAt) }}</span>
+          <span>{{ project.aircraftType }} · {{ project.executeDate || "未设置执行日期" }}</span>
         </button>
-        <select :value="project.team" aria-label="项目班组" @change="updateTeam(project, $event)">
-          <option value="">未分配班组</option>
-          <option v-for="team in TEAMS" :key="team">{{ team }}</option>
-        </select>
-        <select :value="project.type" class="type-select" aria-label="项目类型" @change="updateType(project, $event)">
-          <option value="">类型：未选择</option>
-          <option v-for="t in PROJECT_TYPES" :key="t" :value="t">{{ t }}</option>
-        </select>
+        <span class="card-meta">{{ project.type || "未选择类型" }}</span>
+        <span class="card-meta">{{ project.team || "未分配班组" }}</span>
         <div class="actions">
-          <button @click="rename(project)">改名</button>
+          <button @click="editProject(project)">修订</button>
           <button @click="duplicate(project)">复制项目</button>
           <button class="danger" @click="remove(project)">删除</button>
         </div>
@@ -243,10 +274,79 @@ function cancelEditAnnouncement(): void {
                 <button class="primary" @click="showControlDoc = true">打开维护</button>
               </div>
             </article>
+            <article class="library-card compare-card">
+              <div><strong>网站管理</strong><span>登录过的账号目录</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="openSiteAdmin">打开管理</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="db-group">
+          <h3 class="db-group-title">模板库</h3>
+          <div class="db-group-cards">
+            <article class="library-card compare-card">
+              <div><strong>换发/APU 模板库</strong><span>甘特工作准备单机型模板</span></div>
+              <div class="library-actions">
+                <button class="primary" @click="openEngTemplates">打开模板库</button>
+              </div>
+            </article>
           </div>
         </section>
       </template>
     </div>
+
+    <div v-if="showSiteAdmin" class="site-admin-modal" @click.self="showSiteAdmin = false">
+      <div class="site-admin-card">
+        <div class="site-admin-head">
+          <h3>网站管理 · 登录账号目录</h3>
+          <button @click="showSiteAdmin = false">关闭</button>
+        </div>
+        <p v-if="accountsLoading" class="site-admin-empty">加载中…</p>
+        <table v-else-if="accounts.length" class="site-admin-table">
+          <thead>
+            <tr><th>姓名</th><th>登录次数</th><th>首次登录</th><th>最近登录</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="a in accounts" :key="a.name">
+              <td>{{ a.name }}</td>
+              <td>{{ a.login_count }}</td>
+              <td>{{ a.first_seen ? new Date(a.first_seen).toLocaleString() : "-" }}</td>
+              <td>{{ a.last_seen ? new Date(a.last_seen).toLocaleString() : "-" }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="site-admin-empty">暂无登录账号。</p>
+      </div>
+    </div>
+
+    <div v-if="showEngTemplates" class="site-admin-modal" @click.self="showEngTemplates = false">
+      <div class="site-admin-card">
+        <div class="site-admin-head">
+          <h3>换发/APU 模板库</h3>
+          <button @click="showEngTemplates = false">关闭</button>
+        </div>
+        <p v-if="engTemplatesLoading" class="site-admin-empty">加载中…</p>
+        <template v-else-if="engTemplates.length">
+          <div v-for="t in engTemplates" :key="t._id" class="eng-tpl-row">
+            <div class="eng-tpl-info">
+              <strong>{{ t.name }}</strong>
+              <span>{{ templateSummary(t.state) }}</span>
+            </div>
+            <div class="eng-tpl-actions">
+              <button @click="editEngTemplate(t)">编辑</button>
+              <button @click="duplicateEngTemplate(t)">复制</button>
+              <button class="danger" @click="deleteEngTemplate(t)">删除</button>
+            </div>
+          </div>
+        </template>
+        <p v-else class="site-admin-empty">暂无模板。</p>
+      </div>
+    </div>
+
+    <ProjectFormModal v-if="showCreateModal" :store="store" mode="create" @close="showCreateModal = false" />
+    <ProjectFormModal v-if="editTarget" :store="store" mode="edit" :project="editTarget" @close="editTarget = null" />
   </section>
 </template>
 
@@ -290,4 +390,18 @@ function cancelEditAnnouncement(): void {
 .db-group-title { font-size: 14px; font-weight: 700; color: #2f3b52; margin: 0 0 8px; padding-left: 4px; border-left: 4px solid #378add; }
 .db-group-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .compare-card { border-color: #378add; }
+.site-admin-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; background: rgba(17, 24, 39, 0.45); }
+.site-admin-card { width: min(560px, calc(100% - 48px)); max-height: 80vh; overflow: auto; padding: 20px 24px; background: #fff; border-radius: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
+.site-admin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.site-admin-head h3 { margin: 0; font-size: 16px; color: #2f3b52; }
+.site-admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.site-admin-table th, .site-admin-table td { padding: 7px 10px; border-bottom: 1px solid #eef1f5; text-align: left; }
+.site-admin-table th { color: #5f6b7a; font-weight: 600; background: #f6f8fb; }
+.site-admin-empty { color: #8a94a3; text-align: center; padding: 20px 0; margin: 0; }
+.eng-tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #eef1f5; border-radius: 8px; margin-bottom: 8px; }
+.eng-tpl-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.eng-tpl-info strong { font-size: 14px; color: #2f3b52; }
+.eng-tpl-info span { font-size: 12px; color: #8a94a3; }
+.eng-tpl-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.eng-tpl-actions button { min-height: 28px; padding: 3px 10px; font-size: 12px; }
 </style>

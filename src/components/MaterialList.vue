@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { AIRCRAFT_TYPES } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, type ToolItem } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import MaterialCategorySection from "./MaterialCategorySection.vue";
+import PartNoGroupCard from "./PartNoGroupCard.vue";
 import { exportMaterialList, importMaterialList } from "../services/spreadsheet";
 import { backend } from "../api";
 import { exportFileName } from "../utils/format";
@@ -16,6 +17,8 @@ const title = computed(() => isLibrary.value ? `${props.store.editingMaterialLib
 const state = computed(() => props.store.materialActive.value);
 const cats = computed(() => props.store.materialCategories.value);
 const addCatValue = ref("");
+// 「重复航材梳理」开关：开启后按件号合并，重复(≥2)件号归入「重复航材」，单件归入「单件航材」，取消部位卡片。
+const dedupeMode = ref(false);
 // 类型查询：输入或选择类型名，模糊过滤只显示包含匹配类型的部位卡片
 const typeQuery = ref("");
 watch(() => props.store.editingMaterialLibrary.value, () => { typeQuery.value = ""; });
@@ -54,6 +57,24 @@ const highlightedCats = computed<Set<string>>(() => {
   const items = props.store.materialActive.value?.items || [];
   return new Set(items.filter((it) => (it.sub || "").toLowerCase().includes(tq)).map((it) => it.cat));
 });
+
+// —— 重复航材梳理：按件号合并分组 ——
+interface PartNoGroup { partNo: string; name: string; items: ToolItem[] }
+const partGroups = computed<PartNoGroup[]>(() => {
+  const items = props.store.materialActive.value?.items || [];
+  const map = new Map<string, PartNoGroup>();
+  for (const it of items) {
+    const partNo = (it.partNo || "").trim();
+    const key = partNo || `__nopart__${it.id}`; // 无件号：每件独立一组
+    let g = map.get(key);
+    if (!g) { g = { partNo, name: it.name, items: [] }; map.set(key, g); }
+    if (!g.name && it.name) g.name = it.name;
+    g.items.push(it);
+  }
+  return [...map.values()].sort((a, b) => (a.partNo || "\uffff").localeCompare(b.partNo || "\uffff"));
+});
+const duplicateGroups = computed(() => partGroups.value.filter((g) => g.items.length >= 2));
+const singleGroups = computed(() => partGroups.value.filter((g) => g.items.length === 1));
 
 // 添加部位下拉：被隐藏的已有部位（选入显示）+ 航材标准库里尚未加入的部位（添加并带入数据）+ 新部位
 const addOptions = computed<Array<{ value: string; label: string }>>(() => {
@@ -223,11 +244,26 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <datalist id="m-types"><option v-for="t in allTypes" :key="t" :value="t" /></datalist>
         <button v-if="typeQuery" class="clear-btn" type="button" @click="typeQuery = ''" aria-label="清空">×</button>
       </label>
+      <label v-if="!isLibrary" class="field dedupe-toggle"><input type="checkbox" v-model="dedupeMode" /> 重复航材梳理</label>
       <span class="spacer" />
       <div class="summary">全部合计 <b>{{ store.mAllTotal(shownCats) }}</b></div>
     </div>
 
-    <div class="category-list">
+    <!-- 重复航材梳理：按件号合并，重复(≥2)与单件分开 -->
+    <div v-if="dedupeMode" class="dedupe-view">
+      <section class="dedupe-group">
+        <h4 class="dedupe-title">重复航材（{{ duplicateGroups.length }} 种件号）</h4>
+        <PartNoGroupCard v-for="g in duplicateGroups" :key="g.partNo || String(g.items[0].id)" :store="store" :part-no="g.partNo" :name="g.name" :items="g.items" />
+        <div v-if="!duplicateGroups.length" class="empty-state">暂无重复航材。</div>
+      </section>
+      <section class="dedupe-group">
+        <h4 class="dedupe-title">单件航材（{{ singleGroups.length }} 种件号）</h4>
+        <PartNoGroupCard v-for="g in singleGroups" :key="g.partNo || String(g.items[0].id)" :store="store" :part-no="g.partNo" :name="g.name" :items="g.items" />
+        <div v-if="!singleGroups.length" class="empty-state">暂无单件航材。</div>
+      </section>
+    </div>
+
+    <div v-else class="category-list">
       <MaterialCategorySection v-for="category in shownCats" :key="category" :store="store" :category="category" :highlighted="hasTypeQuery ? highlightedCats.has(category) : undefined" />
       <div v-if="!shownCats.length" class="empty-state">当前没有部位，点击“添加部位”开始录入航材。</div>
     </div>
@@ -239,9 +275,14 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 12px; }
 .add-cat { min-width: 140px; }
 .field { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.dedupe-toggle { cursor: pointer; user-select: none; white-space: nowrap; }
+.dedupe-toggle input { accent-color: var(--blue); cursor: pointer; }
 .summary { font-size: 13px; color: #4a5160; }
 .empty-state { padding: 24px; color: #98a2b3; text-align: center; }
 .auto-filter-warning { color: #d92020; font-weight: 700; font-size: 13px; margin-left: 4px; }
 .clear-btn { border: 0; background: transparent; color: #888; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; }
 .clear-btn:hover { color: #d92020; }
+.dedupe-view { display: flex; flex-direction: column; gap: 18px; }
+.dedupe-group { display: flex; flex-direction: column; gap: 8px; }
+.dedupe-title { margin: 0 0 4px; font-size: 15px; color: #2f3b52; }
 </style>

@@ -33,12 +33,16 @@ async function commitRenameTitle(): Promise<void> {
 }
 function cancelRenameTitle(): void { titleEditing.value = false; }
 
-// ----- 基础信息：机号变更 → 自动回填 FSN/MSN/发动机/机型/ETOPS/ELT-DT -----
-function onAircraftChange(): void {
+// ----- 基础信息：机号变更 → 规范化(XXXX→B-XXXX) + 自动回填 FSN/MSN/发动机/机型/ETOPS/ELT-DT；
+//      回填后若库中索引不到该机号，弹「更新机型标准库」（新增场景，无需 AIRNAV 授权） -----
+async function onAircraftChange(): Promise<void> {
   if (!prep.value) return;
-  const target = prep.value.base.机号.trim();
-  if (!target) return;
-  const match = props.store.lookupAircraftRow(target);
+  const raw = prep.value.base.机号.trim();
+  if (!raw) return;
+  const target = props.store.normalizeAircraftReg(raw);
+  if (!target) { props.store.persist(); return; }
+  prep.value.base.机号 = target;
+  const match = await props.store.fetchAircraftInfo(target);
   if (match) {
     prep.value.base.FSN = String(match["FSN"] || "");
     prep.value.base.MSN = String(match["MSN"] || "");
@@ -46,21 +50,15 @@ function onAircraftChange(): void {
     prep.value.base.发动机 = String(match["发动机"] || "");
     prep.value.base.ETOPS = String(match["ETOPS"] || "");
     prep.value.base["ELT-DT"] = String(match["ELT-DT"] || "");
-  } else {
-    props.store.appendAircraftRow(target, {
-      "FSN": prep.value.base.FSN, "MSN": prep.value.base.MSN,
-      "机型": prep.value.base.机型, "发动机": prep.value.base.发动机,
-      "ETOPS": prep.value.base.ETOPS, "ELT-DT": prep.value.base["ELT-DT"],
-    });
   }
+  props.store.maybePromptAircraftUpdate(prep.value.base);
   props.store.persist();
 }
 
-/** 编辑飞机参数（FSN/MSN/机型/发动机/ETOPS/ELT-DT）后回写到「飞机信息标准库」（新机号自动新增）。 */
-function syncAircraftInfo(): void {
+/** 机型字段（FSN/MSN/机型/发动机/ETOPS/ELT-DT）编辑后：检测与库中差异 → 弹「更新机型标准库」（更新场景，不再标脏走需授权的 autoSync）。 */
+function onAircraftFieldEdited(): void {
   if (!prep.value) return;
-  const b = prep.value.base;
-  props.store.upsertAircraftInfo(b.机号, { FSN: b.FSN, MSN: b.MSN, 机型: b.机型, 发动机: b.发动机, ETOPS: b.ETOPS, "ELT-DT": b["ELT-DT"] });
+  props.store.maybePromptAircraftDiff(prep.value.base);
 }
 
 // ETOPS / ELT-DT 有非 N/A 数据时字体红色加粗（需求 4）
@@ -123,16 +121,16 @@ function exportTableXlsx(): void {
         <label v-for="field in baseFields1" :key="field.key" class="prep-field">
           <span class="field-label">{{ field.label }}</span>
           <input v-if="field.key === '机号'" v-model="prep.base.机号" list="aircraft-numbers" :placeholder="`输入或选择（共 ${store.aircraftNumbers.value.length} 架）`" @change="onAircraftChange" @input="store.persist" />
-          <input v-else v-model="prep.base[field.key]" @change="syncAircraftInfo" @input="store.persist" />
+          <input v-else v-model="prep.base[field.key]" @change="onAircraftFieldEdited" @input="store.persist" />
         </label>
         <!-- ETOPS / ELT-DT：有非 N/A 数据时红色加粗 -->
         <label class="prep-field">
           <span class="field-label">ETOPS</span>
-          <input v-model="prep.base.ETOPS" :class="{ 'special-config': hasSpecialConfig(prep.base.ETOPS) }" @change="syncAircraftInfo" @input="store.persist" />
+          <input v-model="prep.base.ETOPS" :class="{ 'special-config': hasSpecialConfig(prep.base.ETOPS) }" @change="onAircraftFieldEdited" @input="store.persist" />
         </label>
         <label class="prep-field">
           <span class="field-label">ELT-DT</span>
-          <input v-model="prep.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(prep.base['ELT-DT']) }" @change="syncAircraftInfo" @input="store.persist" />
+          <input v-model="prep.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(prep.base['ELT-DT']) }" @change="onAircraftFieldEdited" @input="store.persist" />
         </label>
       </div>
       <datalist id="aircraft-numbers">

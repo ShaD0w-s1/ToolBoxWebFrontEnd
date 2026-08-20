@@ -20,11 +20,10 @@ function cancelRenameTitle(): void { titleEditing.value = false; }
 
 // 机号变更回填
 function onAircraftChange(): void { props.store.spOnAircraftChange(); }
-/** 编辑飞机参数后回写到「飞机信息标准库」（新机号自动新增）。 */
-function syncAircraftInfo(): void {
+/** 机型字段（FSN/MSN/机型/发动机/ETOPS/ELT-DT）编辑后：检测与库中差异 → 弹「更新机型标准库」。 */
+function onAircraftFieldEdited(): void {
   if (!sheet.value) return;
-  const b = sheet.value.base;
-  props.store.upsertAircraftInfo(b.机号, { FSN: b.FSN, MSN: b.MSN, 机型: b.机型, 发动机: b.发动机, ETOPS: b.ETOPS, "ELT-DT": b["ELT-DT"] });
+  props.store.maybePromptAircraftDiff(sheet.value.base);
 }
 function hasSpecialConfig(v: string): boolean { const x = (v || "").trim().toUpperCase(); return Boolean(x) && x !== "N/A"; }
 
@@ -83,12 +82,12 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       <h4>基础信息</h4>
       <div class="prep-grid">
         <label class="prep-field"><span class="field-label">机号</span><input v-model="sheet.base.机号" list="sp-aircraft" @change="onAircraftChange" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">FSN</span><input v-model="sheet.base.FSN" @change="syncAircraftInfo" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">MSN</span><input v-model="sheet.base.MSN" @change="syncAircraftInfo" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">发动机</span><input v-model="sheet.base.发动机" @change="syncAircraftInfo" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">机型</span><input v-model="sheet.base.机型" @change="syncAircraftInfo" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">ETOPS</span><input v-model="sheet.base.ETOPS" :class="{ 'special-config': hasSpecialConfig(sheet.base.ETOPS) }" @change="syncAircraftInfo" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">ELT-DT</span><input v-model="sheet.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(sheet.base['ELT-DT']) }" @change="syncAircraftInfo" @input="store.persist" /></label>
+        <label class="prep-field"><span class="field-label">FSN</span><input v-model="sheet.base.FSN" @change="onAircraftFieldEdited" @input="store.persist" /></label>
+        <label class="prep-field"><span class="field-label">MSN</span><input v-model="sheet.base.MSN" @change="onAircraftFieldEdited" @input="store.persist" /></label>
+        <label class="prep-field"><span class="field-label">发动机</span><input v-model="sheet.base.发动机" @change="onAircraftFieldEdited" @input="store.persist" /></label>
+        <label class="prep-field"><span class="field-label">机型</span><input v-model="sheet.base.机型" @change="onAircraftFieldEdited" @input="store.persist" /></label>
+        <label class="prep-field"><span class="field-label">ETOPS</span><input v-model="sheet.base.ETOPS" :class="{ 'special-config': hasSpecialConfig(sheet.base.ETOPS) }" @change="onAircraftFieldEdited" @input="store.persist" /></label>
+        <label class="prep-field"><span class="field-label">ELT-DT</span><input v-model="sheet.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(sheet.base['ELT-DT']) }" @change="onAircraftFieldEdited" @input="store.persist" /></label>
         <label class="prep-field"><span class="field-label">地点</span><input v-model="sheet.base.地点" @input="store.persist" /></label>
         <label class="prep-field"><span class="field-label">落地航班</span><input v-model="sheet.base.落地航班" @input="store.persist" /></label>
         <label class="prep-field"><span class="field-label">落地时间</span><input v-model="sheet.base.落地时间" @input="store.persist" /></label>

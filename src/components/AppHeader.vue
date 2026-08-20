@@ -5,7 +5,8 @@ interface CloudStatus {
   available: boolean;
 }
 
-defineProps<{ cloud: CloudStatus; watchActive: boolean }>();
+defineProps<{ cloud: CloudStatus; watchActive: boolean; identityName: string }>();
+defineEmits<{ "switch-identity": [] }>();
 </script>
 
 <template>
@@ -15,6 +16,13 @@ defineProps<{ cloud: CloudStatus; watchActive: boolean }>();
       <p>工作项目准备单与标准库统一管理，数据通过 Django API 同步。</p>
     </div>
     <div class="status-group">
+      <button class="identity-badge" :title="identityName ? `当前身份：${identityName}（点击切换）` : '点击设置身份'" @click="$emit('switch-identity')">
+        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
+        </svg>
+        {{ identityName || "未登录" }}
+      </button>
       <span class="status-badge" :class="cloud.state" :title="cloud.text">
         <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <ellipse cx="12" cy="5" rx="8" ry="3" />

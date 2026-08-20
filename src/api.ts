@@ -1,4 +1,4 @@
-import type { ProjectPayload, SectionPayload } from "./domain/toolbox";
+import type { GanttPrepState, ProjectPayload, SectionPayload } from "./domain/toolbox";
 
 const configuredBase = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const apiBase = configuredBase.replace(/\/$/, "");
@@ -78,6 +78,8 @@ export const backend = {
   verifyAirnav: (password: string) => request<{ ok: boolean; verified?: boolean; token?: string; expires_in?: number }>("/api/airnav-verify/", { method: "POST", body: { password } }),
   getConfig: () => request<ApiEnvelope<{ watch_enabled?: boolean; watch_max_users?: number }>>("/api/config/"),
   getAircraftNumbers: () => request<ApiEnvelope<string[]>>("/api/aircraft-numbers/"),
+  getAircraftInfo: (reg: string) => request<ApiEnvelope<Record<string, string> | null>>(`/api/aircraft-info/?reg=${encodeURIComponent(reg)}`),
+  addAircraftInfo: (row: Record<string, string>) => request<ApiEnvelope<Record<string, string>>>("/api/aircraft-info/", { method: "POST", body: row }),
   listControlDocs: () => request<ApiEnvelope<Array<{ _id: string; type: string; fileName: string; cloudObjectId: string; uploadedAt?: string }>>>("/api/control-docs/"),
   uploadControlDoc: (payload: { type: string; fileName: string; content: string }) =>
     request<ApiEnvelope<{ _id: string; type: string; fileName: string; cloudObjectId: string }>>("/api/control-docs/", { method: "POST", body: payload }),
@@ -109,4 +111,21 @@ export const backend = {
     request<ApiEnvelope>(`/api/standard-libraries/${encodeURIComponent(key)}/`, { method: "PUT", body: { rows }, ...(token ? { headers: { "X-Airnav-Token": token } } : {}) }),
   getAnnouncement: () => request<ApiEnvelope<unknown>>("/api/announcement/"),
   saveAnnouncement: (content: string) => request<ApiEnvelope>("/api/announcement/", { method: "PUT", body: { content } }),
+  recordIdentity: (name: string) =>
+    request<ApiEnvelope<{ name: string; last_seen: string; login_count: number }>>("/api/identity/", { method: "POST", body: { name } }),
+  listAccounts: (token: string) =>
+    request<ApiEnvelope<Array<{ name: string; first_seen: string; last_seen: string; login_count: number }>>>(
+      "/api/identity/accounts/",
+      { headers: { "X-Airnav-Token": token } },
+    ),
+  listEngTemplates: () =>
+    request<ApiEnvelope<Array<{ _id: string; id: string; name: string; savedAt: string; state: GanttPrepState }>>>("/api/eng-templates/"),
+  createEngTemplate: (payload: { name: string; state: GanttPrepState }) =>
+    request<ApiEnvelope<Record<string, unknown>>>("/api/eng-templates/", { method: "POST", body: payload }),
+  updateEngTemplate: (id: string, payload: { name: string; state: GanttPrepState }) =>
+    request<ApiEnvelope>(`/api/eng-templates/${encodeURIComponent(id)}/`, { method: "PUT", body: payload }),
+  deleteEngTemplate: (id: string) =>
+    request<ApiEnvelope>(`/api/eng-templates/${encodeURIComponent(id)}/`, { method: "DELETE" }),
+  duplicateEngTemplate: (id: string) =>
+    request<ApiEnvelope<Record<string, unknown>>>(`/api/eng-templates/${encodeURIComponent(id)}/duplicate/`, { method: "POST" }),
 };

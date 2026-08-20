@@ -11,7 +11,7 @@ export const DEFAULT_CATEGORIES = ["ENG", "AV CB", "FC", "LG", "通用", "接机
 export type DefaultCategory = (typeof DEFAULT_CATEGORIES)[number];
 
 /** 新建工作项目时可选择的类型。空字符串表示历史遗留项目（仅有工具清单）。 */
-export const PROJECT_TYPES = ["A检", "零散", "换发", "换APU", "单独项目"] as const;
+export const PROJECT_TYPES = ["A检", "零散", "单独项目", "换发/APU"] as const;
 export type ProjectType = (typeof PROJECT_TYPES)[number];
 
 /** 一级页面新增的标准库。label 为展示名，rowKeys 为表格列顺序（导入/导出一致）。
@@ -299,6 +299,17 @@ export interface ToolItem {
   note?: string;
 }
 
+/** 单机机型数据（更新机型标准库弹窗/接口使用），字段与飞机信息标准库行一致。 */
+export interface AircraftInfoPayload {
+  机号: string;
+  FSN: string;
+  MSN: string;
+  发动机: string;
+  机型: string;
+  ETOPS: string;
+  "ELT-DT": string;
+}
+
 export interface ToolState {
   categories: string[];
   items: ToolItem[];
@@ -312,10 +323,85 @@ export interface ToolCartItem {
   qty: number;
 }
 
+/** 换发/APU 甘特准备单（gantt-web 移植）的工序卡片。 */
+export interface GanttCard {
+  id: string;
+  laneId: string;
+  content: string;
+  owner: string;
+  participants: string;
+  note: string;
+  startStage: number;
+  endStage: number;
+  order: number;
+}
+/** 串件（普查/串件/单拆/单装/装新件等）。 */
+export interface GanttPart {
+  id: string;
+  type: string;
+  content: string;
+  owner: string;
+  participants: string;
+  note: string;
+  executeStage: number | null;
+  order: number;
+}
+export interface GanttStage { id: string; name: string }
+export interface GanttResponsibility { id: string; label: string; name: string }
+export interface GanttChart {
+  id: string;
+  title: string;
+  date: string;
+  day: number;
+  collapsed: boolean;
+  responsibilities: GanttResponsibility[];
+  stages: GanttStage[];
+  lanes: unknown[];
+  cards: GanttCard[];
+  parts: GanttPart[];
+}
+export interface GanttPartListItem {
+  id: string;
+  pn?: string;
+  name: string;
+  qty?: number;
+  note?: string;
+}
+export interface GanttPartList { id: string; name: string; items: GanttPartListItem[] }
+/** 换发/APU 甘特准备单完整 state（对应 gantt-web 的 state，localStorage key toolbox-gantt-v4）。 */
+export interface GanttPrepState {
+  version: number;
+  charts: GanttChart[];
+  manualParticipants: string[];
+  projectName: string;
+  currentTemplateName: string;
+  docs: { wp: unknown[]; eng: unknown[]; sp: unknown[] };
+  airParts: GanttPartList[];
+  toolParts: GanttPartList[];
+  meta: Record<string, unknown>;
+}
+
+/** 换发/APU 甘特准备单默认空结构。 */
+export function defaultGanttPrep(): GanttPrepState {
+  return {
+    version: 3,
+    charts: [],
+    manualParticipants: [],
+    projectName: "",
+    currentTemplateName: "",
+    docs: { wp: [], eng: [], sp: [] },
+    airParts: [],
+    toolParts: [],
+    meta: {},
+  };
+}
+
 export interface Project {
   id: string;
   name: string;
   createdAt: number;
+  /** 执行日期（YYYYMMDD 字符串，如 "20260817"；空串=未设置）。 */
+  executeDate: string;
   aircraftType: AircraftType;
   team: string;
   /** 空字符串表示尚未选择类型（历史遗留项目仅含工具清单）。 */
@@ -328,6 +414,8 @@ export interface Project {
   standalonePrepSheet: StandalonePrepSheet;
   /** 「单独项目」的航材清单（部位与 data.categories 共享）；非单独项目为空。 */
   materialList: ToolState;
+  /** 「换发/APU」的甘特工作准备单；非换发/APU 项目为默认空结构。 */
+  ganttPrep: GanttPrepState;
   /** 云端文档版本号（后端每次写入原子递增），用于乐观锁冲突检测。 */
   version: number;
 }
@@ -350,6 +438,8 @@ export interface ProjectPayload {
   team: string;
   /** 项目类型；空字符串表示未选择（历史遗留项目）。 */
   type?: ProjectType | "";
+  /** 执行日期（YYYYMMDD 字符串）；可选。 */
+  execute_date?: string;
   sections: SectionPayload[];
   use_tool_cart: boolean;
   /** A检项目的工作准备单；非 A检项目为空对象。 */
@@ -360,6 +450,8 @@ export interface ProjectPayload {
   standalone_prep_sheet?: StandalonePrepSheet;
   /** 「单独项目」的航材清单（sections 结构）；非单独项目为空数组。 */
   material_list?: SectionPayload[];
+  /** 「换发/APU」的甘特工作准备单；非换发/APU 项目为空结构。 */
+  gantt_prep?: GanttPrepState;
 }
 
 type StateInput = Partial<ToolState>;
@@ -527,6 +619,7 @@ export function normalizeApp(value: AppInput = {}): ToolboxApp {
     projects: (value.projects || []).map((project) => ({
       ...project,
       id: String(project.id || ""),
+      executeDate: String((project as Partial<Project>).executeDate || ""),
       aircraftType: AIRCRAFT_TYPES.includes(project.aircraftType) ? project.aircraftType : "A320",
       team: project.team || "",
       type: (PROJECT_TYPES as readonly string[]).includes(project.type as string)
@@ -537,6 +630,7 @@ export function normalizeApp(value: AppInput = {}): ToolboxApp {
       workcardAssignment: (project.workcardAssignment as WorkcardAssignment) || defaultWorkcardAssignment(),
       standalonePrepSheet: (project.standalonePrepSheet as StandalonePrepSheet) || defaultStandalonePrepSheet(),
       materialList: normalizeState((project.materialList as StateInput) || {}),
+      ganttPrep: (project.ganttPrep as GanttPrepState) || defaultGanttPrep(),
       version: Number(project.version) || 0,
     })),
     toolCart: (value.toolCart || []).map((entry) => ({
@@ -755,6 +849,25 @@ function standalonePrepSheetFromDoc(doc: Record<string, unknown>): StandalonePre
   return sheet;
 }
 
+function ganttPrepFromDoc(doc: Record<string, unknown>): GanttPrepState {
+  const raw = (doc.gantt_prep || doc.ganttPrep) as Partial<GanttPrepState> | undefined;
+  if (!raw || typeof raw !== "object") return defaultGanttPrep();
+  const docsRaw = raw.docs as { wp?: unknown[]; eng?: unknown[]; sp?: unknown[] } | undefined;
+  return {
+    version: Number(raw.version) || 3,
+    charts: Array.isArray(raw.charts) ? (raw.charts as GanttChart[]) : [],
+    manualParticipants: Array.isArray(raw.manualParticipants) ? raw.manualParticipants.map(String) : [],
+    projectName: String(raw.projectName || ""),
+    currentTemplateName: String(raw.currentTemplateName || ""),
+    docs: docsRaw && typeof docsRaw === "object"
+      ? { wp: Array.isArray(docsRaw.wp) ? docsRaw.wp : [], eng: Array.isArray(docsRaw.eng) ? docsRaw.eng : [], sp: Array.isArray(docsRaw.sp) ? docsRaw.sp : [] }
+      : { wp: [], eng: [], sp: [] },
+    airParts: Array.isArray(raw.airParts) ? (raw.airParts as GanttPartList[]) : [],
+    toolParts: Array.isArray(raw.toolParts) ? (raw.toolParts as GanttPartList[]) : [],
+    meta: raw.meta && typeof raw.meta === "object" ? (raw.meta as Record<string, unknown>) : {},
+  };
+}
+
 export function projectFromDocument(raw: unknown): Project {
   const doc = unwrapDocument(raw) || {};
   const aircraft = String(doc.aircraft_type || "A320").toUpperCase();
@@ -763,6 +876,7 @@ export function projectFromDocument(raw: unknown): Project {
     id: String(doc._id || doc.id || ""),
     name: String(doc.name || "未命名项目"),
     createdAt: Date.parse(String(doc.created_at || "")) || Date.now(),
+    executeDate: String(doc.execute_date || ""),
     aircraftType: AIRCRAFT_TYPES.includes(aircraft as AircraftType) ? aircraft as AircraftType : "A320",
     team: String(doc.team || ""),
     type: (PROJECT_TYPES as readonly string[]).includes(typeRaw) ? (typeRaw as ProjectType) : "",
@@ -771,6 +885,7 @@ export function projectFromDocument(raw: unknown): Project {
     workcardAssignment: workcardAssignmentFromDoc(doc),
     standalonePrepSheet: standalonePrepSheetFromDoc(doc),
     materialList: stateFromSections((doc.material_list || []) as SectionPayload[]),
+    ganttPrep: ganttPrepFromDoc(doc),
     version: Number(doc.version) || 0,
   };
 }
@@ -781,17 +896,19 @@ export function projectPayload(project: Project): ProjectPayload {
     aircraft_type: project.aircraftType,
     team: project.team,
     type: project.type,
+    execute_date: project.executeDate,
     sections: sectionsFromState(project.data),
     use_tool_cart: Boolean(project.data.useCart),
     prep_sheet: project.prepSheet,
     workcard_assignment: project.workcardAssignment,
     standalone_prep_sheet: project.standalonePrepSheet,
     material_list: sectionsFromState(project.materialList),
+    gantt_prep: project.ganttPrep,
   };
 }
 
 /** 项目顶层字段，用于字段级 dirty 追踪与非脏字段合并。 */
-export type ProjectField = "data" | "materialList" | "prepSheet" | "workcardAssignment" | "standalonePrepSheet" | "meta";
+export type ProjectField = "data" | "materialList" | "prepSheet" | "workcardAssignment" | "standalonePrepSheet" | "ganttPrep" | "meta";
 
 /** 稳定的物品行身份：由「部位 + 工作/类型 + 物品名 + 件号」共同确定。
  *  跨客户端一致，替代未持久化的本地数字 id，用于按行合并（PR-C）。 */
@@ -811,11 +928,13 @@ export function projectPartialPayload(project: Project, fields: Set<ProjectField
   if (fields.has("prepSheet")) payload.prep_sheet = project.prepSheet;
   if (fields.has("workcardAssignment")) payload.workcard_assignment = project.workcardAssignment;
   if (fields.has("standalonePrepSheet")) payload.standalone_prep_sheet = project.standalonePrepSheet;
+  if (fields.has("ganttPrep")) payload.gantt_prep = project.ganttPrep;
   if (fields.has("meta")) {
     payload.name = project.name;
     payload.aircraft_type = project.aircraftType;
     payload.team = project.team;
     payload.type = project.type;
+    payload.execute_date = project.executeDate;
   }
   return payload;
 }

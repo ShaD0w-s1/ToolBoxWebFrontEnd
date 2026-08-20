@@ -4,6 +4,7 @@ import { startWatchRevision, stopWatchRevision } from "../services/realtime";
 import {
   AIRCRAFT_TYPES,
   defaultApp,
+  defaultGanttPrep,
   defaultPrepSheet,
   defaultStandardLibraries,
   defaultStandalonePrepSheet,
@@ -28,6 +29,8 @@ import {
   WORKCARD_SECTIONS,
   type WorkcardAssignment,
   type AircraftType,
+  type AircraftInfoPayload,
+  type GanttPrepState,
   type Project,
   type ProjectField,
   type ProjectType,
@@ -73,13 +76,15 @@ export function useToolbox() {
   const screen = ref<Screen>("list");
   const listTab = ref<ListTab>("tools");
   const detailTab = ref<DetailTab>("display");
+  /** 换发/APU 甘特准备单当前子页（form/gantt/docs/airparts/tools），供 App.vue 判断是否甘特图全宽。 */
+  const ganttTab = ref<"form" | "gantt" | "docs" | "airparts" | "tools">("form");
   const currentProjectId = ref<string | null>(null);
   const editingLibrary = ref<AircraftType | null>(null);
   const editingStdLib = ref<StandardLibKey | null>(null);
   /** 正在编辑的航材标准库机型（A320/B787）；与 editingLibrary 互斥。 */
   const editingMaterialLibrary = ref<AircraftType | null>(null);
-  // 一级页面日期筛选框：默认显示当日（输入 type=date 直接展示当天），清空后退回“全部”
-  const searchDay = ref(formatDay(Date.now()));
+  // 一级页面执行日期查询框：date input（YYYY-MM-DD），空=不筛选；筛选时转 YYYYMMDD 与 project.executeDate 精确比对。
+  const searchDay = ref("");
   const teamFilter = ref("");
   // 一级页面按项目名称搜索（模糊、忽略大小写）。
   const nameQuery = ref("");
@@ -119,6 +124,13 @@ export function useToolbox() {
   const watchActive = ref(false); // 是否正使用 watch 实时推送（供 UI 图标变色）
   let watchEnabled = false; // 由远端配置下发决定
   let watchMaxUsers = 10;
+  // —— 无密码身份标识（姓名 2-5 字符）：localStorage 记住，同设备免登录，后端记录登录账号目录 ——
+  const IDENTITY_KEY = "toolbox_identity_name";
+  const identityName = ref<string>(localStorage.getItem(IDENTITY_KEY) || "");
+  const identityReady = computed(() => !!identityName.value);
+
+  // —— 更新机型标准库弹窗（机号+FSN+MSN+发动机+机型+ETOPS+ELT-DT 全必填，确认后更新/补充标准库）——
+  const aircraftUpdate = ref<AircraftInfoPayload | null>(null);
 
   const currentProject = computed(() => app.value.projects.find((item) => item.id === currentProjectId.value) || null);
   const active = computed(() => editingLibrary.value ? app.value.libraries[editingLibrary.value] : currentProject.value?.data || null);
@@ -186,14 +198,16 @@ export function useToolbox() {
     return base;
   });
   const filteredProjects = computed(() => {
-    const query = parseDay(searchDay.value);
     const name = nameQuery.value.trim().toLowerCase();
+    // 基准执行日期：查询栏选定值，否则默认当日；显示「执行日期」前后 5 天内的项目。
+    const base = parseDay(searchDay.value.trim() || formatDay(Date.now()));
     return app.value.projects.filter((project) => {
       if (teamFilter.value && project.team !== teamFilter.value) return false;
       if (name && !project.name.toLowerCase().includes(name)) return false;
-      if (!query) return true;
-      const delta = Math.abs(new Date(project.createdAt).setHours(0, 0, 0, 0) - query.setHours(0, 0, 0, 0));
-      return delta <= 5 * 86400000;
+      if (!base) return true;
+      const ed = parseDay(project.executeDate.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"));
+      if (!ed) return false;
+      return Math.abs(ed.getTime() - base.getTime()) <= 5 * 86400000;
     });
   });
 
@@ -440,11 +454,52 @@ export function useToolbox() {
     }
   }
 
-  async function createProject(name: string, aircraftType: AircraftType = "A320", projectType: ProjectType | "" = ""): Promise<void> {
+  /** 校验 AIRNAV 密码并拉取登录过的账号目录（网站管理卡片用）。返回账号列表，失败/密码错返回 null。 */
+  async function unlockSiteAdmin(password: string): Promise<Array<{ name: string; first_seen: string; last_seen: string; login_count: number }> | null> {
+    try {
+      const res = await backend.verifyAirnav(password);
+      if (!res.verified || !res.token) return null;
+      airnavToken = res.token;
+      sessionStorage.setItem(AIRNAV_TOKEN_KEY, airnavToken);
+      const accountsRes = await backend.listAccounts(res.token);
+      return Array.isArray(accountsRes.data) ? accountsRes.data : [];
+    } catch {
+      return null;
+    }
+  }
+
+  /** 设置无密码身份（姓名 2-5 字符）：写 localStorage + 后端记录登录账号目录。返回是否成功。 */
+  async function setIdentity(name: string): Promise<boolean> {
+    const trimmed = name.trim();
+    if (trimmed.length < 2 || trimmed.length > 5) {
+      notify("姓名需为 2-5 个字符");
+      return false;
+    }
+    identityName.value = trimmed;
+    localStorage.setItem(IDENTITY_KEY, trimmed);
+    if (cloud.available) {
+      try {
+        await backend.recordIdentity(trimmed);
+      } catch {
+        // 后端记录失败不阻塞本地身份（离线/后端不可用时仍可用）
+      }
+    }
+    notify(`已登录：${trimmed}`);
+    return true;
+  }
+
+  /** 清除身份（切换账号 / 退出）。 */
+  function clearIdentity(): void {
+    identityName.value = "";
+    localStorage.removeItem(IDENTITY_KEY);
+  }
+
+  async function createProject(name: string, aircraftType: AircraftType = "A320", projectType: ProjectType | "" = "", executeDate = ""): Promise<void> {
     const project: Project = {
       id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name,
       createdAt: Date.now(),
+      executeDate,
       aircraftType,
       team: "",
       type: (PROJECT_TYPES as readonly string[]).includes(projectType) ? projectType : "",
@@ -455,6 +510,7 @@ export function useToolbox() {
       workcardAssignment: defaultWorkcardAssignment(),
       standalonePrepSheet: defaultStandalonePrepSheet(),
       materialList: normalizeState(),
+      ganttPrep: defaultGanttPrep(),
       version: 0,
     };
     if (cloud.available) {
@@ -1113,19 +1169,20 @@ export function useToolbox() {
   function spRemoveProcessRow(groupIdx: number, rowId: number): void { const p = currentProject.value; if (!p) return; const g = p.standalonePrepSheet.processGroups[groupIdx]; if (!g) return; g.rows = g.rows.filter((r) => r.id !== rowId); markCurrentDirty(); persist(); }
   function spAddSigningRow(): void { const p = currentProject.value; if (!p) return; p.standalonePrepSheet.signingRows.push(emptySigningRow()); markCurrentDirty(); persist(); }
   function spRemoveSigningRow(id: number): void { const p = currentProject.value; if (!p) return; p.standalonePrepSheet.signingRows = p.standalonePrepSheet.signingRows.filter((r) => r.id !== id); markCurrentDirty(); persist(); }
-  /** 单项准备单机号变更 → 从飞机信息标准库回填 FSN/MSN/发动机/机型/ETOPS/ELT-DT。 */
-  function spOnAircraftChange(): void {
+  /** 单项准备单机号变更 → 从飞机信息标准库回填 FSN/MSN/发动机/机型/ETOPS/ELT-DT（本地查不到时走公开接口兜底，无需 AIRNAV 授权）。 */
+  async function spOnAircraftChange(): Promise<void> {
     const p = currentProject.value; if (!p) return;
-    const target = p.standalonePrepSheet.base.机号.trim(); if (!target) return;
-    const match = lookupAircraftRow(target);
+    const raw = p.standalonePrepSheet.base.机号.trim(); if (!raw) return;
+    const target = normalizeAircraftReg(raw);
+    if (!target) return;
+    p.standalonePrepSheet.base.机号 = target;
+    const match = await fetchAircraftInfo(target);
+    const b = p.standalonePrepSheet.base;
     if (match) {
-      const b = p.standalonePrepSheet.base;
       b.FSN = String(match["FSN"] || ""); b.MSN = String(match["MSN"] || ""); b.机型 = String(match["机型"] || "");
       b.发动机 = String(match["发动机"] || ""); b.ETOPS = String(match["ETOPS"] || ""); b["ELT-DT"] = String(match["ELT-DT"] || "");
-    } else {
-      const b = p.standalonePrepSheet.base;
-      appendAircraftRow(target, { FSN: b.FSN, MSN: b.MSN, 机型: b.机型, 发动机: b.发动机, ETOPS: b.ETOPS, "ELT-DT": b["ELT-DT"] });
     }
+    maybePromptAircraftUpdate(b);
     persist();
   }
 
@@ -1224,6 +1281,31 @@ export function useToolbox() {
     return rows.find((row) => String(row["飞机号"] || "").trim() === target) || null;
   }
 
+  /** 按机号查询飞机信息（FSN/MSN/机型/发动机/ETOPS/ELT-DT），供机号回填展示。
+   *  优先查本地标准库；本地未解锁（无 AIRNAV token）导致查不到时，改走公开单机信息接口
+   *  （/api/aircraft-info/，无需 AIRNAV 授权），并把结果合并进本地缓存（只读展示，不标脏）。 */
+  async function fetchAircraftInfo(regNo: string): Promise<StandardLibRow | null> {
+    const target = (regNo || "").trim();
+    if (!target) return null;
+    const local = lookupAircraftRow(target);
+    if (local) return local;
+    if (!cloud.available) return null;
+    try {
+      const res = await backend.getAircraftInfo(target);
+      const row = res?.data as StandardLibRow | null | undefined;
+      if (row && String(row["飞机号"] || "").trim() === target) {
+        const rows = app.value.standardLibraries.aircraft_info?.rows;
+        if (rows && !rows.some((r) => String(r["飞机号"] || "").trim() === target)) {
+          rows.push({ ...row });
+        }
+        return row;
+      }
+    } catch {
+      // 忽略网络/接口错误，回退到"新增空行"逻辑
+    }
+    return null;
+  }
+
   /** 机号格式校验：仅 "B-"+4 个字母数字字符（如 B-1005、B-226N）视为合法，允许新增到标准库。 */
   function isValidAircraftReg(regNo: string): boolean {
     return /^B-[A-Za-z0-9]{4}$/.test((regNo || "").trim());
@@ -1250,22 +1332,103 @@ export function useToolbox() {
     persist();
     return row;
   }
-  /** 飞机信息回传：机号已存在则更新其 MSN/FSN/机型/发动机/ETOPS/ELT-DT，不存在则新增。
-   *  用于工作准备单/单项准备单编辑飞机参数后回写到「飞机信息标准库」。 */
+  /** 飞机信息本地更新（已有机号）：仅更新本地标准库行的 MSN/FSN/机型/发动机/ETOPS/ELT-DT，
+   *  不标脏、不推送云端（机型数据的云端写入统一走「更新机型标准库」弹窗 + 公开接口 upsert，避免无授权 403）。 */
   function upsertAircraftInfo(regNo: string, fields: Partial<StandardLibRow>): void {
     const target = (regNo || "").trim();
     if (!target) return;
     const existing = lookupAircraftRow(target);
-    if (existing) {
-      for (const [key, value] of Object.entries(fields || {})) {
-        if (value != null && value !== "") existing[key] = String(value);
-      }
-    } else {
-      appendAircraftRow(target, fields);
-      return;
+    if (!existing) return;
+    for (const [key, value] of Object.entries(fields || {})) {
+      if (value != null && value !== "") existing[key] = String(value);
     }
-    dirtyStdLibs.add("aircraft_info");
-    persist();
+  }
+
+  /** 机号规范化：支持 B-XXXX（6 字符）或 XXXX（4 字符，自动补 B- 前缀）。非法返回空串。 */
+  function normalizeAircraftReg(input: string): string {
+    const s = (input || "").trim().toUpperCase();
+    if (/^B-[A-Z0-9]{4}$/.test(s)) return s;
+    if (/^[A-Z0-9]{4}$/.test(s)) return `B-${s}`;
+    return "";
+  }
+
+  /** 打开/关闭「更新机型标准库」弹窗。 */
+  function openAircraftUpdate(data: AircraftInfoPayload): void { aircraftUpdate.value = { ...data }; }
+  function closeAircraftUpdate(): void { aircraftUpdate.value = null; }
+
+  /** 机号输入后检测：标准库中索引不到该机号 → 弹「更新机型标准库」（新增场景，代入已输入/回传数据）。 */
+  function maybePromptAircraftUpdate(base: AircraftInfoPayload): void {
+    const reg = normalizeAircraftReg(base.机号);
+    if (!reg) return;
+    if (lookupAircraftRow(reg)) return;
+    openAircraftUpdate({ 机号: reg, FSN: base.FSN, MSN: base.MSN, 机型: base.机型, 发动机: base.发动机, ETOPS: base.ETOPS, "ELT-DT": base["ELT-DT"] });
+  }
+
+  /** 机型字段（FSN/MSN/机型/发动机/ETOPS/ELT-DT）编辑后检测：机号在库中且任一字段与库中不同 → 弹「更新机型标准库」（更新场景）。 */
+  function maybePromptAircraftDiff(base: AircraftInfoPayload): void {
+    const reg = normalizeAircraftReg(base.机号);
+    if (!reg) return;
+    const existing = lookupAircraftRow(reg);
+    if (!existing) return;
+    const fields: Array<"FSN" | "MSN" | "机型" | "发动机" | "ETOPS" | "ELT-DT"> = ["FSN", "MSN", "机型", "发动机", "ETOPS", "ELT-DT"];
+    const diff = fields.some((k) => String(existing[k] || "").trim() !== String(base[k] || "").trim());
+    if (diff) {
+      openAircraftUpdate({ 机号: reg, FSN: base.FSN, MSN: base.MSN, 机型: base.机型, 发动机: base.发动机, ETOPS: base.ETOPS, "ELT-DT": base["ELT-DT"] });
+    }
+  }
+
+  /** 保存机型数据到标准库（弹窗确认后）：校验全字段非空 → 后端 upsert → 本地更新 → 关闭弹窗。 */
+  async function saveAircraftToLib(data: AircraftInfoPayload): Promise<boolean> {
+    const keys: Array<keyof AircraftInfoPayload> = ["机号", "FSN", "MSN", "发动机", "机型", "ETOPS", "ELT-DT"];
+    for (const k of keys) {
+      if (!String(data[k] ?? "").trim()) { notify(`请填写「${k}」`); return false; }
+    }
+    const reg = normalizeAircraftReg(data.机号);
+    if (!reg) { notify("机号格式应为 B-XXXX（或 XXXX）"); return false; }
+    const row: StandardLibRow = { 飞机号: reg, FSN: String(data.FSN), MSN: String(data.MSN), 机型: String(data.机型), 发动机: String(data.发动机), ETOPS: String(data.ETOPS), "ELT-DT": String(data["ELT-DT"]) };
+    if (cloud.available) {
+      try {
+        await backend.addAircraftInfo(row);
+      } catch (error) {
+        notify(errorMessage(error, "更新机型标准库失败"));
+        return false;
+      }
+    }
+    const existing = lookupAircraftRow(reg);
+    if (existing) {
+      for (const k of keys) existing[k] = String(data[k] ?? "");
+    } else {
+      const cols = STANDARD_LIB_META.aircraft_info.rowKeys;
+      const newRow: StandardLibRow = {};
+      for (const col of cols) newRow[col] = "";
+      for (const k of keys) newRow[k] = String(data[k] ?? "");
+      newRow["飞机号"] = reg;
+      app.value.standardLibraries.aircraft_info.rows.push(newRow);
+    }
+    // 回填到当前项目表单（工作准备单/单项准备单）的 base 字段，使表单立即显示保存的机型数据
+    const p = currentProject.value;
+    if (p) {
+      const fillBase = (base?: AircraftInfoPayload): void => {
+        if (!base) return;
+        if (normalizeAircraftReg(base.机号) === reg) {
+          base.机号 = reg;
+          base.FSN = String(data.FSN);
+          base.MSN = String(data.MSN);
+          base.机型 = String(data.机型);
+          base.发动机 = String(data.发动机);
+          base.ETOPS = String(data.ETOPS);
+          base["ELT-DT"] = String(data["ELT-DT"]);
+        }
+      };
+      fillBase(p.prepSheet?.base as AircraftInfoPayload | undefined);
+      fillBase(p.standalonePrepSheet?.base as AircraftInfoPayload | undefined);
+      // 新机号加入机号下拉列表
+      if (!aircraftNumberList.value.includes(reg)) aircraftNumberList.value.push(reg);
+      persist();
+    }
+    closeAircraftUpdate();
+    notify("机型标准库已更新");
+    return true;
   }
 
   /** 合并两个 ToolState 的物品行（内容键对齐，本地优先）：本地正在编辑的行保留，
@@ -1343,6 +1506,7 @@ export function useToolbox() {
       workcardAssignment: mergeWorkcardAssignment(local.workcardAssignment, remote.workcardAssignment, dirty("workcardAssignment")),
       standalonePrepSheet: dirty("standalonePrepSheet") ? local.standalonePrepSheet : remote.standalonePrepSheet,
       materialList: dirty("materialList") ? mergeToolStateRows(local.materialList, remote.materialList) : remote.materialList,
+      ganttPrep: dirty("ganttPrep") ? local.ganttPrep : remote.ganttPrep,
       version: remote.version,
     };
   }
@@ -1529,7 +1693,8 @@ export function useToolbox() {
 
   function scheduleNextPoll(): void {
     if (pollingTimer) clearTimeout(pollingTimer);
-    const interval = document.hidden ? 10000 : 3000;
+    // 短轮询：前台 1s（聚焦场景多人协同实时性），后台 10s（省调用）。
+    const interval = document.hidden ? 10000 : 1000;
     pollingTimer = setTimeout(pollOnce, interval);
   }
 
@@ -1637,8 +1802,37 @@ export function useToolbox() {
     autoSyncTimer = setInterval(autoSync, intervalMs);
   }
 
+  /** 换发/APU 甘特准备单：标记 ganttPrep 字段脏并落盘（供 GanttPrep.vue 编辑后保存）。 */
+  function saveGantt(): void {
+    markField("ganttPrep");
+    persist();
+  }
+
+  /** 把模板 state 灌入当前项目的 ganttPrep（深拷贝，避免与模板库共享引用）。
+   *  name 为模板名，灌入后作为「当前模板名称」显示在标题行（可编辑）。 */
+  function applyGanttTemplate(state: GanttPrepState, name = ""): void {
+    const project = currentProject.value;
+    if (!project) return;
+    project.ganttPrep = deepCopy(state);
+    project.ganttPrep.currentTemplateName = name || state.currentTemplateName || "";
+    saveGantt();
+  }
+
+  /** 一级页模板库「编辑」：新建一个「换发/APU」项目并预载模板内容后打开（类项目页面调整模板），
+   *  改完在甘特页「保存模板 → 覆盖」写回原模板。 */
+  async function openEngTemplateForEdit(name: string, state: GanttPrepState): Promise<void> {
+    await createProject(name, "A320", "换发/APU");
+    const project = currentProject.value;
+    if (!project) return;
+    project.ganttPrep = deepCopy(state);
+    project.ganttPrep.currentTemplateName = name;
+    markField("ganttPrep");
+    persist();
+    notify(`已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`);
+  }
+
   return {
-    app, screen, listTab, detailTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
+    app, screen, listTab, detailTab, ganttTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
     active, materialActive, materialCategories, standardMaterialCategories, mStandardSubs,
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
     searchDay, teamFilter, nameQuery, filteredProjects, cloud, toast, shared,
@@ -1655,12 +1849,15 @@ export function useToolbox() {
     spAddProcessGroup, spRemoveProcessGroup, spAddProcessRow, spRemoveProcessRow, spAddSigningRow, spRemoveSigningRow,
     moveCard, moveUnassignedToSection, deleteUnassigned, upsertWorkcardStdLib,
     sortAvCbCards,
-    lookupAircraftRow, appendAircraftRow, upsertAircraftInfo,
+    lookupAircraftRow, fetchAircraftInfo, appendAircraftRow, upsertAircraftInfo,
+    normalizeAircraftReg, openAircraftUpdate, closeAircraftUpdate, saveAircraftToLib, maybePromptAircraftUpdate, maybePromptAircraftDiff, aircraftUpdate,
     renamePrepTitle, addPrepItem, removePrepItem,
     startAutoSync, startPolling, stopPolling, setEditingField, isFlashing, syncing,
     unlockAircraftInfo, startWatch, stopWatch, syncRealtimeMode, watchActive,
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
+    identityName, identityReady, setIdentity, clearIdentity, unlockSiteAdmin,
+    saveGantt, applyGanttTemplate, openEngTemplateForEdit,
   };
 }
 
