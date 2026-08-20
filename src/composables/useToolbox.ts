@@ -1492,6 +1492,31 @@ export function useToolbox() {
     return merged;
   }
 
+  /** 换发/APU 甘特准备单行级合并：本地编辑优先（本地 chart/card/part 全保留），远端新增的行（本地无对应 id）并入，
+   *  避免两人改不同 DAY（chart）时后保存者整体覆盖前者。docs/meta/manualParticipants 无稳定行 id，保持本地优先。 */
+  function mergeGanttPrep(local: GanttPrepState, remote: GanttPrepState, localDirty: boolean): GanttPrepState {
+    if (!localDirty) return remote;
+    const mergeById = <T extends { id: string }>(l: T[], r: T[]): T[] => {
+      const ids = new Set(l.map((x) => x.id));
+      const merged = [...l];
+      for (const item of r) if (!ids.has(item.id)) merged.push(deepCopy(item));
+      return merged;
+    };
+    const localChartIds = new Set(local.charts.map((c) => c.id));
+    const charts = local.charts.map((lc) => {
+      const rc = remote.charts.find((c) => c.id === lc.id);
+      if (!rc) return lc;
+      return { ...lc, cards: mergeById(lc.cards, rc.cards), parts: mergeById(lc.parts, rc.parts) };
+    });
+    for (const rc of remote.charts) if (!localChartIds.has(rc.id)) charts.push(deepCopy(rc));
+    return {
+      ...local,
+      charts,
+      airParts: mergeById(local.airParts, remote.airParts),
+      toolParts: mergeById(local.toolParts, remote.toolParts),
+    };
+  }
+
   /** 字段级合并单个项目：本地脏字段保留（data/materialList 脏时按内容键行合并），其余采用远端。 */
   function mergeProjectFields(local: Project, remote: Project, fields?: Set<ProjectField>): Project {
     const dirty = (f: ProjectField) => fields?.has(f) ?? false;
@@ -1506,7 +1531,7 @@ export function useToolbox() {
       workcardAssignment: mergeWorkcardAssignment(local.workcardAssignment, remote.workcardAssignment, dirty("workcardAssignment")),
       standalonePrepSheet: dirty("standalonePrepSheet") ? local.standalonePrepSheet : remote.standalonePrepSheet,
       materialList: dirty("materialList") ? mergeToolStateRows(local.materialList, remote.materialList) : remote.materialList,
-      ganttPrep: dirty("ganttPrep") ? local.ganttPrep : remote.ganttPrep,
+      ganttPrep: mergeGanttPrep(local.ganttPrep, remote.ganttPrep, dirty("ganttPrep")),
       version: remote.version,
     };
   }
