@@ -2227,8 +2227,10 @@ textarea.textwrap {
 .form-stage-head input:focus { background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--focus, #8eaadb); }
 .form-stage-body { display: flex; flex-direction: column; gap: 6px; }
 .form-card-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: 8px; padding: 6px 8px; background: #fff; }
-/* 表单工序行：整行黄底 #FDCA17（内容标题列 + 拖拽柄区域 + 对应卡片底色），内部输入框白底；串件行 part-form-row 除外 */
-.form-card-row:not(.part-form-row) { background: #FDCA17; }
+/* 表单工序行：纯黄 #FDCA17 从左侧拖拽柄到标题栏（内容列）后，负责人栏起剩余白色；备注栏红字；串件行 part-form-row 除外 */
+.form-card-row:not(.part-form-row) .form-card-drag { background: #FDCA17; border-radius: 6px; padding: 4px 6px; }
+.form-card-row:not(.part-form-row) textarea:first-of-type { background: #FDCA17; }
+.form-card-row:not(.part-form-row) textarea:last-of-type { color: var(--danger, #c0392b); }
 .form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 3px 6px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; font-size: 12.5px; font-family: inherit; }
 .form-card-row textarea { resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; }
 .form-card-row input:first-child, .form-card-row textarea:first-of-type { flex: 1.5; }
