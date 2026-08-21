@@ -1650,7 +1650,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           </section>
 
           <!-- 每个 DAY 的表单卡片 -->
-          <section v-for="chart in state.charts" :key="chart.id" class="gp-card" :id="'day-' + chart.id">
+          <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
             <div class="chart-header">
               <div class="chart-title-row">
                 <button class="collapse-btn" @click="toggleCollapse(chart.id)" :title="chart.collapsed ? '展开本天' : '收起本天'">{{ chart.collapsed ? '▶' : '▼' }}</button>
@@ -1726,7 +1726,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <button class="ghost" @click="exportAllImage">导出图片</button>
             </div>
           </div>
-          <section v-for="chart in state.charts" :key="chart.id" class="gp-card" :id="'day-' + chart.id">
+          <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
             <div class="chart-header">
               <div class="chart-title-row">
                 <button class="collapse-btn" @click="toggleCollapse(chart.id)" :title="chart.collapsed ? '展开本天' : '收起本天'">{{ chart.collapsed ? '▶' : '▼' }}</button>
@@ -2034,6 +2034,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 
 /* ===== 通用卡片 ===== */
 .gp-card { border: 1px solid var(--line, #dde2ec); border-radius: 12px; background: #fff; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+/* DAY 卡片：浅灰底（表单录入 + 甘特图），内部白色子卡片更分明 */
+.gp-card.day-card { background: #f2f4f8; }
 .gp-sec-title { font-size: 14px; font-weight: 700; color: var(--blue-dark, #2f5597); margin: 10px 0 8px; border-left: 3px solid var(--blue, #4472c4); padding-left: 8px; }
 .gp-add { margin-top: 10px; }
 .icon-btn { border: none; background: transparent; color: var(--danger, #c0392b); font-size: 14px; cursor: pointer; }
