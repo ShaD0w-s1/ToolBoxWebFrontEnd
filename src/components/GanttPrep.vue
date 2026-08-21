@@ -303,18 +303,32 @@ function deleteCard(chartId: string, cardId: string): void {
   c.cards = c.cards.filter((x) => x.id !== cardId);
   save();
 }
-/** 工序卡片迁移到其它 DAY：放入目标 DAY 第 1 阶段末尾；源阶段内 order 重排；阶段跨度重置为单阶段。 */
-function moveCardToChart(srcChartId: string, cardId: string, targetChartId: string): void {
+/** 阶段迁移到其它 DAY：整个阶段（名称 + 起始于该阶段的工序卡片 + 指向该阶段的串件分配）搬到目标 DAY 末尾；
+ *  源 DAY 后续阶段索引/卡片/串件 stageIdx 前移；跨阶段卡片收缩 endStage。 */
+function moveStageToChart(srcChartId: string, stageIdx: number, targetChartId: string): void {
   const s = state.value; if (!s || !targetChartId || targetChartId === srcChartId) return;
   const src = s.charts.find((x) => x.id === srcChartId); if (!src) return;
   const tgt = s.charts.find((x) => x.id === targetChartId); if (!tgt) return;
-  const idx = src.cards.findIndex((x) => x.id === cardId); if (idx < 0) return;
-  const [card] = src.cards.splice(idx, 1);
-  src.cards.filter((x) => x.startStage === card.startStage).forEach((x, i) => { x.order = i; });
-  card.startStage = 0;
-  card.endStage = 0;
-  card.order = tgt.cards.filter((x) => x.startStage === 0).reduce((m, x) => Math.max(m, x.order ?? 0), -1) + 1;
-  tgt.cards.push(card);
+  if (stageIdx < 0 || stageIdx >= src.stages.length) return;
+  const [stage] = src.stages.splice(stageIdx, 1);
+  const newIdx = tgt.stages.length;
+  tgt.stages.push(stage);
+  const moved: GanttCard[] = [];
+  src.cards.forEach((c) => {
+    if (c.startStage === stageIdx) moved.push(c);
+    else if (c.startStage > stageIdx) { c.startStage--; c.endStage--; }
+    else if (c.endStage >= stageIdx) c.endStage = Math.min(c.endStage - 1, stageIdx - 1);
+  });
+  src.cards = src.cards.filter((c) => !moved.includes(c));
+  moved.forEach((c) => { c.startStage = newIdx; c.endStage = newIdx; });
+  tgt.cards.push(...moved);
+  tgt.cards.filter((x) => x.startStage === newIdx).forEach((x, i) => { x.order = i; });
+  // 串件分配：指向该阶段的迁到目标；指向源 DAY 后续阶段的 stageIdx 前移
+  getSpArrangements().forEach((a) => a.rows.forEach((r) => {
+    if (!r.executeStage || r.executeStage.chartId !== srcChartId) return;
+    if (r.executeStage.stageIdx === stageIdx) r.executeStage = { chartId: targetChartId, stageIdx: newIdx };
+    else if (r.executeStage.stageIdx > stageIdx) r.executeStage.stageIdx--;
+  }));
   save();
 }
 /** 可迁移的目标 DAY 选项（排除当前 DAY）。 */
@@ -1634,6 +1648,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                   <div class="form-stage-head">
                     <div class="form-stage-drag" title="拖动调整阶段顺序" @pointerdown="startFormStageDrag($event, chart.id, si)">⠿</div>
                     <input v-model="st.name" @input="save" />
+                    <select v-if="dayOptionsExcluding(chart.id).length" class="day-move-select form" :value="''" title="迁移整个阶段到其它 DAY" @change="moveStageToChart(chart.id, si, ($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''">
+                      <option value="" disabled>⇄ 移 DAY</option>
+                      <option v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" :value="c.id">{{ c.label }}</option>
+                    </select>
                     <button class="icon-btn" title="在当前位置前插入阶段" @click="insertStage(chart.id, si)">+插</button>
                     <button class="icon-btn" @click="removeStage(chart.id, si)">×</button>
                   </div>
@@ -1645,10 +1663,6 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" />
                       <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="save"></textarea>
                       <span v-if="card.endStage > card.startStage" class="fc-span">持续至「{{ chart.stages[card.endStage]?.name }}」</span>
-                      <select v-if="dayOptionsExcluding(chart.id).length" class="day-move-select form" :value="''" title="迁移到其它 DAY（放入目标 DAY 第 1 阶段）" @change="moveCardToChart(chart.id, card.id, ($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''">
-                        <option value="" disabled>⇄ 移到 DAY</option>
-                        <option v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" :value="c.id">{{ c.label }}</option>
-                      </select>
                       <button class="icon-btn" @click="deleteCard(chart.id, card.id)">×</button>
                     </div>
                     <div v-for="x in spRowsOfStage(chart.id, si)" :key="'sp' + x.row.id" class="form-card-row part-form-row">
@@ -1704,6 +1718,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                   <div v-for="(st, si) in chart.stages" :key="st.id" class="gantt-head" :style="{ gridColumn: si + 1, gridRow: 1 }">
                     <div class="stage-col-drag" title="拖动调整列位置" @pointerdown="startStageColDrag($event, chart.id, si)">⠿</div>
                     <input v-model="st.name" class="stage-name-input" @input="save" />
+                    <select v-if="dayOptionsExcluding(chart.id).length" class="stage-move-select" :value="''" title="迁移整个阶段到其它 DAY" @change="moveStageToChart(chart.id, si, ($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''">
+                      <option value="" disabled>移 DAY</option>
+                      <option v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" :value="c.id">{{ c.label }}</option>
+                    </select>
                     <button class="add-card-btn" title="本列添加工序" @click="addCard(chart.id, si)">+工序</button>
                     <button class="stage-ins-btn" title="在当前位置前插入阶段" @click="insertStage(chart.id, si)">+插</button>
                     <button class="stage-del-btn" title="删除阶段" @click="removeStage(chart.id, si)">×</button>
@@ -1718,10 +1736,6 @@ async function importAllXlsx(event: Event): Promise<void> {
                         <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" /></div>
                         <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" /></div>
                         <textarea class="f-note" v-model="card.note" placeholder="备注(红色提示)" @input="save" rows="1"></textarea>
-                        <select v-if="dayOptionsExcluding(chart.id).length" class="day-move-select" :value="''" title="迁移到其它 DAY（放入目标 DAY 第 1 阶段）" @change="moveCardToChart(chart.id, card.id, ($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''">
-                          <option value="" disabled>⇄ 移到 DAY</option>
-                          <option v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" :value="c.id">{{ c.label }}</option>
-                        </select>
                       </div>
                       <div class="card-foot"><button class="icon-btn danger" @click="deleteCard(chart.id, card.id)">×</button></div>
                     </div>
@@ -2057,10 +2071,13 @@ async function importAllXlsx(event: Event): Promise<void> {
 .f-owner:focus, .f-part:focus { background: #fff; box-shadow: 0 0 0 2px var(--focus, #8eaadb); border-radius: 3px; }
 .f-note { font-size: 11.5px; color: var(--danger, #c0392b); outline: none; word-break: break-word; font-weight: 500; min-height: 14px; border: none; background: transparent; width: 100%; padding: 1px 2px; resize: none; font-family: inherit; overflow: hidden; }
 .f-note:focus { background: #fff; box-shadow: 0 0 0 2px var(--focus, #8eaadb); border-radius: 3px; }
-/* 工序卡片跨 DAY 迁移下拉 */
+/* 阶段跨 DAY 迁移下拉 */
 .day-move-select { width: 100%; height: 20px; padding: 0 4px; font-size: 10.5px; color: var(--blue-dark, #2f5597); border: 1px dashed var(--blue, #4472c4); border-radius: 4px; background: rgba(255,255,255,.75); cursor: pointer; font-family: inherit; }
 .day-move-select.form { width: auto; flex-shrink: 0; height: 24px; font-size: 11.5px; }
 .day-move-select:hover { border-style: solid; background: #fff; }
+.stage-move-select { flex-shrink: 0; width: 62px; height: 20px; padding: 0 2px; font-size: 10px; color: #fff; border: 1px solid rgba(255,255,255,.45); border-radius: 3px; background: rgba(255,255,255,.18); cursor: pointer; font-family: inherit; }
+.stage-move-select:hover { background: rgba(255,255,255,.3); }
+.stage-move-select option { color: var(--blue-dark, #2f5597); background: #fff; }
 .card-foot { position: absolute; top: 2px; right: 4px; display: flex; gap: 2px; z-index: 5; }
 .card-foot .icon-btn { font-size: 11px; padding: 0 4px; height: 16px; line-height: 14px; opacity: 0; transition: opacity .15s; }
 .gantt-card:hover .card-foot .icon-btn { opacity: 1; }
