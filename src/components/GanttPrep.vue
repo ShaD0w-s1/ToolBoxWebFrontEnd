@@ -1123,12 +1123,26 @@ function nextDate(): string {
 }
 // ===== 保存当前数据为模板 =====
 const saveTplName = ref("");
+/** 模板数据剥离人名（工序/串件/安排 的负责人参与人、安排姓名、手动名单），模板库不残留人员信息。 */
+function stripNamesForTemplate(s: GanttPrepState): GanttPrepState {
+  const t = JSON.parse(JSON.stringify(s)) as GanttPrepState;
+  for (const ch of t.charts) {
+    for (const c of ch.cards) { c.owner = ""; c.participants = ""; }
+    for (const p of ch.parts) { p.owner = ""; p.participants = ""; }
+    for (const r of ch.responsibilities) r.name = "";
+  }
+  for (const arr of t.spArrangements) {
+    for (const row of arr.rows) { row.owner = ""; row.participants = ""; }
+  }
+  t.manualParticipants = [];
+  return t;
+}
 async function saveAsTemplate(): Promise<void> {
   const s = state.value; if (!s) return;
   const name = saveTplName.value.trim();
   if (!name) { props.store.notify("请输入模板名称"); return; }
   try {
-    await backend.createEngTemplate({ name, state: JSON.parse(JSON.stringify(s)) });
+    await backend.createEngTemplate({ name, state: stripNamesForTemplate(s) });
     props.store.notify(`已保存模板：${name}`);
     saveTplName.value = "";
     await openTplModal(tplMode.value);
@@ -1140,7 +1154,7 @@ async function overwriteTemplate(t: { _id: string; name: string }): Promise<void
   const s = state.value; if (!s) return;
   if (!window.confirm(`确认覆盖模板“${t.name}”？当前甘特数据将写入该模板。`)) return;
   try {
-    await backend.updateEngTemplate(t._id, { name: t.name, state: JSON.parse(JSON.stringify(s)) });
+    await backend.updateEngTemplate(t._id, { name: t.name, state: stripNamesForTemplate(s) });
     props.store.notify(`已覆盖模板：${t.name}`);
     await openTplModal(tplMode.value);
   } catch (e) {
