@@ -1243,7 +1243,16 @@ async function exportAllImage(): Promise<void> {
   try {
     const html2canvas = (await import("html2canvas")).default;
     props.store.notify("正在渲染图片…");
-    const canvas = await html2canvas(target, { scale: 1.5, backgroundColor: "#ffffff", useCORS: true });
+    // 完整渲染整个子页：显式指定元素完整宽高，避免 html2canvas 按窗口视口裁剪（长图文字截半）
+    const canvas = await html2canvas(target, {
+      scale: 1.5,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: target.scrollWidth,
+      windowHeight: target.scrollHeight,
+    });
     canvas.toBlob((blob) => {
       if (blob) downloadBlob(blob, `换发准备单_${tab.value === "gantt" ? "甘特图" : "表单"}_${stampDate()}.jpg`);
       else props.store.notify("图片导出失败");
