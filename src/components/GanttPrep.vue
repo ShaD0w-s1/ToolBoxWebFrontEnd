@@ -612,7 +612,10 @@ function removePartItem(kind: "airParts" | "toolParts", listId: string, itemId: 
 }
 // 航材/工具「+ 新增卡片」splitbutton：下拉含「清空清单(danger)」（对齐 A检 清空清单）
 const partClearOpen = ref(false);
-function onDocClick(): void { partClearOpen.value = false; }
+// 手册清单 换发/串件工卡 splitbutton 下拉状态
+const engImportOpen = ref(false);
+const spImportOpen = ref(false);
+function onDocClick(): void { partClearOpen.value = false; engImportOpen.value = false; spImportOpen.value = false; }
 onMounted(() => document.addEventListener("click", onDocClick));
 onUnmounted(() => document.removeEventListener("click", onDocClick));
 function clearPartList(kind: "airParts" | "toolParts"): void {
@@ -1430,6 +1433,7 @@ async function importEngXlsx(event: Event): Promise<void> {
       n++;
     });
     save();
+    engImportOpen.value = false;
     props.store.notify(`换发工卡导入完成：${n} 条`);
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "解析失败");
@@ -1498,6 +1502,7 @@ async function importSpXlsx(event: Event): Promise<void> {
       n++;
     });
     save();
+    spImportOpen.value = false;
     props.store.notify(`串件工卡导入完成：${n} 条`);
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "解析失败");
@@ -1995,8 +2000,13 @@ async function importAllXlsx(event: Event): Promise<void> {
           <section class="gp-card">
             <div class="gp-docs-head">
               <div class="gp-sec-title">换发工卡</div>
-              <label class="button primary">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importEngXlsx" /></label>
-              <button class="ghost" @click="exportEngXlsx">导出表格</button>
+              <span class="split-btn" @click.stop>
+                <button class="ghost" @click="exportEngXlsx">导出换发工卡表格</button>
+                <button class="ghost split-arrow" title="更多操作" @click="engImportOpen = !engImportOpen">▾</button>
+                <div v-if="engImportOpen" class="split-menu">
+                  <label>导入换发工卡表格<input hidden type="file" accept=".xlsx,.xls" @change="importEngXlsx" /></label>
+                </div>
+              </span>
             </div>
             <table class="parts-table">
               <thead><tr><th>工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
@@ -2013,8 +2023,13 @@ async function importAllXlsx(event: Event): Promise<void> {
           <section class="gp-card">
             <div class="gp-docs-head">
               <div class="gp-sec-title">串件工卡</div>
-              <label class="button primary">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importSpXlsx" /></label>
-              <button class="ghost" @click="exportSpXlsx">导出表格</button>
+              <span class="split-btn" @click.stop>
+                <button class="ghost" @click="exportSpXlsx">导出串件工卡表格</button>
+                <button class="ghost split-arrow" title="更多操作" @click="spImportOpen = !spImportOpen">▾</button>
+                <div v-if="spImportOpen" class="split-menu">
+                  <label>导入串件工卡表格<input hidden type="file" accept=".xlsx,.xls" @change="importSpXlsx" /></label>
+                </div>
+              </span>
             </div>
             <div class="part-rule">数据与「表单录入 → 串件安排」一致；类型「串件」含拆/装两行，工卡号/工卡名称拆装各自独立填写。</div>
             <table class="parts-table sp-table">
@@ -2187,6 +2202,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 .split-menu button:hover { background: #f2f6fd; }
 .split-menu button.danger { color: var(--danger, #c0392b); }
 .split-menu button.danger:hover { background: #fdecec; }
+.split-menu label { display: block; width: 100%; padding: 7px 10px; border: none; background: transparent; border-radius: 6px; font-size: 13px; text-align: left; cursor: pointer; white-space: nowrap; box-sizing: border-box; }
+.split-menu label:hover { background: #f2f6fd; }
 
 /* ===== 通用卡片 ===== */
 .gp-card { border: 1px solid var(--line, #dde2ec); border-radius: 12px; background: #fff; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
