@@ -1240,6 +1240,13 @@ async function exportAllImage(): Promise<void> {
   if (!s.charts.length) { props.store.notify("没有数据"); return; }
   const target = mainAreaRef.value;
   if (!target) return;
+  // html2canvas 绘制 textarea 时按元素当前高度裁剪内容——渲染前临时撑高到内容实际高度，渲染后恢复
+  const textareas = Array.from(target.querySelectorAll<HTMLTextAreaElement>("textarea"));
+  const savedHeights = textareas.map((el) => ({ el, h: el.style.height }));
+  textareas.forEach((el) => {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  });
   try {
     const html2canvas = (await import("html2canvas")).default;
     props.store.notify("正在渲染图片…");
@@ -1259,6 +1266,8 @@ async function exportAllImage(): Promise<void> {
     }, "image/jpeg", 0.92);
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "图片导出失败");
+  } finally {
+    savedHeights.forEach((x) => { x.el.style.height = x.h; });
   }
 }
 
@@ -2071,14 +2080,14 @@ async function importAllXlsx(event: Event): Promise<void> {
 .resize-r { right: 0; border-radius: 0 8px 8px 0; }
 .resize-l:hover, .resize-r:hover { background: rgba(142,170,219,.45); }
 .card-body { padding: 16px 9px 6px; display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.f-content { font-size: 12.5px; font-weight: 600; outline: none; word-break: break-word; background: rgba(247,249,253,.6); padding: 2px 4px; border-radius: 3px; min-height: 18px; border: none; width: 100%; resize: none; font-family: inherit; overflow: hidden; }
+.f-content { font-size: 12.5px; font-weight: 600; outline: none; word-break: break-word; background: rgba(247,249,253,.6); padding: 2px 4px; border-radius: 3px; min-height: 18px; border: none; width: 100%; resize: none; font-family: inherit; overflow: hidden; field-sizing: content; max-height: 140px; }
 .f-content:focus { background: #fff; box-shadow: 0 0 0 2px var(--focus, #8eaadb); }
 .people-row { display: flex; align-items: center; gap: 4px; font-size: 11.5px; }
 .people-row .pl { color: var(--muted, #697386); flex-shrink: 0; }
 .f-owner, .f-part { outline: none; flex: 1; min-width: 0; word-break: break-word; border: none; background: transparent; font-size: 11.5px; padding: 1px 2px; resize: none; overflow: hidden; font-family: inherit; }
 .f-owner { font-weight: 600; }
 .f-owner:focus, .f-part:focus { background: #fff; box-shadow: 0 0 0 2px var(--focus, #8eaadb); border-radius: 3px; }
-.f-note { font-size: 11.5px; color: var(--danger, #c0392b); outline: none; word-break: break-word; font-weight: 500; min-height: 14px; border: none; background: transparent; width: 100%; padding: 1px 2px; resize: none; font-family: inherit; overflow: hidden; }
+.f-note { font-size: 11.5px; color: var(--danger, #c0392b); outline: none; word-break: break-word; font-weight: 500; min-height: 14px; border: none; background: transparent; width: 100%; padding: 1px 2px; resize: none; font-family: inherit; overflow: hidden; field-sizing: content; max-height: 140px; }
 .f-note:focus { background: #fff; box-shadow: 0 0 0 2px var(--focus, #8eaadb); border-radius: 3px; }
 /* 阶段跨 DAY 迁移下拉 */
 .day-move-select { width: 100%; height: 20px; padding: 0 4px; font-size: 10.5px; color: var(--blue-dark, #2f5597); border: 1px dashed var(--blue, #4472c4); border-radius: 4px; background: rgba(255,255,255,.75); cursor: pointer; font-family: inherit; }
