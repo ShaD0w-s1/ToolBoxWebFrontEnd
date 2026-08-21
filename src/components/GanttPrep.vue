@@ -1782,10 +1782,12 @@ async function importAllXlsx(event: Event): Promise<void> {
                   </div>
                   <div v-for="x in spCardsOfChart(chart)" :key="'sp' + x.row.id" class="card-slot" :style="{ gridColumn: `${x.stageIdx + 1}/${x.stageIdx + 2}`, gridRow: (ganttRows(chart)['sp:' + x.row.id] ?? 0) + 2 }">
                     <div class="gantt-card part-item">
-                      <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
                       <div class="card-grip" title="拖动: 同 DAY 内换阶段" @pointerdown="startPartDrag($event, chart.id, x.arr.id, x.row.id)">⠿</div>
                       <div class="card-body">
-                        <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
+                        <div class="sp-title-row">
+                          <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
+                          <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
+                        </div>
                         <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" /></div>
                         <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" /></div>
                         <textarea class="f-note" v-model="x.row.note" placeholder="备注" @input="save" rows="1"></textarea>
@@ -1806,8 +1808,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <span class="card-warn">▲</span>
                     <div class="card-grip" title="拖动到甘特图阶段列以分配" @pointerdown="startUnassignedDrag($event, chart.id, x.arr.id, x.row.id)">⠿</div>
                     <div class="card-body">
-                      <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
-                      <span class="f-content sp-view-content" :title="x.arr.content">{{ x.arr.content || '（空）' }}</span>
+                      <div class="sp-title-row">
+                        <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
+                        <span class="f-content sp-view-content" :title="x.arr.content">{{ x.arr.content || '（空）' }}</span>
+                      </div>
                       <div class="people-row"><span class="pl">负责</span><span>{{ x.row.owner || '未指派' }}</span></div>
                       <div class="people-row"><span class="pl">参与</span><span>{{ x.row.participants }}</span></div>
                       <span v-if="x.row.note" class="sp-view-note">{{ x.row.note }}</span>
@@ -2118,17 +2122,22 @@ async function importAllXlsx(event: Event): Promise<void> {
   display: flex; flex-direction: column; min-height: 64px; z-index: 2; transition: box-shadow .15s;
 }
 .gantt-card {
-  background: linear-gradient(180deg, #FDCA17 0%, #FCE9A9 42%, #ffffff 70%);
+  background: #fff;
 }
 .gantt-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 3; }
-.gantt-card.unassigned { background: linear-gradient(180deg, #fde8cf 0%, #fdf3e6 52%, #fff7ec 76%); border-color: #e8a44d; }
+.gantt-card.unassigned { background: #fff; border-color: #e8a44d; }
 .gantt-card.unassigned .card-warn { position: absolute; top: 0; left: 0; color: var(--danger, #c0392b); font-size: 10px; line-height: 1; padding: 1px 3px; z-index: 5; }
 .gantt-card.part-item {
   border-color: #e8a44d;
-  background: linear-gradient(180deg, #fbe3c8 0%, #fdf0e0 52%, #fff8ee 76%);
+  background: #fff;
 }
-.part-tag { position: absolute; top: 2px; left: 6px; font-size: 10px; font-weight: 700; color: #b45309; z-index: 5; }
-.gantt-card.part-item .part-tag, .gantt-card.unassigned .part-tag { color: #fff; background: #c2701a; border-radius: 999px; padding: 0 7px; line-height: 14px; }
+/* 标题栏及以上：工序卡=黄底 #FDCA17（无渐变，标题栏底边清晰分界）；串件卡=橙底 #E8A44D 标题白字 */
+.gantt-card .card-grip { background: #FDCA17; border-radius: 6px 6px 0 0; }
+.gantt-card .f-content { background: #FDCA17; }
+.gantt-card.part-item .card-grip, .gantt-card.unassigned .card-grip { background: #E8A44D; }
+.sp-title-row { display: flex; align-items: center; gap: 5px; margin: -2px -9px 4px; padding: 2px 9px; background: #E8A44D; color: #fff; border-radius: 0 0 6px 6px; min-width: 0; }
+.sp-title-row .sp-view-content, .sp-title-row .f-content { color: #fff; font-weight: 600; flex: 1; min-width: 0; width: auto; background: transparent; border-radius: 0; box-shadow: none; }
+.part-tag { flex-shrink: 0; font-size: 10px; font-weight: 700; color: #fff; background: #c2701a; border-radius: 999px; padding: 0 7px; line-height: 14px; z-index: 5; }
 .card-grip { position: absolute; top: 0; left: 8px; right: 8px; height: 14px; cursor: grab; display: flex; align-items: center; justify-content: center; color: var(--muted, #697386); font-size: 9px; letter-spacing: 3px; user-select: none; touch-action: none; z-index: 4; }
 .card-grip:active { cursor: grabbing; }
 .resize-l, .resize-r { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 4; touch-action: none; }
@@ -2218,9 +2227,8 @@ textarea.textwrap {
 .form-stage-head input:focus { background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--focus, #8eaadb); }
 .form-stage-body { display: flex; flex-direction: column; gap: 6px; }
 .form-card-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: 8px; padding: 6px 8px; background: #fff; }
-/* 表单工序行：标题列（内容）及向前（拖拽柄）位置黄底 #FDCA17（仅工序行，串件行 part-form-row 除外） */
-.form-card-row:not(.part-form-row) .form-card-drag { background: #FDCA17; border-radius: 6px; padding: 4px 6px; }
-.form-card-row:not(.part-form-row) textarea:first-of-type { background: #FDCA17; }
+/* 表单工序行：整行黄底 #FDCA17（内容标题列 + 拖拽柄区域 + 对应卡片底色），内部输入框白底；串件行 part-form-row 除外 */
+.form-card-row:not(.part-form-row) { background: #FDCA17; }
 .form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 3px 6px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; font-size: 12.5px; font-family: inherit; }
 .form-card-row textarea { resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; }
 .form-card-row input:first-child, .form-card-row textarea:first-of-type { flex: 1.5; }
