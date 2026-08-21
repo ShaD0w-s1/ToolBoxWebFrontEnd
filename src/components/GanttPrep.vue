@@ -355,7 +355,16 @@ function cardsOfStage(chart: GanttChart, stageIdx: number): GanttCard[] {
 
 // —— 全局串件安排（跨 DAY 统筹，不再跟随 DAY 卡片） ——
 function ensureSpArrangements(s: GanttPrepState): GanttSpArrangement[] {
-  if (Array.isArray(s.spArrangements)) return s.spArrangements;
+  if (Array.isArray(s.spArrangements)) {
+    // 幂等补新字段：拆/装行独立工卡号/名称（旧数据缺省时继承 arrangement 层旧值）
+    s.spArrangements.forEach((a) => {
+      a.rows.forEach((r) => {
+        if (r.jc === undefined) r.jc = a.jc || "";
+        if (r.name === undefined) r.name = a.name || "";
+      });
+    });
+    return s.spArrangements;
+  }
   // 一次性迁移旧数据：charts[].parts → spArrangements（parts 字段保留作兼容，UI 不再使用）
   const d = ensureDocs(s);
   const spList = d.sp as Array<Record<string, string>>;
@@ -363,13 +372,15 @@ function ensureSpArrangements(s: GanttPrepState): GanttSpArrangement[] {
   (s.charts || []).forEach((c) => {
     (c.parts || []).forEach((p) => {
       const ext = p.content ? spList.find((x) => x.content === p.content) : undefined;
+      const jc0 = ext?.jc || "", name0 = ext?.name || "";
       const rows: GanttSpRow[] = [{
         id: genId(), tag: p.type === "串件" || p.type === "单拆" ? "拆" : p.type === "单装" ? "装" : "",
         owner: p.owner || "", participants: p.participants || "", note: p.note || "",
+        jc: jc0, name: name0,
         executeStage: (typeof p.executeStage === "number" && p.executeStage >= 0) ? { chartId: c.id, stageIdx: p.executeStage } : null,
       }];
-      if (p.type === "串件") rows.push({ id: genId(), tag: "装", owner: "", participants: "", note: "", executeStage: null });
-      arr.push({ id: genId(), type: p.type || "串件", content: p.content || "", jc: ext?.jc || "", name: ext?.name || "", rows });
+      if (p.type === "串件") rows.push({ id: genId(), tag: "装", owner: "", participants: "", note: "", jc: jc0, name: name0, executeStage: null });
+      arr.push({ id: genId(), type: p.type || "串件", content: p.content || "", jc: jc0, name: name0, rows });
     });
   });
   s.spArrangements = arr;
@@ -385,8 +396,8 @@ function addSpArrangement(): void {
   list.push({
     id: genId(), type: "串件", content: "", jc: "", name: "",
     rows: [
-      { id: genId(), tag: "拆", owner: "", participants: "", note: "", executeStage: null },
-      { id: genId(), tag: "装", owner: "", participants: "", note: "", executeStage: null },
+      { id: genId(), tag: "拆", owner: "", participants: "", note: "", jc: "", name: "", executeStage: null },
+      { id: genId(), tag: "装", owner: "", participants: "", note: "", jc: "", name: "", executeStage: null },
     ],
   });
   save();
@@ -400,9 +411,9 @@ function removeSpArrangement(id: string): void {
 function changeSpType(a: GanttSpArrangement, type: string): void {
   a.type = type;
   if (type === "串件") {
-    if (!a.rows.length) a.rows.push({ id: genId(), tag: "拆", owner: "", participants: "", note: "", executeStage: null });
+    if (!a.rows.length) a.rows.push({ id: genId(), tag: "拆", owner: "", participants: "", note: "", jc: "", name: "", executeStage: null });
     a.rows[0].tag = "拆";
-    if (a.rows.length < 2) a.rows.push({ id: genId(), tag: "装", owner: "", participants: "", note: "", executeStage: null });
+    if (a.rows.length < 2) a.rows.push({ id: genId(), tag: "装", owner: "", participants: "", note: "", jc: "", name: "", executeStage: null });
     else a.rows[1].tag = "装";
   } else {
     if (a.rows.length > 1) a.rows = a.rows.slice(0, 1);
@@ -1352,10 +1363,10 @@ async function exportDocsXlsx(): Promise<void> {
     wpEng.push([i + 1, x.jc || "", x.name || "", ""]);
   });
   const spList = getSpArrangements();
-  const sp: unknown[][] = [["序号", "类型", "串件内容", "工卡号", "工卡名称", "领用人"]];
+  const sp: unknown[][] = [["序号", "类型", "串件内容", "拆/装", "工卡号", "工卡名称"]];
   spList.forEach((a, i) => {
-    a.rows.forEach((_r, ri) => {
-      sp.push(ri === 0 ? [i + 1, a.type || "", a.content || "", a.jc || "", a.name || "", ""] : ["", "", "", "", "", ""]);
+    a.rows.forEach((r, ri) => {
+      sp.push([ri === 0 ? i + 1 : "", a.type || "", ri === 0 ? a.content || "" : "", r.tag || "", r.jc || "", r.name || ""]);
     });
   });
   if (!wpEng.length && !spList.length) { props.store.notify("手册清单暂无数据"); return; }
@@ -1367,12 +1378,129 @@ async function exportDocsXlsx(): Promise<void> {
     XLSX.utils.book_append_sheet(wb, ws1, "手册清单");
     if (spList.length) {
       const ws2 = XLSX.utils.aoa_to_sheet(sp);
-      ws2["!cols"] = [{ wch: 6 }, { wch: 10 }, { wch: 26 }, { wch: 24 }, { wch: 40 }, { wch: 12 }];
+      ws2["!cols"] = [{ wch: 6 }, { wch: 10 }, { wch: 26 }, { wch: 8 }, { wch: 24 }, { wch: 40 }];
       XLSX.utils.book_append_sheet(wb, ws2, "串件工卡");
     }
     XLSX.writeFile(wb, `手册清单_${stampDate()}.xlsx`);
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败");
+  }
+}
+// 换发工卡导出（数据表单：序号/工卡号/工卡名称）
+async function exportEngXlsx(): Promise<void> {
+  const s = state.value; if (!s) return;
+  const d = ensureDocs(s);
+  const eng = d.eng as Array<Record<string, string>>;
+  if (!eng.length) { props.store.notify("换发工卡暂无数据"); return; }
+  const rows: unknown[][] = [["序号", "工卡号", "工卡名称"]];
+  eng.forEach((x, i) => rows.push([i + 1, x.jc || "", x.name || ""]));
+  try {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 6 }, { wch: 24 }, { wch: 50 }];
+    XLSX.utils.book_append_sheet(wb, ws, "换发工卡");
+    XLSX.writeFile(wb, `换发工卡_${stampDate()}.xlsx`);
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败");
+  }
+}
+// 换发工卡导入：追加 docs.eng（兼容 带序号三列 / 无序号两列 / 含表头）
+async function importEngXlsx(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  const s = state.value; if (!s) return;
+  const d = ensureDocs(s);
+  try {
+    const XLSX = await import("xlsx");
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
+    let n = 0;
+    rows.forEach((r) => {
+      const cells = r.map((v) => String(v || "").trim());
+      if (cells.some((c) => /工卡|序号/.test(c))) return; // 表头
+      const jc = cells.length >= 3 ? cells[1] : cells[0] || "";
+      const name = cells.length >= 3 ? cells[2] : cells[1] || "";
+      if (!jc && !name) return;
+      (d.eng as Array<Record<string, string>>).push({ jc, name });
+      n++;
+    });
+    save();
+    props.store.notify(`换发工卡导入完成：${n} 条`);
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "解析失败");
+  }
+}
+// 串件工卡导出（数据表单：序号/类型/串件内容/拆装/工卡号/工卡名称；拆装行独立）
+async function exportSpXlsx(): Promise<void> {
+  const s = state.value; if (!s) return;
+  const spList = getSpArrangements();
+  if (!spList.length) { props.store.notify("串件工卡暂无数据"); return; }
+  const rows: unknown[][] = [["序号", "类型", "串件内容", "拆/装", "工卡号", "工卡名称"]];
+  spList.forEach((a, i) => {
+    a.rows.forEach((r, ri) => {
+      rows.push([ri === 0 ? i + 1 : "", a.type || "", ri === 0 ? a.content || "" : "", r.tag || "", r.jc || "", r.name || ""]);
+    });
+  });
+  try {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 6 }, { wch: 10 }, { wch: 26 }, { wch: 8 }, { wch: 24 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, ws, "串件工卡");
+    XLSX.writeFile(wb, `串件工卡_${stampDate()}.xlsx`);
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败");
+  }
+}
+// 串件工卡导入：按 类型+内容+拆装 匹配现有行更新工卡号/名称；未匹配则新建串件安排
+async function importSpXlsx(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  const s = state.value; if (!s) return;
+  const spList = ensureSpArrangements(s);
+  try {
+    const XLSX = await import("xlsx");
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
+    let n = 0;
+    rows.forEach((r) => {
+      const cells = r.map((v) => String(v || "").trim());
+      if (cells.some((c) => /序号|工卡/.test(c))) return; // 表头
+      const type = cells.length >= 4 ? cells[1] : cells[0] || "";
+      const content = cells.length >= 4 ? cells[2] : cells[1] || "";
+      const tag = cells.length >= 4 ? cells[3] : cells[2] || "";
+      const jc = cells.length >= 4 ? cells[4] : cells[3] || "";
+      const name = cells.length >= 4 ? cells[5] : cells[4] || "";
+      if (!jc && !name) return;
+      let arr = spList.find((x) => x.type === type && x.content === content);
+      if (arr) {
+        const row = arr.rows.find((x) => x.tag === tag) || arr.rows[0];
+        if (row) { row.jc = jc; row.name = name; }
+      } else {
+        arr = {
+          id: genId(), type: type || "串件", content, jc: "", name: "",
+          rows: [{
+            id: genId(), tag: (tag as "拆" | "装" | "") || (type === "串件" ? "拆" : type === "单拆" ? "拆" : type === "单装" ? "装" : ""),
+            owner: "", participants: "", note: "", jc, name, executeStage: null,
+          }],
+        };
+        spList.push(arr);
+      }
+      n++;
+    });
+    save();
+    props.store.notify(`串件工卡导入完成：${n} 条`);
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "解析失败");
   }
 }
 // 串件航材/工具表格导出
@@ -1865,7 +1993,11 @@ async function importAllXlsx(event: Event): Promise<void> {
             <button class="gp-add" @click="addDoc('wp')">+ 添加</button>
           </section>
           <section class="gp-card">
-            <div class="gp-sec-title">换发工卡</div>
+            <div class="gp-docs-head">
+              <div class="gp-sec-title">换发工卡</div>
+              <label class="button primary">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importEngXlsx" /></label>
+              <button class="ghost" @click="exportEngXlsx">导出表格</button>
+            </div>
             <table class="parts-table">
               <thead><tr><th>工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
               <tbody>
@@ -1879,8 +2011,12 @@ async function importAllXlsx(event: Event): Promise<void> {
             <button class="gp-add" @click="addDoc('eng')">+ 添加</button>
           </section>
           <section class="gp-card">
-            <div class="gp-sec-title">串件工卡</div>
-            <div class="part-rule">数据与「表单录入 → 串件安排」一致（行数一致）：类型「串件」含拆/装两行；工卡号/工卡名称与串件安排共用（任一处填写联动）。</div>
+            <div class="gp-docs-head">
+              <div class="gp-sec-title">串件工卡</div>
+              <label class="button primary">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importSpXlsx" /></label>
+              <button class="ghost" @click="exportSpXlsx">导出表格</button>
+            </div>
+            <div class="part-rule">数据与「表单录入 → 串件安排」一致；类型「串件」含拆/装两行，工卡号/工卡名称拆装各自独立填写。</div>
             <table class="parts-table sp-table">
               <thead><tr><th style="width:14%">类型</th><th style="width:26%">串件内容</th><th style="width:24%">工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
               <tbody>
@@ -1893,8 +2029,8 @@ async function importAllXlsx(event: Event): Promise<void> {
                       </select>
                     </td>
                     <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save"></textarea></td>
-                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><input :value="a.jc" placeholder="工卡号" @input="a.jc = ($event.target as HTMLInputElement).value; save()" /></td>
-                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><textarea class="sp-name" rows="1" :value="a.name" placeholder="工卡名称" @input="a.name = ($event.target as HTMLTextAreaElement).value; save()"></textarea></td>
+                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><input :value="r.jc" placeholder="工卡号" @input="r.jc = ($event.target as HTMLInputElement).value; save()" /></td>
+                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><textarea class="sp-name" rows="1" :value="r.name" placeholder="工卡名称" @input="r.name = ($event.target as HTMLTextAreaElement).value; save()"></textarea></td>
                     <td v-if="ri === 0" :rowspan="a.rows.length"><button class="icon-btn" title="删除整条串件安排" @click="removeSpArrangement(a.id)">×</button></td>
                   </tr>
                 </template>

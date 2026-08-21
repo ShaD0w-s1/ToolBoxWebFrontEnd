@@ -345,13 +345,15 @@ export interface GanttPartListItem {
 export interface GanttPartList { id: string; name: string; items: GanttPartListItem[] }
 /** 串件安排的执行阶段引用：跨 DAY（chartId + 该 DAY 内阶段索引）；null = 未分配。 */
 export interface GanttSpStageRef { chartId: string; stageIdx: number }
-/** 串件安排的一行（拆/装 两行独立数据）。 */
+/** 串件安排的一行（拆/装 两行独立数据，工卡号/名称也各自独立填写）。 */
 export interface GanttSpRow {
   id: string;
   tag: "拆" | "装" | "";   // 负责人输入框前标识
   owner: string;
   participants: string;
   note: string;
+  jc: string;              // 工卡号（拆/装 独立，不再联动 arrangement.jc）
+  name: string;            // 工卡名称（拆/装 独立，不再联动 arrangement.name）
   executeStage: GanttSpStageRef | null;
 }
 /** 串件安排（全局统筹，不跟随 DAY）：串件类型含拆/装两行，其他类型一行。 */
