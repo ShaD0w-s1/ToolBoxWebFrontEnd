@@ -1286,7 +1286,15 @@ async function exportAllImage(): Promise<void> {
   if (!s.charts.length) { props.store.notify("没有数据"); return; }
   const target = mainAreaRef.value;
   if (!target) return;
-  // html2canvas 绘制 textarea 时按元素当前高度裁剪内容——渲染前临时撑高到内容实际高度，渲染后恢复
+  // ① 横向滚动容器（.gantt-wrap）完整展开：临时 overflow visible，main-area 宽度撑到内容最宽（最宽页面导出，而非视口宽度）
+  const wraps = Array.from(target.querySelectorAll<HTMLElement>(".gantt-wrap"));
+  const savedOverflows = wraps.map((w) => ({ el: w, o: w.style.overflow }));
+  wraps.forEach((w) => { w.style.overflow = "visible"; });
+  const savedMainW = target.style.width;
+  const fullW0 = target.scrollWidth;
+  target.style.width = `${fullW0}px`;
+  const fullW = target.scrollWidth;
+  // ② 撑高所有 textarea 到内容实际高度（按最终宽度重算，避免多行文字被裁剪成半行）——渲染后恢复
   const textareas = Array.from(target.querySelectorAll<HTMLTextAreaElement>("textarea"));
   const savedHeights = textareas.map((el) => ({ el, h: el.style.height }));
   textareas.forEach((el) => {
@@ -1303,7 +1311,7 @@ async function exportAllImage(): Promise<void> {
       useCORS: true,
       scrollX: 0,
       scrollY: 0,
-      windowWidth: target.scrollWidth,
+      windowWidth: fullW,
       windowHeight: target.scrollHeight,
     });
     canvas.toBlob((blob) => {
@@ -1314,6 +1322,8 @@ async function exportAllImage(): Promise<void> {
     props.store.notify(e instanceof Error ? e.message : "图片导出失败");
   } finally {
     savedHeights.forEach((x) => { x.el.style.height = x.h; });
+    wraps.forEach((w, i) => { w.style.overflow = savedOverflows[i].o; });
+    target.style.width = savedMainW;
   }
 }
 
