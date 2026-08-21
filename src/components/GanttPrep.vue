@@ -1330,10 +1330,19 @@ async function exportAllImage(): Promise<void> {
 
   // ③ 在最终横向宽度确定后，撑高所有 textarea 到内容实际高度，避免多行文字被裁剪成半行
   const textareas = Array.from(target.querySelectorAll<HTMLTextAreaElement>("textarea"));
-  const savedHeights = textareas.map((el) => ({ el, h: el.style.height, fs: (el.style as any).fieldSizing }));
+  const savedHeights = textareas.map((el) => ({
+    el,
+    h: el.style.height,
+    fs: (el.style as any).fieldSizing,
+    ov: el.style.overflow,
+    rows: el.getAttribute("rows"),
+  }));
   textareas.forEach((el) => {
     (el.style as any).fieldSizing = "content";
+    el.style.overflow = "visible";
+    el.removeAttribute("rows");
     el.style.height = "auto";
+    void el.offsetHeight; // 强制 reflow
     el.style.height = `${el.scrollHeight}px`;
   });
 
@@ -1360,7 +1369,13 @@ async function exportAllImage(): Promise<void> {
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "图片导出失败");
   } finally {
-    savedHeights.forEach((x) => { x.el.style.height = x.h; if (x.fs) (x.el.style as any).fieldSizing = x.fs; });
+    savedHeights.forEach((x) => {
+      x.el.style.height = x.h;
+      x.el.style.overflow = x.ov;
+      if (x.rows !== null) x.el.setAttribute("rows", x.rows);
+      else x.el.removeAttribute("rows");
+      if (x.fs) (x.el.style as any).fieldSizing = x.fs;
+    });
     savedGrids.forEach((g) => {
       g.el.style.gridTemplateColumns = g.gridTemplateColumns;
       g.el.style.width = g.width;
