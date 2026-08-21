@@ -1233,19 +1233,22 @@ function updateSaveMask(): void {
     borderRadius: getComputedStyle(el).borderRadius || "6px",
   };
 }
-/** 根容器 @input 事件委托：任意填空框输入 → 记录目标并立即显示上传中蒙版。 */
+/** 根容器 @input 事件委托：输入只记录目标框，不显示蒙版（上传开始时才显示）。 */
 function onAnyInput(e: Event): void {
   const t = e.target as HTMLElement | null;
   if (!t) return;
   if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) {
     saveTarget.value = t;
-    maskVisible.value = true;
-    updateSaveMask();
   }
 }
-// 上传完成（remoteSaving true→false）→ 蒙版淡出
+// 显示时机 = 上传真正开始（remoteSaving false→true）且最近编辑过填空框；上传完成（true→false）→ 蒙版淡出
 watch(() => props.store.remoteSaving.value, (v, old) => {
-  if (old === true && v === false) {
+  if (old === false && v === true) {
+    if (saveTarget.value) {
+      maskVisible.value = true;
+      updateSaveMask();
+    }
+  } else if (old === true && v === false) {
     maskVisible.value = false;
     saveTarget.value = null;
   }
