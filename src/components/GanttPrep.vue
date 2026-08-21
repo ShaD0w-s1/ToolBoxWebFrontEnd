@@ -6,6 +6,7 @@ import { backend } from "../api";
 import NameSuggest from "./NameSuggest.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
+const emit = defineEmits<{ (e: "share"): void }>();
 
 const DEFAULT_RESP = ["现场负责人", "工具负责", "持卡", "必检", "拆装记录人"];
 const DEFAULT_PARTS_TYPES = ["无", "串件", "单拆", "单装", "领新件"];
@@ -609,6 +610,11 @@ function clearPartList(kind: "airParts" | "toolParts"): void {
   s[kind] = [];
   partClearOpen.value = false;
   save();
+}
+// 清空整个项目数据（含甘特准备单与模板引用），对齐 A检 top-row 的清空数据
+function clearGanttAll(): void {
+  if (!window.confirm("确认清空本项目的全部数据（含甘特准备单与模板引用）？此操作不可撤销。")) return;
+  props.store.clearProjectAllData();
 }
 // 进入串件 tab 时，把表单串件内容同步成卡片，并重置搜索/胶囊、撑高物品输入栏
 function onPartTabEnter(): void {
@@ -1506,6 +1512,13 @@ async function importAllXlsx(event: Event): Promise<void> {
         <input class="gp-title-input" v-model="templateName" placeholder="工作准备单（甘特）" @change="save" @input="save" />
         <button class="ghost" @click="openTplModal('load')">调取模板</button>
         <button class="ghost" @click="openTplModal('save')">保存模板</button>
+        <span class="toolbar-sep" />
+        <div class="subpage-actions top-actions">
+          <button class="ghost" @click="emit('share')">分享本页</button>
+          <button class="ghost" @click="props.store.saveNow()">保存</button>
+          <button class="ghost" @click="props.store.refresh()">刷新</button>
+          <button class="danger" @click="clearGanttAll">清空数据</button>
+        </div>
       </div>
 
       <nav class="tabs gp-tabs">
@@ -2006,6 +2019,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 .gp-title-input:hover { border-color: var(--line, #dde2ec); background: #fff; }
 .gp-title-input:focus { border-color: var(--focus, #8eaadb); background: #fff; outline: none; }
 .subpage-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.top-actions { margin-left: auto; }
+@media (max-width: 768px) { .top-actions { margin-left: 0; } }
 .toolbar-sep { width: 1px; height: 20px; background: var(--line, #dde2ec); flex: 0 0 auto; }
 /* 「+ 新增卡片」splitbutton：主按钮 + ▾ 下拉（清空清单 danger） */
 .split-btn { position: relative; display: inline-flex; align-items: stretch; }

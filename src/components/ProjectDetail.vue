@@ -318,8 +318,9 @@ async function runToolFilterByWorkcard(): Promise<void> {
         </template>
       </header>
 
-      <!-- 二级页首行共享按钮（所有项目类型公用，修复 3）。单独项目/换发·APU 隐藏「依据工卡清单」（不走工卡流程）。 -->
-      <div v-if="store.currentProject.value && !store.editingLibrary.value" class="toolbar top-row">
+      <!-- 二级页首行共享按钮（所有项目类型公用，修复 3）。单独项目/换发·APU 隐藏「依据工卡清单」（不走工卡流程）；
+           换发/APU 的 分享/保存/刷新/清空数据 已并入 GanttPrep 自身 L1 工具条（输入框靠左、功能按钮靠右）。 -->
+      <div v-if="store.currentProject.value && !store.editingLibrary.value && !isEngApu" class="toolbar top-row">
         <label v-if="!isStandalone && !isEngApu" class="button primary">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="applyWorkCardListFile" /></label>
         <button @click="emit('share')">分享本页</button>
         <button @click="store.saveNow()">保存</button>
@@ -353,7 +354,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
       <MaterialList v-else-if="isStandalone && subPage === 'material'" :store="store" @export-image="(el) => emit('export-image', el, '航材清单')" />
 
       <!-- 换发/APU：甘特准备单直接作为二级页主体（含 表单/甘特/手册/串件航材/串件工具 五子页） -->
-      <GanttPrep v-if="isEngApu" :store="store" />
+      <GanttPrep v-if="isEngApu" :store="store" @share="emit('share')" />
 
       <!-- A检 航材清单子页面 -->
       <MaterialList v-else-if="isAcheck && subPage === 'material'" :store="store" @export-image="(el) => emit('export-image', el, '航材清单')" />
