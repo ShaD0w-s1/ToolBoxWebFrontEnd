@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
 import { backend } from "../api";
@@ -596,6 +596,18 @@ function removePartItem(kind: "airParts" | "toolParts", listId: string, itemId: 
   const s = state.value; if (!s) return;
   const list = (s[kind] as GanttPartList[]).find((c) => c.id === listId); if (!list) return;
   list.items = list.items.filter((x) => x.id !== itemId);
+  save();
+}
+// 航材/工具「+ 新增卡片」splitbutton：下拉含「清空清单(danger)」（对齐 A检 清空清单）
+const partClearOpen = ref(false);
+function onDocClick(): void { partClearOpen.value = false; }
+onMounted(() => document.addEventListener("click", onDocClick));
+onUnmounted(() => document.removeEventListener("click", onDocClick));
+function clearPartList(kind: "airParts" | "toolParts"): void {
+  const s = state.value; if (!s) return;
+  if (!window.confirm(`确认清空全部${kind === "airParts" ? "航材" : "工具"}卡片？`)) return;
+  s[kind] = [];
+  partClearOpen.value = false;
   save();
 }
 // 进入串件 tab 时，把表单串件内容同步成卡片，并重置搜索/胶囊、撑高物品输入栏
@@ -1492,24 +1504,8 @@ async function importAllXlsx(event: Event): Promise<void> {
     <div class="main-area" ref="mainAreaRef">
       <div class="subpage-head">
         <input class="gp-title-input" v-model="templateName" placeholder="工作准备单（甘特）" @change="save" @input="save" />
-      </div>
-      <!-- 子页功能按钮：统一放在子页标题行下首行 -->
-      <div class="subpage-toolbar">
         <button class="ghost" @click="openTplModal('load')">调取模板</button>
         <button class="ghost" @click="openTplModal('save')">保存模板</button>
-        <span class="toolbar-sep" />
-        <template v-if="tab === 'form'">
-          <button class="ghost" @click="exportDocx">导出 Word</button>
-          <button class="ghost" @click="exportAllImage">导出图片</button>
-          <button class="ghost" @click="exportAllXlsx">导出表格</button>
-          <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importAllXlsx" /></label>
-        </template>
-        <button v-if="tab === 'gantt'" class="ghost" @click="exportAllImage">导出图片</button>
-        <button v-if="tab === 'docs'" class="ghost" @click="exportDocsXlsx">表格导出</button>
-        <template v-if="tab === 'airparts' || tab === 'tools'">
-          <button class="ghost" @click="exportPartsXlsx">表格导出</button>
-          <label class="button ghost">表格导入<input hidden type="file" accept=".xlsx,.xls" @change="importPartsXlsx" /></label>
-        </template>
       </div>
 
       <nav class="tabs gp-tabs">
@@ -1534,6 +1530,14 @@ async function importAllXlsx(event: Event): Promise<void> {
       <template v-if="state">
         <!-- 表单录入 -->
         <div v-if="tab === 'form'" class="gp-form">
+          <div class="subpage-head">
+            <div class="subpage-actions">
+              <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importAllXlsx" /></label>
+              <button class="ghost" @click="exportAllXlsx">导出表格</button>
+              <button class="ghost" @click="exportDocx">导出 Word</button>
+              <button class="ghost" @click="exportAllImage">导出图片</button>
+            </div>
+          </div>
           <!-- 全局飞机/项目信息 -->
           <section class="gp-section">
             <div class="gp-sec-title">飞机信息</div>
@@ -1704,6 +1708,11 @@ async function importAllXlsx(event: Event): Promise<void> {
 
         <!-- 甘特图 -->
         <div v-else-if="tab === 'gantt'" class="gp-gantt">
+          <div class="subpage-head">
+            <div class="subpage-actions">
+              <button class="ghost" @click="exportAllImage">导出图片</button>
+            </div>
+          </div>
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card" :id="'day-' + chart.id">
             <div class="chart-header">
               <div class="chart-title-row">
@@ -1800,6 +1809,11 @@ async function importAllXlsx(event: Event): Promise<void> {
 
         <!-- 手册清单 -->
         <div v-else-if="tab === 'docs'" class="gp-docs">
+          <div class="subpage-head">
+            <div class="subpage-actions">
+              <button class="ghost" @click="exportDocsXlsx">导出表格</button>
+            </div>
+          </div>
           <section class="gp-card">
             <div class="gp-docs-head">
               <div class="gp-sec-title">工包工卡</div>
@@ -1863,7 +1877,15 @@ async function importAllXlsx(event: Event): Promise<void> {
             <h3>{{ tab === 'airparts' ? '串件航材清单' : '串件工具清单' }}</h3>
             <div class="subpage-actions">
               <label v-if="tab === 'airparts'" class="field dedupe-toggle"><input type="checkbox" v-model="airDedupeMode" /> 重复航材检查</label>
-              <button class="ghost" @click="addPartList(partKind)">+ 新增卡片</button>
+              <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importPartsXlsx" /></label>
+              <button class="ghost" @click="exportPartsXlsx">导出表格</button>
+              <span class="split-btn" @click.stop>
+                <button class="ghost" @click="addPartList(partKind)">+ 新增卡片</button>
+                <button class="ghost split-arrow" title="更多操作" @click="partClearOpen = !partClearOpen">▾</button>
+                <div v-if="partClearOpen" class="split-menu">
+                  <button class="danger" @click="clearPartList(partKind)">清空清单</button>
+                </div>
+              </span>
             </div>
           </div>
           <!-- 卡片搜索：模糊搜索卡片名/件号/名称 + 多选胶囊筛选 -->
@@ -1984,9 +2006,16 @@ async function importAllXlsx(event: Event): Promise<void> {
 .gp-title-input:hover { border-color: var(--line, #dde2ec); background: #fff; }
 .gp-title-input:focus { border-color: var(--focus, #8eaadb); background: #fff; outline: none; }
 .subpage-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.subpage-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; padding-bottom: 4px; }
-.subpage-toolbar:empty { display: none; }
 .toolbar-sep { width: 1px; height: 20px; background: var(--line, #dde2ec); flex: 0 0 auto; }
+/* 「+ 新增卡片」splitbutton：主按钮 + ▾ 下拉（清空清单 danger） */
+.split-btn { position: relative; display: inline-flex; align-items: stretch; }
+.split-btn .ghost:first-child { border-radius: 8px 0 0 8px; }
+.split-btn .split-arrow { border-radius: 0 8px 8px 0; border-left: none; padding: 0 7px; }
+.split-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 40; min-width: 130px; padding: 4px; background: #fff; border: 1px solid var(--line, #dde2ec); border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, .12); }
+.split-menu button { display: block; width: 100%; padding: 7px 10px; border: none; background: transparent; border-radius: 6px; font-size: 13px; text-align: left; cursor: pointer; }
+.split-menu button:hover { background: #f2f6fd; }
+.split-menu button.danger { color: var(--danger, #c0392b); }
+.split-menu button.danger:hover { background: #fdecec; }
 
 /* ===== 通用卡片 ===== */
 .gp-card { border: 1px solid var(--line, #dde2ec); border-radius: 12px; background: #fff; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
@@ -2297,7 +2326,7 @@ textarea.textwrap {
   .pt-items { grid-template-columns: 1fr; }
   .pt-item { grid-template-columns: 1fr 1fr auto; }
   .pt-item .m-field-name { grid-column: span 2; }
-  .subpage-toolbar { gap: 6px; }
+  .subpage-actions { gap: 6px; }
   .form-card-row { align-items: stretch; }
   .form-card-row textarea { min-width: 100%; }
   .gantt-grid { min-width: 640px; }

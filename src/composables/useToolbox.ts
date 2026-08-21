@@ -853,7 +853,7 @@ export function useToolbox() {
     persist();
   }
 
-  /** 清空当前项目的所有数据（工具清单 + 工作准备单 + 工卡分配清单 + 单项准备单 + 航材清单）。 */
+  /** 清空当前项目的所有数据（工具清单 + 工作准备单 + 工卡分配清单 + 单项准备单 + 航材清单 + 换发/APU 甘特准备单与模板引用）。 */
   function clearProjectAllData(): void {
     const project = currentProject.value;
     if (!project) return;
@@ -862,6 +862,7 @@ export function useToolbox() {
     project.workcardAssignment = defaultWorkcardAssignment();
     project.standalonePrepSheet = defaultStandalonePrepSheet();
     project.materialList = normalizeState();
+    project.ganttPrep = defaultGanttPrep();
     // 显式标记所有字段为脏：persist() 默认只标当前子页 editingField，会漏标其它字段，
     // 导致清空后其它字段未推送、被 loadRemote 用远端旧数据覆盖回（数据残留的根因）。
     markField("data");
@@ -869,6 +870,7 @@ export function useToolbox() {
     markField("workcardAssignment");
     markField("standalonePrepSheet");
     markField("materialList");
+    markField("ganttPrep");
     persist();
   }
 
