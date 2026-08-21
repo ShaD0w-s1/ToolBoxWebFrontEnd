@@ -1692,8 +1692,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                   </div>
                   <div class="form-stage-body">
                     <div v-for="card in cardsOfStage(chart, si)" :key="card.id" class="form-card-row">
-                      <div class="form-card-drag" title="拖动调行序" @pointerdown="startFormCardDrag($event, chart.id, card.id)">⠿</div>
-                      <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="save"></textarea>
+                      <div class="form-card-title">
+                        <div class="form-card-drag" title="拖动调行序" @pointerdown="startFormCardDrag($event, chart.id, card.id)">⠿</div>
+                        <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="save"></textarea>
+                      </div>
                       <NameSuggest :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" />
                       <NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" />
                       <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="save"></textarea>
@@ -1771,28 +1773,28 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="card-grip" title="拖动: 横移改阶段 / 纵移调行序" @pointerdown="startCardDrag($event, 'move', chart.id, card.id)">⠿</div>
                       <div class="resize-l" title="拖左边缘改开始阶段" @pointerdown="startCardDrag($event, 'resize-left', chart.id, card.id)"></div>
                       <div class="resize-r" title="拖右边缘改结束阶段" @pointerdown="startCardDrag($event, 'resize-right', chart.id, card.id)"></div>
+                      <button class="card-close" title="删除工序" @click="deleteCard(chart.id, card.id)">✕</button>
                       <div class="card-body">
                         <textarea class="f-content" v-model="card.content" placeholder="工作内容" @input="save" rows="1"></textarea>
                         <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" /></div>
                         <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" /></div>
                         <textarea class="f-note" v-model="card.note" placeholder="备注(红色提示)" @input="save" rows="1"></textarea>
                       </div>
-                      <div class="card-foot"><button class="icon-btn danger" @click="deleteCard(chart.id, card.id)">×</button></div>
                     </div>
                   </div>
                   <div v-for="x in spCardsOfChart(chart)" :key="'sp' + x.row.id" class="card-slot" :style="{ gridColumn: `${x.stageIdx + 1}/${x.stageIdx + 2}`, gridRow: (ganttRows(chart)['sp:' + x.row.id] ?? 0) + 2 }">
                     <div class="gantt-card part-item">
                       <div class="card-grip" title="拖动: 同 DAY 内换阶段" @pointerdown="startPartDrag($event, chart.id, x.arr.id, x.row.id)">⠿</div>
+                      <button class="card-close" title="删除原分配的阶段（串件仍在串件安排中）" @click="clearSpStage(x.arr.id, x.row.id)">✕</button>
                       <div class="card-body">
                         <div class="sp-title-row">
                           <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
-                          <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
+                          <textarea class="f-content sp-view-content" rows="1" v-model="x.arr.content" placeholder="（空）" @input="save"></textarea>
                         </div>
                         <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" /></div>
                         <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" /></div>
                         <textarea class="f-note" v-model="x.row.note" placeholder="备注" @input="save" rows="1"></textarea>
                       </div>
-                      <div class="card-foot"><button class="icon-btn danger" title="删除原分配的阶段（串件仍在串件安排中）" @click="clearSpStage(x.arr.id, x.row.id)">×</button></div>
                     </div>
                   </div>
                 </div>
@@ -1810,7 +1812,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <div class="card-body">
                       <div class="sp-title-row">
                         <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
-                        <span class="f-content sp-view-content" :title="x.arr.content">{{ x.arr.content || '（空）' }}</span>
+                        <textarea class="f-content sp-view-content" rows="1" v-model="x.arr.content" placeholder="（空）" @input="save"></textarea>
                       </div>
                       <div class="people-row"><span class="pl">负责</span><span>{{ x.row.owner || '未指派' }}</span></div>
                       <div class="people-row"><span class="pl">参与</span><span>{{ x.row.participants }}</span></div>
@@ -2161,9 +2163,16 @@ async function importAllXlsx(event: Event): Promise<void> {
 .stage-move-select { flex-shrink: 0; width: 62px; height: 20px; padding: 0 2px; font-size: 10px; color: #fff; border: 1px solid rgba(255,255,255,.45); border-radius: 3px; background: rgba(255,255,255,.18); cursor: pointer; font-family: inherit; }
 .stage-move-select:hover { background: rgba(255,255,255,.3); }
 .stage-move-select option { color: var(--blue-dark, #2f5597); background: #fff; }
-.card-foot { position: absolute; top: 2px; right: 4px; display: flex; gap: 2px; z-index: 5; }
-.card-foot .icon-btn { font-size: 11px; padding: 0 4px; height: 16px; line-height: 14px; opacity: 0; transition: opacity .15s; }
-.gantt-card:hover .card-foot .icon-btn { opacity: 1; }
+/* 甘特卡右上角黑色关闭叉号（黄/橙标题区上可见） */
+.gantt-card .card-close {
+  position: absolute; top: 3px; right: 5px; z-index: 6;
+  width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
+  background: rgba(255,255,255,.72); color: #000; cursor: pointer;
+  font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .15s, background .15s, color .15s;
+}
+.gantt-card:hover .card-close { opacity: 1; }
+.gantt-card .card-close:hover { background: #fff; color: var(--danger, #c0392b); }
 
 /* ===== 未分配串件 ===== */
 .unassigned-banner { margin: 12px 0 0; padding: 10px 12px; background: #ffe8c7; border: 1.5px solid #e8a44d; border-radius: 10px; }
@@ -2227,13 +2236,28 @@ textarea.textwrap {
 .form-stage-head input:focus { background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--focus, #8eaadb); }
 .form-stage-body { display: flex; flex-direction: column; gap: 6px; }
 .form-card-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: 8px; padding: 6px 8px; background: #fff; }
-/* 表单工序行：左半（拖拽柄+标题列）纯黄 #FDCA17、右半白色，标题栏右边为左右区分线；备注红字；串件行除外 */
-.form-card-row:not(.part-form-row) .form-card-drag { background: #FDCA17; border-radius: 6px 0 0 6px; padding: 4px 6px; }
-.form-card-row:not(.part-form-row) textarea:first-of-type { background: #FDCA17; border-right: 2px solid #C9A227; }
+/* 表单工序行：左侧纯黄（拖拽柄+标题）随标题自适应、黄色竖线分界、右半白；备注红字；串件行除外 */
+.form-card-row:not(.part-form-row) .form-card-title {
+  display: flex; align-items: center; gap: 2px;
+  background: #FDCA17; border-radius: 6px;
+  border-right: 2px solid #C9A227;
+  flex: none; max-width: 50%; min-width: 0;
+  padding: 2px 4px 2px 2px;
+}
+.form-card-row:not(.part-form-row) .form-card-title .form-card-drag {
+  background: transparent; border-radius: 4px; padding: 4px 6px;
+  color: #8a6d00;
+}
+.form-card-row:not(.part-form-row) .form-card-title textarea {
+  flex: none; width: auto; min-width: 60px; max-width: 100%;
+  background: transparent; border: none; box-shadow: none;
+  color: #5c4a00; font-weight: 600;
+  padding: 3px 4px;
+}
 .form-card-row:not(.part-form-row) textarea:last-of-type { color: var(--danger, #c0392b); }
 .form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 3px 6px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; font-size: 12.5px; font-family: inherit; }
 .form-card-row textarea { resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; }
-.form-card-row input:first-child, .form-card-row textarea:first-of-type { flex: 1.5; }
+.form-card-row.part-form-row textarea:first-of-type { flex: 1.5; }
 .form-card-row input:focus, .form-card-row textarea:focus { border-color: var(--focus, #8eaadb); outline: none; }
 .part-form-row { border-color: #f0d9b8; background: #fff6e8; }
 .part-form-tag { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #b45309; background: #ffe0b3; padding: 2px 6px; border-radius: 4px; }
@@ -2270,7 +2294,7 @@ textarea.textwrap {
 .sp-view-content { flex: 1.5; min-width: 90px; padding: 3px 6px; font-size: 12.5px; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 .sp-view-field { flex: 1; min-width: 70px; padding: 3px 6px; font-size: 12.5px; line-height: 1.4; word-break: break-word; }
 .sp-view-note { flex: 1; min-width: 70px; padding: 3px 6px; font-size: 12.5px; color: #c0392b; word-break: break-word; }
-.gantt-card .sp-view-content, .gantt-card .sp-view-field, .gantt-card .sp-view-note { flex: none; width: 100%; padding: 0 2px; }
+.gantt-card > .card-body > .sp-view-content, .gantt-card > .card-body > .sp-view-field, .gantt-card > .card-body > .sp-view-note { flex: none; width: 100%; padding: 0 2px; }
 .sp-arr-table td { vertical-align: top; }
 /* 串件安排表：未填写栏浅红底色 */
 .sp-arr-table textarea.sp-empty { background: #fdeaea; border-color: #f0b9b9; }
@@ -2369,6 +2393,7 @@ textarea.textwrap {
   .subpage-actions { gap: 6px; }
   .form-card-row { align-items: stretch; }
   .form-card-row textarea { min-width: 100%; }
+  .form-card-row .form-card-title textarea { min-width: 60px; max-width: 100%; }
   .gantt-grid { min-width: 640px; }
 }
 </style>
