@@ -188,7 +188,7 @@ async function openStandaloneTemplates(): Promise<void> {
   showStandaloneTemplates.value = true;
   try {
     const res = await backend.listStandaloneTemplates();
-    standaloneTemplates.value = Array.isArray(res.data) ? res.data : [];
+    standaloneTemplates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "模板列表加载失败");
   } finally {
@@ -219,10 +219,26 @@ async function duplicateStandaloneTemplate(t: { _id: string; name: string }): Pr
     const doc = res.data;
     if (doc && typeof doc === "object") {
       standaloneTemplates.value.unshift(doc as { _id: string; id: string; name: string; savedAt: string; state: StandalonePrepSheet });
+      standaloneTemplates.value.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
     }
     props.store.notify("模板已复制");
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "复制失败");
+  }
+}
+
+/** 单项工作模板「改名」：改名后本地同步并保持名称排序（与换发/APU 模板库一致）。 */
+async function renameStandaloneTemplate(t: { _id: string; name: string }): Promise<void> {
+  const name = window.prompt("请输入新模板名称", t.name)?.trim();
+  if (!name || name === t.name) return;
+  try {
+    const found = standaloneTemplates.value.find((x) => x._id === t._id);
+    await backend.updateStandaloneTemplate(t._id, { name, state: found?.state ?? ({} as unknown as StandalonePrepSheet) });
+    t.name = name;
+    standaloneTemplates.value.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+    props.store.notify("模板已改名");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "改名失败");
   }
 }
 
@@ -240,11 +256,6 @@ function addStandaloneTemplate(): void {
   showStandaloneTemplates.value = false;
   newStandaloneTplName.value = "";
   props.store.openStandaloneTemplateForEdit(name, defaultStandalonePrepSheet());
-}
-/** 调取模板：用模板创建实际项目（预载内容），填写基础信息即可用。 */
-function applyStandaloneTemplate(t: { name: string; state: StandalonePrepSheet }): void {
-  showStandaloneTemplates.value = false;
-  props.store.openStandaloneTemplateForEdit(t.name, t.state, "apply");
 }
 
 /** 公告栏编辑。 */
@@ -471,8 +482,8 @@ function cancelEditAnnouncement(): void {
               <span>{{ standaloneTemplateSummary(t.state) }}</span>
             </div>
             <div class="eng-tpl-actions">
-              <button @click="applyStandaloneTemplate(t)">调取</button>
               <button @click="editStandaloneTemplate(t)">编辑</button>
+              <button @click="renameStandaloneTemplate(t)">改名</button>
               <button @click="duplicateStandaloneTemplate(t)">复制</button>
               <button class="danger" @click="deleteStandaloneTemplate(t)">删除</button>
             </div>
