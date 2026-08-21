@@ -2091,7 +2091,10 @@ async function importAllXlsx(event: Event): Promise<void> {
 .fc-span { flex-shrink: 0; font-size: 11px; color: var(--blue-dark, #2f5597); background: var(--blue-light, #d9e1f2); padding: 2px 8px; border-radius: 4px; }
 .gantt-head {
   background: var(--blue, #4472c4);
-  border-right: 1px solid rgba(255,255,255,.28); border-bottom: 1px solid rgba(255,255,255,.28);
+  border-radius: 8px;
+  margin: 3px 2px;
+  border: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
   padding: 6px 8px; display: flex; flex-direction: row; align-items: center; gap: 4px;
   position: relative; min-height: 44px;
 }
@@ -2115,7 +2118,7 @@ async function importAllXlsx(event: Event): Promise<void> {
   display: flex; flex-direction: column; min-height: 64px; z-index: 2; transition: box-shadow .15s;
 }
 .gantt-card {
-  background: linear-gradient(180deg, #eef1f5 0%, #f7f9fb 52%, #ffffff 76%);
+  background: linear-gradient(180deg, #FDCA17 0%, #FCE9A9 42%, #ffffff 70%);
 }
 .gantt-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 3; }
 .gantt-card.unassigned { background: linear-gradient(180deg, #fde8cf 0%, #fdf3e6 52%, #fff7ec 76%); border-color: #e8a44d; }
@@ -2215,6 +2218,9 @@ textarea.textwrap {
 .form-stage-head input:focus { background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--focus, #8eaadb); }
 .form-stage-body { display: flex; flex-direction: column; gap: 6px; }
 .form-card-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: 8px; padding: 6px 8px; background: #fff; }
+/* 表单工序行：标题列（内容）及向前（拖拽柄）位置黄底 #FDCA17（仅工序行，串件行 part-form-row 除外） */
+.form-card-row:not(.part-form-row) .form-card-drag { background: #FDCA17; border-radius: 6px; padding: 4px 6px; }
+.form-card-row:not(.part-form-row) textarea:first-of-type { background: #FDCA17; }
 .form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 3px 6px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; font-size: 12.5px; font-family: inherit; }
 .form-card-row textarea { resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; }
 .form-card-row input:first-child, .form-card-row textarea:first-of-type { flex: 1.5; }
