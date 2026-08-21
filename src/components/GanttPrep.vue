@@ -2073,8 +2073,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 /* ===== 甘特网格 ===== */
 .gantt-wrap { overflow-x: auto; margin: 0 -6px; padding: 0 6px 6px; display: flex; align-items: stretch; }
 .gantt-grid {
-  display: grid; min-width: 0; width: 100%; border: 1px solid #4a515c; border-radius: 10px;
-  background: #21242a; position: relative; flex: 1;
+  display: grid; min-width: 0; width: 100%; border: 1px solid var(--line, #dde2ec); border-radius: 10px;
+  background: #eaf1fa; position: relative; flex: 1;
 }
 .stage-edge { flex-shrink: 0; width: 16px; cursor: ew-resize; background: var(--blue-light, #d9e1f2); border: 1px solid var(--line, #dde2ec); border-left: none; border-radius: 0 10px 10px 0; display: flex; align-items: center; justify-content: center; color: var(--blue-dark, #2f5597); font-weight: 700; user-select: none; touch-action: none; }
 .stage-edge:hover { background: #cdddf4; }
@@ -2104,7 +2104,7 @@ async function importAllXlsx(event: Event): Promise<void> {
 /* ===== 甘特卡片（工序=灰渐变至白 / 串件=橙渐变至白，从顶部渐变到负责行后全白） ===== */
 .gantt-card {
   margin: 2px; padding: 0; border-radius: 8px; background: #fff;
-  border: 1.5px solid var(--focus, #8eaadb); box-shadow: 0 1px 3px rgba(0,0,0,.04); position: relative;
+  border: 2.5px solid var(--focus, #8eaadb); box-shadow: 0 1px 3px rgba(0,0,0,.04); position: relative;
   display: flex; flex-direction: column; min-height: 64px; z-index: 2; transition: box-shadow .15s;
 }
 .gantt-card {
