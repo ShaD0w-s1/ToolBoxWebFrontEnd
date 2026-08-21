@@ -1286,33 +1286,72 @@ async function exportAllImage(): Promise<void> {
   if (!s.charts.length) { props.store.notify("没有数据"); return; }
   const target = mainAreaRef.value;
   if (!target) return;
-  // ① 横向滚动容器（.gantt-wrap）完整展开：临时 overflow visible，main-area 宽度撑到内容最宽（最宽页面导出，而非视口宽度）
+
+  // ① 先把所有 .gantt-grid 的列宽固定为当前实际列宽（替代百分比模板），保证横向内容能自然撑开
+  const grids = Array.from(target.querySelectorAll<HTMLElement>(".gantt-grid"));
+  const savedGrids = grids.map((el) => {
+    const computed = window.getComputedStyle(el);
+    const cols = computed.gridTemplateColumns.split(" ").filter(Boolean);
+    const firstCol = cols[0] ? parseFloat(cols[0]) : 0;
+    const stages = el.querySelectorAll<HTMLElement>(".gantt-head").length || 1;
+    return {
+      el,
+      gridTemplateColumns: el.style.gridTemplateColumns,
+      width: el.style.width,
+      minWidth: el.style.minWidth,
+      colWidth: firstCol,
+      stages,
+    };
+  });
+  savedGrids.forEach((g) => {
+    if (g.colWidth > 0) {
+      const total = Math.max(g.el.clientWidth, g.colWidth * g.stages);
+      g.el.style.gridTemplateColumns = `repeat(${g.stages}, ${g.colWidth}px)`;
+      g.el.style.width = `${total}px`;
+      g.el.style.minWidth = `${total}px`;
+    } else {
+      g.el.style.width = "max-content";
+      g.el.style.minWidth = "max-content";
+    }
+  });
+
+  // ② 横向滚动容器展开：.gantt-wrap overflow visible + 宽度随内容；.main-area 也随内容
   const wraps = Array.from(target.querySelectorAll<HTMLElement>(".gantt-wrap"));
-  const savedOverflows = wraps.map((w) => ({ el: w, o: w.style.overflow }));
-  wraps.forEach((w) => { w.style.overflow = "visible"; });
-  const savedMainW = target.style.width;
-  const fullW0 = target.scrollWidth;
-  target.style.width = `${fullW0}px`;
-  const fullW = target.scrollWidth;
-  // ② 撑高所有 textarea 到内容实际高度（按最终宽度重算，避免多行文字被裁剪成半行）——渲染后恢复
+  const savedWraps = wraps.map((w) => ({
+    el: w,
+    overflow: w.style.overflow,
+    width: w.style.width,
+    minWidth: w.style.minWidth,
+  }));
+  wraps.forEach((w) => { w.style.overflow = "visible"; w.style.width = "max-content"; w.style.minWidth = "max-content"; });
+  const savedMain = { width: target.style.width, minWidth: target.style.minWidth };
+  target.style.width = "max-content";
+  target.style.minWidth = "max-content";
+
+  // ③ 在最终横向宽度确定后，撑高所有 textarea 到内容实际高度，避免多行文字被裁剪成半行
   const textareas = Array.from(target.querySelectorAll<HTMLTextAreaElement>("textarea"));
-  const savedHeights = textareas.map((el) => ({ el, h: el.style.height }));
+  const savedHeights = textareas.map((el) => ({ el, h: el.style.height, fs: (el.style as any).fieldSizing }));
   textareas.forEach((el) => {
+    (el.style as any).fieldSizing = "content";
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   });
+
   try {
     const html2canvas = (await import("html2canvas")).default;
     props.store.notify("正在渲染图片…");
-    // 完整渲染整个子页：显式指定元素完整宽高，避免 html2canvas 按窗口视口裁剪（长图文字截半）
+    const fullW = Math.max(target.scrollWidth, document.documentElement.clientWidth);
+    const fullH = target.scrollHeight;
+    // 大宽度时降低 scale，避免 canvas 尺寸超限（iOS 安全 4096 在 App.vue 处理，这里是桌面导出）
+    const scale = fullW > 3600 ? 1 : 1.5;
     const canvas = await html2canvas(target, {
-      scale: 1.5,
+      scale,
       backgroundColor: "#ffffff",
       useCORS: true,
       scrollX: 0,
       scrollY: 0,
       windowWidth: fullW,
-      windowHeight: target.scrollHeight,
+      windowHeight: fullH,
     });
     canvas.toBlob((blob) => {
       if (blob) downloadBlob(blob, `换发准备单_${tab.value === "gantt" ? "甘特图" : "表单"}_${stampDate()}.jpg`);
@@ -1321,9 +1360,19 @@ async function exportAllImage(): Promise<void> {
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "图片导出失败");
   } finally {
-    savedHeights.forEach((x) => { x.el.style.height = x.h; });
-    wraps.forEach((w, i) => { w.style.overflow = savedOverflows[i].o; });
-    target.style.width = savedMainW;
+    savedHeights.forEach((x) => { x.el.style.height = x.h; if (x.fs) (x.el.style as any).fieldSizing = x.fs; });
+    savedGrids.forEach((g) => {
+      g.el.style.gridTemplateColumns = g.gridTemplateColumns;
+      g.el.style.width = g.width;
+      g.el.style.minWidth = g.minWidth;
+    });
+    savedWraps.forEach((w, i) => {
+      w.el.style.overflow = savedWraps[i].overflow;
+      w.el.style.width = savedWraps[i].width;
+      w.el.style.minWidth = savedWraps[i].minWidth;
+    });
+    target.style.width = savedMain.width;
+    target.style.minWidth = savedMain.minWidth;
   }
 }
 
