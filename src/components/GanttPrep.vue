@@ -2034,8 +2034,12 @@ async function importAllXlsx(event: Event): Promise<void> {
 
 /* ===== 通用卡片 ===== */
 .gp-card { border: 1px solid var(--line, #dde2ec); border-radius: 12px; background: #fff; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-/* DAY 卡片：浅灰底（表单录入 + 甘特图），内部白色子卡片更分明 */
-.gp-card.day-card { background: #f2f4f8; }
+/* DAY 卡片：深灰底（表单录入 + 甘特图），内部白色子卡片更分明 */
+.gp-card.day-card { background: #3a4049; }
+.gp-card.day-card .day-label { color: #fff; }
+.gp-card.day-card .chart-title-input { color: #fff; }
+.gp-card.day-card .chart-title-input:hover { background: rgba(255, 255, 255, .12); border-radius: 4px; }
+.gp-card.day-card .chart-title-input:focus { background: #fff; color: var(--blue-dark, #2f5597); }
 .gp-sec-title { font-size: 14px; font-weight: 700; color: var(--blue-dark, #2f5597); margin: 10px 0 8px; border-left: 3px solid var(--blue, #4472c4); padding-left: 8px; }
 .gp-add { margin-top: 10px; }
 .icon-btn { border: none; background: transparent; color: var(--danger, #c0392b); font-size: 14px; cursor: pointer; }
@@ -2073,8 +2077,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 /* ===== 甘特网格 ===== */
 .gantt-wrap { overflow-x: auto; margin: 0 -6px; padding: 0 6px 6px; display: flex; align-items: stretch; }
 .gantt-grid {
-  display: grid; min-width: 0; width: 100%; border: 1px solid var(--line, #dde2ec); border-radius: 10px;
-  background: #fafbff; position: relative; flex: 1;
+  display: grid; min-width: 0; width: 100%; border: 1px solid #4a515c; border-radius: 10px;
+  background: #21242a; position: relative; flex: 1;
 }
 .stage-edge { flex-shrink: 0; width: 16px; cursor: ew-resize; background: var(--blue-light, #d9e1f2); border: 1px solid var(--line, #dde2ec); border-left: none; border-radius: 0 10px 10px 0; display: flex; align-items: center; justify-content: center; color: var(--blue-dark, #2f5597); font-weight: 700; user-select: none; touch-action: none; }
 .stage-edge:hover { background: #cdddf4; }
