@@ -45,23 +45,25 @@ function exportTableXlsx(): void {
   props.store.notify("表格已导出");
 }
 
-// ===== 单项工作模板（调取/保存，模板不含 base 基础信息） =====
+// ===== 单项工作模板（调取/保存双模式，与换发/APU 二级页一致：调取仅加载；保存=新模板+覆盖/改名/删除） =====
 const showTplModal = ref(false);
+const tplMode = ref<"load" | "save">("load");
 const templates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: StandalonePrepSheet }>>([]);
 const templatesLoading = ref(false);
 const saveTplName = ref("");
 const saveTplInputRef = ref<HTMLInputElement | null>(null);
-async function openTplModal(focusSave = false): Promise<void> {
+async function openTplModal(mode: "load" | "save" = tplMode.value): Promise<void> {
+  tplMode.value = mode;
   showTplModal.value = true;
   templatesLoading.value = true;
   try {
     const res = await backend.listStandaloneTemplates();
-    templates.value = Array.isArray(res.data) ? res.data : [];
+    templates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "模板加载失败");
   } finally {
     templatesLoading.value = false;
-    if (focusSave) nextTick(() => saveTplInputRef.value?.focus());
+    if (mode === "save") nextTick(() => saveTplInputRef.value?.focus());
   }
 }
 function applyTemplate(t: { name: string; state: StandalonePrepSheet }): void {
@@ -75,13 +77,13 @@ async function saveAsTemplate(): Promise<void> {
   const name = saveTplName.value.trim();
   if (!name) { props.store.notify("请输入模板名称"); return; }
   const id = await props.store.saveStandaloneTemplate(name);
-  if (id) { saveTplName.value = ""; await openTplModal(); }
+  if (id) { saveTplName.value = ""; await openTplModal(tplMode.value); }
 }
 async function overwriteTemplate(t: { _id: string; name: string }): Promise<void> {
   if (!sheet.value) return;
   if (!window.confirm(`确认覆盖模板“${t.name}”？当前单项准备单内容将写入该模板。`)) return;
   const id = await props.store.saveStandaloneTemplate(t.name, t._id);
-  if (id) await openTplModal();
+  if (id) await openTplModal(tplMode.value);
 }
 async function deleteTemplate(t: { _id: string; name: string }): Promise<void> {
   if (!window.confirm(`确认删除模板“${t.name}”？`)) return;
@@ -93,13 +95,15 @@ async function deleteTemplate(t: { _id: string; name: string }): Promise<void> {
     props.store.notify(e instanceof Error ? e.message : "模板删除失败");
   }
 }
-async function duplicateTemplate(t: { _id: string }): Promise<void> {
+async function renameTemplate(t: { _id: string; name: string; state: StandalonePrepSheet }): Promise<void> {
+  const name = window.prompt("请输入新模板名称", t.name)?.trim();
+  if (!name || name === t.name) return;
   try {
-    await backend.duplicateStandaloneTemplate(t._id);
-    props.store.notify("模板已复制");
-    await openTplModal();
+    await backend.updateStandaloneTemplate(t._id, { name, state: t.state });
+    props.store.notify(`模板已改名为：${name}`);
+    await openTplModal(tplMode.value);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板复制失败");
+    props.store.notify(e instanceof Error ? e.message : "模板改名失败");
   }
 }
 
@@ -132,8 +136,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       <input v-else class="sp-title-input" v-model="titleDraft" @blur="commitRenameTitle" @keydown.enter.prevent="commitRenameTitle" @keydown.esc.prevent="cancelRenameTitle" autofocus />
       <div class="subpage-actions">
         <label v-if="!titleEditing" class="ghost" @click="startRenameTitle">改名称</label>
-        <button class="ghost" @click="openTplModal(false)">调取模板</button>
-        <button class="ghost" @click="openTplModal(true)">保存模板</button>
+        <button class="ghost" @click="openTplModal('load')">调取模板</button>
+        <button class="ghost" @click="openTplModal('save')">保存模板</button>
         <button class="ghost" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTableXlsx">导出表格</button>
       </div>
@@ -257,23 +261,25 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       <div class="prep-block-actions"><button class="ghost" @click="store.spAddSigningRow">+ 新增行</button></div>
     </section>
 
-    <!-- 单项工作模板弹窗（调取/保存共用） -->
+    <!-- 单项工作模板弹窗（调取/保存共用，与换发/APU 二级页一致：调取=仅加载；保存=新模板+覆盖/改名/删除） -->
     <div v-if="showTplModal" class="tpl-modal" @click.self="showTplModal = false">
       <div class="tpl-modal-card">
-        <div class="tpl-modal-head"><h3>单项工作模板库</h3><button class="icon-btn" @click="showTplModal = false">×</button></div>
-        <div class="tpl-save-row">
+        <div class="tpl-modal-head"><h3>{{ tplMode === 'load' ? '调取模板' : '保存模板' }}</h3><button class="icon-btn" @click="showTplModal = false">×</button></div>
+        <div v-if="tplMode === 'save'" class="tpl-save-row">
           <input ref="saveTplInputRef" v-model="saveTplName" placeholder="新模板名称" @keydown.enter="saveAsTemplate" />
           <button class="primary" @click="saveAsTemplate">保存为新模板</button>
         </div>
         <p v-if="templatesLoading" class="tpl-empty">加载中…</p>
         <template v-else-if="templates.length">
           <div v-for="t in templates" :key="t._id" class="tpl-row">
-            <div class="tpl-info" @click="applyTemplate(t)"><strong>{{ t.name }}</strong><span>工序 {{ (t.state.processGroups || []).length }} 组 · 签署 {{ (t.state.signingRows || []).length }} 行</span></div>
+            <div class="tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>工序 {{ (t.state.processGroups || []).length }} 组 · 签署 {{ (t.state.signingRows || []).length }} 行</span></div>
             <div class="tpl-actions">
-              <button class="ghost" @click="applyTemplate(t)">加载</button>
-              <button class="ghost" @click="overwriteTemplate(t)">覆盖</button>
-              <button class="ghost" @click="duplicateTemplate(t)">复制</button>
-              <button class="ghost danger" @click="deleteTemplate(t)">删除</button>
+              <button v-if="tplMode === 'load'" class="ghost" @click="applyTemplate(t)">加载</button>
+              <template v-else>
+                <button class="ghost" @click="overwriteTemplate(t)">覆盖</button>
+                <button class="ghost" @click="renameTemplate(t)">改名</button>
+                <button class="ghost danger" @click="deleteTemplate(t)">删除</button>
+              </template>
             </div>
           </div>
         </template>
@@ -338,7 +344,9 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .tpl-save-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid #d7dbe4; border-radius: 7px; font-size: 13px; }
 .tpl-empty { color: #697386; font-size: 13px; text-align: center; padding: 14px 0; }
 .tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid #e6e9f0; border-radius: 8px; margin-bottom: 8px; }
-.tpl-info { flex: 1; min-width: 0; cursor: pointer; }
+.tpl-info { flex: 1; min-width: 0; }
+.tpl-info.clickable { cursor: pointer; }
+.tpl-info.clickable:hover strong { color: #4472c4; }
 .tpl-info strong { display: block; font-size: 14px; color: #222; }
 .tpl-info span { font-size: 12px; color: #697386; }
 .tpl-actions { display: flex; gap: 6px; flex-shrink: 0; }
