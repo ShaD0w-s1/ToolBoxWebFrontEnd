@@ -2133,7 +2133,7 @@ async function importAllXlsx(event: Event): Promise<void> {
 }
 /* 标题栏及以上：工序卡=黄底 #FDCA17（无渐变，标题栏底边清晰分界）；串件卡=橙底 #E8A44D 标题白字 */
 .gantt-card .card-grip { background: #FDCA17; border-radius: 6px 6px 0 0; }
-.gantt-card .f-content { background: #FDCA17; }
+.gantt-card .f-content { background: #FDCA17; margin-top: -2px; border-radius: 0 0 3px 3px; }
 .gantt-card.part-item .card-grip, .gantt-card.unassigned .card-grip { background: #E8A44D; }
 .sp-title-row { display: flex; align-items: center; gap: 5px; margin: -2px -9px 4px; padding: 2px 9px; background: #E8A44D; color: #fff; border-radius: 0 0 6px 6px; min-width: 0; }
 .sp-title-row .sp-view-content, .sp-title-row .f-content { color: #fff; font-weight: 600; flex: 1; min-width: 0; width: auto; background: transparent; border-radius: 0; box-shadow: none; }
@@ -2227,9 +2227,9 @@ textarea.textwrap {
 .form-stage-head input:focus { background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--focus, #8eaadb); }
 .form-stage-body { display: flex; flex-direction: column; gap: 6px; }
 .form-card-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: 8px; padding: 6px 8px; background: #fff; }
-/* 表单工序行：纯黄 #FDCA17 从左侧拖拽柄到标题栏（内容列）后，负责人栏起剩余白色；备注栏红字；串件行 part-form-row 除外 */
-.form-card-row:not(.part-form-row) .form-card-drag { background: #FDCA17; border-radius: 6px; padding: 4px 6px; }
-.form-card-row:not(.part-form-row) textarea:first-of-type { background: #FDCA17; }
+/* 表单工序行：左半（拖拽柄+标题列）纯黄 #FDCA17、右半白色，标题栏右边为左右区分线；备注红字；串件行除外 */
+.form-card-row:not(.part-form-row) .form-card-drag { background: #FDCA17; border-radius: 6px 0 0 6px; padding: 4px 6px; }
+.form-card-row:not(.part-form-row) textarea:first-of-type { background: #FDCA17; border-right: 2px solid #C9A227; }
 .form-card-row:not(.part-form-row) textarea:last-of-type { color: var(--danger, #c0392b); }
 .form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 3px 6px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; font-size: 12.5px; font-family: inherit; }
 .form-card-row textarea { resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; }
