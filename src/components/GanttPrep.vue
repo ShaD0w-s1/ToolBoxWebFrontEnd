@@ -1351,18 +1351,56 @@ async function exportAllImage(): Promise<void> {
     props.store.notify("正在渲染图片…");
     const fullW = Math.max(target.scrollWidth, document.documentElement.clientWidth);
     const fullH = target.scrollHeight;
-    // 大宽度时降低 scale，避免 canvas 尺寸超限（iOS 安全 4096 在 App.vue 处理，这里是桌面导出）
-    const scale = fullW > 3600 ? 1 : 1.5;
-    const canvas = await html2canvas(target, {
-      scale,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: fullW,
-      windowHeight: fullH,
-    });
-    canvas.toBlob((blob) => {
+    // 无尺寸限制：固定 1.5x 高清渲染，分块（tile）拼接突破浏览器单 canvas 尺寸上限，保证甘特图完整输出
+    const scale = 1.5;
+    const canvasW = Math.ceil(fullW * scale);
+    const canvasH = Math.ceil(fullH * scale);
+    if (canvasW > 30000 || canvasH > 30000) {
+      props.store.notify(`导出尺寸过大（${canvasW}×${canvasH}px），请精简内容后重试`);
+      return;
+    }
+    const out = document.createElement("canvas");
+    out.width = canvasW;
+    out.height = canvasH;
+    const ctx = out.getContext("2d");
+    if (!ctx) { props.store.notify("图片导出失败"); return; }
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvasW, canvasH);
+    // 每块渲染的 CSS 像素：×1.5 ≈ 3750px，单块 canvas 在浏览器安全上限内
+    const tilePx = 2500;
+    const cols = Math.ceil(fullW / tilePx);
+    const rows = Math.ceil(fullH / tilePx);
+    for (let ry = 0; ry < rows; ry++) {
+      for (let rx = 0; rx < cols; rx++) {
+        const bx = rx * tilePx;
+        const by = ry * tilePx;
+        const bw = Math.min(tilePx, fullW - bx);
+        const bh = Math.min(tilePx, fullH - by);
+        // 在克隆文档中把 main-area 裁剪为当前分块并平移内容，实现按块渲染、无损拼接
+        const tile = await html2canvas(target, {
+          scale,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: Math.max(bw, document.documentElement.clientWidth),
+          windowHeight: Math.max(bh, document.documentElement.clientHeight),
+          onclone: (doc: Document) => {
+            const el = doc.getElementById("gp-main-area");
+            if (!el) return;
+            el.style.width = `${bw}px`;
+            el.style.height = `${bh}px`;
+            el.style.overflow = "hidden";
+            Array.from(el.children).forEach((c) => {
+              const h = c as HTMLElement;
+              h.style.transform = `translate(${-bx}px, ${-by}px)`;
+            });
+          },
+        });
+        ctx.drawImage(tile, bx * scale, by * scale, bw * scale, bh * scale);
+      }
+    }
+    out.toBlob((blob) => {
       if (blob) downloadBlob(blob, `换发准备单_${tab.value === "gantt" ? "甘特图" : "表单"}_${stampDate()}.jpg`);
       else props.store.notify("图片导出失败");
     }, "image/jpeg", 0.92);
@@ -1749,7 +1787,7 @@ async function importAllXlsx(event: Event): Promise<void> {
     </aside>
 
     <!-- 主区 -->
-    <div class="main-area" ref="mainAreaRef">
+    <div class="main-area" id="gp-main-area" ref="mainAreaRef">
       <div class="subpage-head">
         <input class="gp-title-input" v-model="templateName" placeholder="工作准备单（甘特）" @change="save" @input="save" />
         <button class="ghost" @click="openTplModal('load')">调取模板</button>
