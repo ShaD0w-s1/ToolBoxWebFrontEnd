@@ -1570,6 +1570,27 @@ async function importPartsXlsx(event: Event): Promise<void> {
     props.store.notify(err instanceof Error ? err.message : "解析失败");
   }
 }
+// 串件工具清单「下载现场管控单」：下载「定检工具现场管控单(单项工作).docx」（优先按文件名，其次按类型「单独项目」）
+async function downloadSpControlDoc(): Promise<void> {
+  try {
+    const res = await backend.listControlDocs();
+    const list = (res.data || []) as Array<{ _id: string; type: string; fileName: string }>;
+    const doc = list.find((d) => d.fileName === "定检工具现场管控单(单项工作).docx") || list.find((d) => d.type === "单独项目");
+    if (!doc) { props.store.notify("尚未上传「定检工具现场管控单(单项工作).docx」的现场管控单"); return; }
+    const urlRes = await backend.getControlDocUrl(doc._id);
+    const url = urlRes.data?.downloadUrl;
+    if (!url) { props.store.notify("未获取到下载链接"); return; }
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = doc.fileName || "";
+    anchor.target = "_blank";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } catch (error) {
+    props.store.notify(error instanceof Error ? error.message : "下载失败");
+  }
+}
 async function importAllXlsx(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -2063,6 +2084,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <label v-if="tab === 'airparts'" class="field dedupe-toggle"><input type="checkbox" v-model="airDedupeMode" /> 重复航材检查</label>
               <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importPartsXlsx" /></label>
               <button class="ghost" @click="exportPartsXlsx">导出表格</button>
+              <button v-if="tab === 'tools'" class="ghost" @click="downloadSpControlDoc">下载现场管控单</button>
               <span class="split-btn" @click.stop>
                 <button class="ghost" @click="addPartList(partKind)">+ 新增卡片</button>
                 <button class="ghost split-arrow" title="更多操作" @click="partClearOpen = !partClearOpen">▾</button>
