@@ -2034,13 +2034,13 @@ async function importAllXlsx(event: Event): Promise<void> {
 
 /* ===== 通用卡片 ===== */
 .gp-card { border: 1px solid var(--line, #dde2ec); border-radius: 12px; background: #fff; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-/* DAY 卡片：蓝底 #0070C0 白字；填空栏/选择框保持白底黑字 */
-.gp-card.day-card { background: #0070C0; }
-.gp-card.day-card .day-label { color: #fff; }
-.gp-card.day-card .chart-title-input { color: #fff; }
-.gp-card.day-card .chart-title-input:hover { background: rgba(255, 255, 255, .2); border-radius: 4px; }
+/* DAY 卡片：浅蓝底黑字；填空栏/选择框保持白底黑字 */
+.gp-card.day-card { background: #E8F1FC; }
+.gp-card.day-card .day-label { color: #222; }
+.gp-card.day-card .chart-title-input { color: #222; }
+.gp-card.day-card .chart-title-input:hover { background: rgba(255, 255, 255, .6); border-radius: 4px; }
 .gp-card.day-card .chart-title-input:focus { background: #fff; color: #222; box-shadow: none; }
-.gp-card.day-card .gp-sec-title { color: #fff; border-left-color: rgba(255, 255, 255, .85); }
+.gp-card.day-card .gp-sec-title { color: #222; border-left-color: var(--blue, #4472c4); }
 .gp-card.day-card .date-input { background: #fff; color: #222; }
 .gp-card.day-card .day-input { background: #fff; color: #222; }
 .gp-sec-title { font-size: 14px; font-weight: 700; color: var(--blue-dark, #2f5597); margin: 10px 0 8px; border-left: 3px solid var(--blue, #4472c4); padding-left: 8px; }
