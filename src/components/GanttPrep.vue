@@ -635,6 +635,14 @@ function onPartTabEnter(): void {
   syncPartCardsFromCharts(partKind.value);
   partFilter.value = new Set();
   partSearch.value = "";
+  // 备注有数据的物品自动展开备注行（保留用户手动展开的空备注状态）
+  const s = state.value;
+  const list = (s && (tab.value === "airparts" ? s.airParts : s.toolParts)) || [];
+  const auto = new Set<string>();
+  list.forEach((c) => (c.items || []).forEach((it) => { if (it.note && String(it.note).trim()) auto.add(it.id); }));
+  const prev = expandedNotes.value;
+  auto.forEach((id) => prev.add(id));
+  expandedNotes.value = new Set(prev);
   autoSizeAllParts();
 }
 // ===== 清单卡片搜索（模糊搜索 + 多选胶囊） =====
