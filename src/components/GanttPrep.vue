@@ -3,7 +3,6 @@ import { computed, nextTick, ref } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
 import { backend } from "../api";
-import { sectionHex, sectionRgba } from "../utils/sectionColor";
 import NameSuggest from "./NameSuggest.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
@@ -616,10 +615,16 @@ function autoSizeAllParts(): void {
     });
   });
 }
-// ===== 卡片自动浅色配色（标题栏+左边条一卡一色，参考 A检 航材部位卡片 sectionColor） =====
-function partCardColor(name: string): string { return sectionHex(name); }
-function partCardHead(name: string): string { return sectionRgba(name, 0.5); }
-function partCardBg(name: string): string { return sectionRgba(name, 0.2); }
+// ===== 卡片自动浅色配色：蓝-橙-绿-土黄-灰 循环（按卡片在完整清单中的索引取色，筛选后颜色不漂移） =====
+const PART_CARD_PALETTE = ["#4472C4", "#ED7D31", "#548235", "#C9A227", "#7F7F7F"];
+function partCardColorOf(card: GanttPartList): string {
+  const s = state.value; if (!s) return PART_CARD_PALETTE[0];
+  const list = tab.value === "airparts" ? s.airParts : s.toolParts;
+  const idx = list.findIndex((c) => c.id === card.id);
+  return PART_CARD_PALETTE[(idx < 0 ? 0 : idx) % PART_CARD_PALETTE.length];
+}
+function partCardHeadOf(card: GanttPartList): string { return partCardColorOf(card) + "80"; } // 50% 透明度
+function partCardBgOf(card: GanttPartList): string { return partCardColorOf(card) + "33"; }  // 20% 透明度
 // 串件航材清单：重复航材检查（跨卡片按件号分组，重复 ≥2 次即列出）
 const airDedupeMode = ref(false);
 interface AirDedupeGroup { pn: string; name: string; qty: number; count: number; cards: string[] }
@@ -1818,8 +1823,8 @@ async function importAllXlsx(event: Event): Promise<void> {
             </div>
             <div v-else class="pt-empty">暂无重复航材。</div>
           </section>
-          <section v-for="card in visiblePartCards" :key="card.id" class="gp-card pt-card" :style="{ borderLeft: '6px solid ' + partCardColor(card.name), background: partCardBg(card.name) }">
-            <div class="pt-card-head" :style="{ background: partCardHead(card.name) }">
+          <section v-for="card in visiblePartCards" :key="card.id" class="gp-card pt-card" :style="{ borderLeft: '6px solid ' + partCardColorOf(card), background: partCardBgOf(card) }">
+            <div class="pt-card-head" :style="{ background: partCardHeadOf(card) }">
               <input v-model="card.name" class="pt-card-name" placeholder="卡片名称(可输入或搜索串件内容)" list="gp-part-contents" @input="save" />
               <span class="pt-count">{{ card.items.length }} 项</span>
               <button class="icon-btn" @click="removePartList(partKind, card.id)">×</button>
