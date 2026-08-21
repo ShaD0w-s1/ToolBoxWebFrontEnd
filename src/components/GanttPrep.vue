@@ -1692,8 +1692,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                   </div>
                   <div class="form-stage-body">
                     <div v-for="card in cardsOfStage(chart, si)" :key="card.id" class="form-card-row">
-                      <div class="form-card-drag" title="拖动调行序" @pointerdown="startFormCardDrag($event, chart.id, card.id)">⠿</div>
-                      <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="save"></textarea>
+                      <div class="form-card-title">
+                        <div class="form-card-drag" title="拖动调行序" @pointerdown="startFormCardDrag($event, chart.id, card.id)">⠿</div>
+                        <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="save"></textarea>
+                      </div>
                       <NameSuggest :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" />
                       <NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" />
                       <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="save"></textarea>
@@ -2227,13 +2229,28 @@ textarea.textwrap {
 .form-stage-head input:focus { background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--focus, #8eaadb); }
 .form-stage-body { display: flex; flex-direction: column; gap: 6px; }
 .form-card-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: 8px; padding: 6px 8px; background: #fff; }
-/* 表单工序行：左半（拖拽柄+标题列）纯黄 #FDCA17、右半白色，标题栏右边为左右区分线；备注红字；串件行除外 */
-.form-card-row:not(.part-form-row) .form-card-drag { background: #FDCA17; border-radius: 6px 0 0 6px; padding: 4px 6px; }
-.form-card-row:not(.part-form-row) textarea:first-of-type { background: #FDCA17; border-right: 2px solid #C9A227; }
+/* 表单工序行：左侧纯黄（拖拽柄+标题）随标题自适应、黄色竖线分界、右半白；备注红字；串件行除外 */
+.form-card-row:not(.part-form-row) .form-card-title {
+  display: flex; align-items: center; gap: 2px;
+  background: #FDCA17; border-radius: 6px;
+  border-right: 2px solid #C9A227;
+  flex: none; max-width: 60%; min-width: 0;
+  padding: 2px 4px 2px 2px;
+}
+.form-card-row:not(.part-form-row) .form-card-title .form-card-drag {
+  background: transparent; border-radius: 4px; padding: 4px 6px;
+  color: #8a6d00;
+}
+.form-card-row:not(.part-form-row) .form-card-title textarea {
+  flex: none; width: auto; min-width: 60px; max-width: 100%;
+  background: transparent; border: none; box-shadow: none;
+  color: #5c4a00; font-weight: 600;
+  padding: 3px 4px;
+}
 .form-card-row:not(.part-form-row) textarea:last-of-type { color: var(--danger, #c0392b); }
 .form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 3px 6px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; font-size: 12.5px; font-family: inherit; }
 .form-card-row textarea { resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; }
-.form-card-row input:first-child, .form-card-row textarea:first-of-type { flex: 1.5; }
+.form-card-row.part-form-row textarea:first-of-type { flex: 1.5; }
 .form-card-row input:focus, .form-card-row textarea:focus { border-color: var(--focus, #8eaadb); outline: none; }
 .part-form-row { border-color: #f0d9b8; background: #fff6e8; }
 .part-form-tag { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #b45309; background: #ffe0b3; padding: 2px 6px; border-radius: 4px; }
@@ -2369,6 +2386,7 @@ textarea.textwrap {
   .subpage-actions { gap: 6px; }
   .form-card-row { align-items: stretch; }
   .form-card-row textarea { min-width: 100%; }
+  .form-card-row .form-card-title textarea { min-width: 60px; max-width: 100%; }
   .gantt-grid { min-width: 640px; }
 }
 </style>
