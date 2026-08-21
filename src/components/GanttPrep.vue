@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
 import { backend } from "../api";
+import { sectionHex, sectionRgba } from "../utils/sectionColor";
 import NameSuggest from "./NameSuggest.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
@@ -545,7 +546,7 @@ function syncPartCardsFromCharts(kind: "airParts" | "toolParts"): void {
 function addPartList(kind: "airParts" | "toolParts"): void {
   const s = state.value; if (!s) return;
   ensurePartLists(s);
-  (s[kind] as GanttPartList[]).push({ id: genId(), name: "新卡片", items: [] });
+  (s[kind] as GanttPartList[]).unshift({ id: genId(), name: "新卡片", items: [] });
   save();
 }
 function removePartList(kind: "airParts" | "toolParts", id: string): void {
@@ -565,10 +566,60 @@ function removePartItem(kind: "airParts" | "toolParts", listId: string, itemId: 
   list.items = list.items.filter((x) => x.id !== itemId);
   save();
 }
-// 进入串件 tab 时，把表单串件内容同步成卡片
+// 进入串件 tab 时，把表单串件内容同步成卡片，并重置搜索/胶囊、撑高物品输入栏
 function onPartTabEnter(): void {
   syncPartCardsFromCharts(partKind.value);
+  partFilter.value = new Set();
+  partSearch.value = "";
+  autoSizeAllParts();
 }
+// ===== 清单卡片搜索（模糊搜索 + 多选胶囊） =====
+const partSearch = ref("");
+const partFilter = ref<Set<string>>(new Set());
+const partCapsules = computed<string[]>(() => {
+  const s = state.value; if (!s) return [];
+  return [...new Set((tab.value === "airparts" ? s.airParts : s.toolParts).map((c) => c.name).filter((n) => n.trim() !== ""))];
+});
+const visiblePartCards = computed<GanttPartList[]>(() => {
+  const s = state.value; if (!s) return [];
+  const all = tab.value === "airparts" ? s.airParts : s.toolParts;
+  let list = all;
+  if (partFilter.value.size) list = list.filter((c) => partFilter.value.has(c.name));
+  const q = partSearch.value.trim().toLowerCase();
+  if (q) {
+    list = list.filter((c) =>
+      c.name.toLowerCase().includes(q) ||
+      (c.items || []).some((it) =>
+        String(it.pn || "").toLowerCase().includes(q) || String(it.name || "").toLowerCase().includes(q)
+      )
+    );
+  }
+  return list;
+});
+function togglePartFilter(name: string): void {
+  const s = new Set(partFilter.value);
+  if (s.has(name)) s.delete(name); else s.add(name);
+  partFilter.value = s;
+}
+// ===== 物品卡片输入栏自动撑高（参考 A检 m-item onAutoSize） =====
+function onPartAutoSize(event: Event): void {
+  const el = event.target as HTMLTextAreaElement;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+  save();
+}
+function autoSizeAllParts(): void {
+  nextTick(() => {
+    document.querySelectorAll<HTMLTextAreaElement>(".pt-item .m-name").forEach((el) => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    });
+  });
+}
+// ===== 卡片自动浅色配色（标题栏+左边条一卡一色，参考 A检 航材部位卡片 sectionColor） =====
+function partCardColor(name: string): string { return sectionHex(name); }
+function partCardHead(name: string): string { return sectionRgba(name, 0.5); }
+function partCardBg(name: string): string { return sectionRgba(name, 0.2); }
 // 串件航材清单：重复航材检查（跨卡片按件号分组，重复 ≥2 次即列出）
 const airDedupeMode = ref(false);
 interface AirDedupeGroup { pn: string; name: string; qty: number; count: number; cards: string[] }
@@ -1747,6 +1798,13 @@ async function importAllXlsx(event: Event): Promise<void> {
               <button class="ghost" @click="addPartList(partKind)">+ 新增卡片</button>
             </div>
           </div>
+          <!-- 卡片搜索：模糊搜索卡片名/件号/名称 + 多选胶囊筛选 -->
+          <div class="part-search-bar">
+            <input v-model="partSearch" class="part-search-input" placeholder="搜索卡片名 / 件号 / 名称（模糊匹配）" />
+            <div v-if="partCapsules.length" class="part-capsules">
+              <button v-for="n in partCapsules" :key="n" class="part-capsule" :class="{ on: partFilter.has(n) }" @click="togglePartFilter(n)">{{ n }}</button>
+            </div>
+          </div>
           <!-- 重复航材检查：按件号跨卡片分组，重复 ≥2 次列出 -->
           <section v-if="tab === 'airparts' && airDedupeMode" class="gp-card air-dedupe-card">
             <div class="gp-sec-title">重复航材（{{ airDedupeGroups.length }} 种件号）</div>
@@ -1760,20 +1818,20 @@ async function importAllXlsx(event: Event): Promise<void> {
             </div>
             <div v-else class="pt-empty">暂无重复航材。</div>
           </section>
-          <section v-for="card in (tab === 'airparts' ? state.airParts : state.toolParts)" :key="card.id" class="gp-card pt-card">
-            <div class="pt-card-head">
+          <section v-for="card in visiblePartCards" :key="card.id" class="gp-card pt-card" :style="{ borderLeft: '6px solid ' + partCardColor(card.name), background: partCardBg(card.name) }">
+            <div class="pt-card-head" :style="{ background: partCardHead(card.name) }">
               <input v-model="card.name" class="pt-card-name" placeholder="卡片名称(可输入或搜索串件内容)" list="gp-part-contents" @input="save" />
               <span class="pt-count">{{ card.items.length }} 项</span>
               <button class="icon-btn" @click="removePartList(partKind, card.id)">×</button>
             </div>
             <div class="pt-items">
               <div v-for="it in card.items" :key="it.id" class="pt-item" :class="{ 'pt-item-air': tab === 'airparts', 'pt-item-tool': tab === 'tools' }">
-                <label v-if="tab === 'airparts'" class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.pn" class="m-name" @input="save"></textarea></label>
-                <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" class="m-name" @input="save"></textarea></label>
+                <label v-if="tab === 'airparts'" class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.pn" class="m-name" @input="onPartAutoSize"></textarea></label>
+                <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" class="m-name" @input="onPartAutoSize"></textarea></label>
                 <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" type="number" min="0" @input="save" /></label>
                 <div class="m-ops">
-                  <button class="pt-note-toggle" @click="toggleNote(it.id)">备注 {{ expandedNotes.has(it.id) ? '▾' : '▸' }}</button>
-                  <button class="icon-btn" @click="removePartItem(partKind, card.id, it.id)">×</button>
+                  <button class="m-op m-op-del" title="删除物品" @click="removePartItem(partKind, card.id, it.id)">×</button>
+                  <button class="m-op" :title="expandedNotes.has(it.id) ? '收起备注' : '添加备注'" @click="toggleNote(it.id)">+</button>
                 </div>
                 <div v-if="expandedNotes.has(it.id)" class="pt-note-row"><textarea v-model="it.note" class="pt-note" placeholder="备注" @input="save"></textarea></div>
               </div>
@@ -1781,7 +1839,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             </div>
             <button class="gp-add" @click="addPartItem(partKind, card.id)">+ 增加物品</button>
           </section>
-          <div v-if="!(tab === 'airparts' ? state.airParts : state.toolParts).length" class="pt-empty-all">暂无卡片 — 点上方「+ 新增卡片」</div>
+          <div v-if="!visiblePartCards.length" class="pt-empty-all">暂无卡片 — 点上方「+ 新增卡片」</div>
         </div>
       </template>
 
@@ -1909,16 +1967,17 @@ async function importAllXlsx(event: Event): Promise<void> {
 .form-stage-drag:active, .form-card-drag:active { cursor: grabbing; }
 .fc-span { flex-shrink: 0; font-size: 11px; color: var(--blue-dark, #2f5597); background: var(--blue-light, #d9e1f2); padding: 2px 8px; border-radius: 4px; }
 .gantt-head {
-  background: linear-gradient(180deg, #edf2fc, #fff);
-  border-right: 1px solid var(--line, #dde2ec); border-bottom: 1px solid var(--line, #dde2ec);
+  background: var(--blue, #4472c4);
+  border-right: 1px solid rgba(255,255,255,.28); border-bottom: 1px solid rgba(255,255,255,.28);
   padding: 6px 8px; display: flex; flex-direction: row; align-items: center; gap: 4px;
   position: relative; min-height: 44px;
 }
-.stage-name-input { flex: 1; min-width: 0; text-align: center; border: none; background: transparent; font-size: 13.5px; font-weight: 650; padding: 2px 0; color: var(--blue-dark, #2f5597); }
-.stage-name-input:focus { background: #fff; border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus, #8eaadb); }
-.add-card-btn { width: auto; height: 20px; padding: 0 6px; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid var(--line, #dde2ec); background: #fff; color: var(--blue-dark, #2f5597); flex-shrink: 0; }
-.stage-del-btn { width: 22px; height: 20px; padding: 0; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid var(--line, #dde2ec); background: #fff; color: var(--danger, #c0392b); flex-shrink: 0; }
-.stage-col-drag { cursor: grab; color: var(--muted, #697386); font-size: 12px; user-select: none; touch-action: none; flex-shrink: 0; }
+.stage-name-input { flex: 1; min-width: 0; text-align: center; border: none; background: transparent; font-size: 13.5px; font-weight: 650; padding: 2px 0; color: #fff; }
+.stage-name-input:focus { background: #fff; border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus, #8eaadb); color: var(--blue-dark, #2f5597); }
+.add-card-btn { width: auto; height: 20px; padding: 0 6px; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.18); color: #fff; flex-shrink: 0; }
+.stage-ins-btn { width: auto; height: 20px; padding: 0 5px; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.18); color: #fff; flex-shrink: 0; }
+.stage-del-btn { width: 22px; height: 20px; padding: 0; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.18); color: #ffe3e3; flex-shrink: 0; }
+.stage-col-drag { cursor: grab; color: rgba(255,255,255,.85); font-size: 12px; user-select: none; touch-action: none; flex-shrink: 0; }
 .stage-col-drag:active { cursor: grabbing; }
 .corner-cell { background: #fff; border-right: 1px solid var(--line, #dde2ec); border-bottom: 1px solid var(--line, #dde2ec); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--muted, #697386); padding: 6px 8px; }
 .lane-label-cell { background: #fff; border-right: 1px solid var(--line, #dde2ec); border-bottom: 1px dashed var(--line, #dde2ec); display: flex; align-items: center; justify-content: center; min-height: 72px; font-size: 12px; font-weight: 650; color: var(--blue-dark, #2f5597); }
@@ -1926,17 +1985,24 @@ async function importAllXlsx(event: Event): Promise<void> {
 .stage-capsules { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .stage-capsule { font-size: 11.5px; font-weight: 600; color: var(--blue-dark, #2f5597); background: var(--blue-light, #d9e1f2); border: 1px solid var(--blue, #4472c4); border-radius: 999px; padding: 2px 10px; }
 
-/* ===== 甘特卡片 ===== */
+/* ===== 甘特卡片（工序=灰渐变至白 / 串件=橙渐变至白，从顶部渐变到负责行后全白） ===== */
 .gantt-card {
   margin: 2px; padding: 0; border-radius: 8px; background: #fff;
   border: 1.5px solid var(--focus, #8eaadb); box-shadow: 0 1px 3px rgba(0,0,0,.04); position: relative;
   display: flex; flex-direction: column; min-height: 64px; z-index: 2; transition: box-shadow .15s;
 }
+.gantt-card {
+  background: linear-gradient(180deg, #eef1f5 0%, #f7f9fb 52%, #ffffff 76%);
+}
 .gantt-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 3; }
-.gantt-card.unassigned { background: #ffe0b3; border-color: #e8a44d; }
+.gantt-card.unassigned { background: linear-gradient(180deg, #fde8cf 0%, #fdf3e6 52%, #fff7ec 76%); border-color: #e8a44d; }
 .gantt-card.unassigned .card-warn { position: absolute; top: 0; left: 0; color: var(--danger, #c0392b); font-size: 10px; line-height: 1; padding: 1px 3px; z-index: 5; }
-.gantt-card.part-item { border-color: #e8a44d; }
+.gantt-card.part-item {
+  border-color: #e8a44d;
+  background: linear-gradient(180deg, #fbe3c8 0%, #fdf0e0 52%, #fff8ee 76%);
+}
 .part-tag { position: absolute; top: 2px; left: 6px; font-size: 10px; font-weight: 700; color: #b45309; z-index: 5; }
+.gantt-card.part-item .part-tag, .gantt-card.unassigned .part-tag { color: #fff; background: #c2701a; border-radius: 999px; padding: 0 7px; line-height: 14px; }
 .card-grip { position: absolute; top: 0; left: 8px; right: 8px; height: 14px; cursor: grab; display: flex; align-items: center; justify-content: center; color: var(--muted, #697386); font-size: 9px; letter-spacing: 3px; user-select: none; touch-action: none; z-index: 4; }
 .card-grip:active { cursor: grabbing; }
 .resize-l, .resize-r { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 4; touch-action: none; }
@@ -2075,6 +2141,14 @@ textarea.textwrap {
 .pt-items { padding: 4px 0 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .pt-empty { color: var(--muted, #697386); font-size: 12.5px; text-align: center; padding: 10px 0; }
 .pt-empty-all { text-align: center; color: var(--muted, #697386); padding: 40px 0; font-size: 13px; }
+/* 卡片搜索栏：模糊搜索输入 + 多选胶囊 */
+.part-search-bar { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; padding: 10px 12px; background: #fff; border: 1px solid var(--line, #dde2ec); border-radius: 10px; }
+.part-search-input { height: 34px; padding: 0 12px; border: 1.5px solid var(--line, #dde2ec); border-radius: 8px; font-size: 13.5px; width: 100%; box-sizing: border-box; font-family: inherit; }
+.part-search-input:focus { outline: none; border-color: var(--focus, #8eaadb); box-shadow: 0 0 0 3px rgba(142, 170, 219, .18); }
+.part-capsules { display: flex; flex-wrap: wrap; gap: 6px; }
+.part-capsule { border: 1px solid var(--line, #dde2ec); background: #fff; border-radius: 999px; padding: 3px 12px; font-size: 12.5px; color: var(--muted, #697386); cursor: pointer; }
+.part-capsule:hover { border-color: var(--blue, #4472c4); color: var(--blue-dark, #2f5597); }
+.part-capsule.on { background: var(--blue, #4472c4); border-color: var(--blue, #4472c4); color: #fff; }
 /* 物品卡片：参考 A检 航材清单 m-item 样式（件号/名称/数量带字段标签 + 自动换行） */
 .pt-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: stretch; border: 1px solid #e6e9f0; border-radius: 8px; padding: 6px 8px; background: #fff; word-break: break-word; }
 .pt-item-tool { grid-template-columns: 2fr 0.6fr auto; }
@@ -2082,11 +2156,14 @@ textarea.textwrap {
 .m-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #6b7280; min-width: 0; }
 .m-field input, .m-name { padding: 5px 7px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 13px; min-width: 0; width: 100%; box-sizing: border-box; }
 .m-name { padding: 5px 7px; font-size: 12px; line-height: 1.4; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; font-family: inherit; min-height: 30px; }
-.m-ops { display: flex; flex-direction: column; gap: 4px; align-items: center; }
-.pt-note-row { grid-column: 1 / -1; }
+.m-ops { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.pt-note-row { grid-column: 1 / -1; display: flex; align-items: flex-end; }
 .pt-note { min-height: 28px; font-size: 12.5px; color: #666; outline: none; background: #f2f6fd; border: 1px dashed var(--line, #dde2ec); border-radius: 6px; padding: 4px 8px; resize: none; width: 100%; font-family: inherit; }
-.pt-note-toggle { border: 1px solid var(--line, #dde2ec); background: #fff; border-radius: 6px; height: 26px; padding: 0 8px; font-size: 12px; color: var(--muted, #697386); cursor: pointer; flex-shrink: 0; }
-.pt-note-toggle:hover { color: var(--blue-dark, #2f5597); border-color: var(--blue, #4472c4); }
+/* 物品操作按钮：×（删除）在上、+（备注）在下，两按钮平分卡片高度（参考 A检 m-item） */
+.m-op { flex: 1; min-width: 26px; min-height: 22px; padding: 0 6px; border: 1px solid #d7dbe4; border-radius: 6px; background: #fff; color: #5a6b85; font-size: 14px; line-height: 1; cursor: pointer; }
+.m-op:hover { background: var(--blue-light); }
+.m-op-del { border-color: #f2cdcd; background: #fdecec; color: #b53a3a; }
+.m-op-del:hover { background: #f9dcdc; }
 .danger-text { color: var(--danger, #c0392b); }
 
 /* ===== 重复航材检查 ===== */
@@ -2139,6 +2216,8 @@ textarea.textwrap {
   .resp-banner { grid-template-columns: 1fr; }
   .component-cols { grid-template-columns: 1fr; }
   .pt-items { grid-template-columns: 1fr; }
+  .pt-item { grid-template-columns: 1fr 1fr auto; }
+  .pt-item .m-field-name { grid-column: span 2; }
   .subpage-toolbar { gap: 6px; }
   .form-card-row { align-items: stretch; }
   .form-card-row textarea { min-width: 100%; }
