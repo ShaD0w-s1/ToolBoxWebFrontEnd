@@ -1696,7 +1696,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                         <div class="form-card-drag" title="拖动调行序" @pointerdown="startFormCardDrag($event, chart.id, card.id)">⠿</div>
                         <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="save"></textarea>
                       </div>
-                      <NameSuggest :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" />
+                      <NameSuggest class="ns-owner" :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" />
                       <NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" />
                       <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="save"></textarea>
                       <span v-if="card.endStage > card.startStage" class="fc-span">持续至「{{ chart.stages[card.endStage]?.name }}」</span>
@@ -2249,12 +2249,18 @@ textarea.textwrap {
   color: #8a6d00;
 }
 .form-card-row:not(.part-form-row) .form-card-title textarea {
-  flex: none; width: auto; min-width: 60px; max-width: 100%;
+  flex: none; width: 20em; min-width: 20em; max-width: 100%;
   background: transparent; border: none; box-shadow: none;
-  color: #5c4a00; font-weight: 600;
+  color: #000; font-weight: 600;
   padding: 3px 4px;
 }
-.form-card-row:not(.part-form-row) textarea:last-of-type { color: var(--danger, #c0392b); }
+/* 表单工序行输入框定宽：负责人 8 字加粗黑字 / 参与人自适应 / 备注 15 字红字 */
+.form-card-row .ns-owner { flex: none; width: 8em; min-width: 0; }
+.form-card-row .ns-owner .ns-input { font-weight: 600; color: #000; }
+.form-card-row:not(.part-form-row) textarea:last-of-type {
+  flex: none; width: 15em; min-width: 15em;
+  color: var(--danger, #c0392b);
+}
 .form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 3px 6px; border: 1px solid var(--line, #dde2ec); border-radius: 6px; font-size: 12.5px; font-family: inherit; }
 .form-card-row textarea { resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; }
 .form-card-row.part-form-row textarea:first-of-type { flex: 1.5; }
