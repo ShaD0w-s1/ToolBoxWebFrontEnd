@@ -112,7 +112,7 @@ async function openEngTemplates(): Promise<void> {
   showEngTemplates.value = true;
   try {
     const res = await backend.listEngTemplates();
-    engTemplates.value = Array.isArray(res.data) ? res.data : [];
+    engTemplates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "模板列表加载失败");
   } finally {
@@ -144,10 +144,26 @@ async function duplicateEngTemplate(t: { _id: string; name: string }): Promise<v
     const doc = res.data;
     if (doc && typeof doc === "object") {
       engTemplates.value.unshift(doc as { _id: string; id: string; name: string; savedAt: string; state: GanttPrepState });
+      engTemplates.value.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
     }
     props.store.notify("模板已复制");
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "复制失败");
+  }
+}
+
+/** 模板库「改名」：改名后本地同步并保持名称排序。 */
+async function renameEngTemplate(t: { _id: string; name: string }): Promise<void> {
+  const name = window.prompt("请输入新模板名称", t.name)?.trim();
+  if (!name || name === t.name) return;
+  try {
+    const found = engTemplates.value.find((x) => x._id === t._id);
+    await backend.updateEngTemplate(t._id, { name, state: found?.state ?? ({} as unknown as GanttPrepState) });
+    t.name = name;
+    engTemplates.value.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+    props.store.notify("模板已改名");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "改名失败");
   }
 }
 
@@ -164,11 +180,6 @@ function addEngTemplate(): void {
   showEngTemplates.value = false;
   newEngTplName.value = "";
   props.store.openEngTemplateForEdit(name, defaultGanttPrep());
-}
-/** 调取模板：用模板创建实际项目（预载内容），填写基础信息即可用。 */
-function applyEngTemplate(t: { name: string; state: GanttPrepState }): void {
-  showEngTemplates.value = false;
-  props.store.openEngTemplateForEdit(t.name, t.state, "apply");
 }
 
 /** 单项工作模板库（单独项目）：拉取模板列表并打开弹窗。 */
@@ -431,8 +442,8 @@ function cancelEditAnnouncement(): void {
               <span>{{ templateSummary(t.state) }}</span>
             </div>
             <div class="eng-tpl-actions">
-              <button @click="applyEngTemplate(t)">调取</button>
               <button @click="editEngTemplate(t)">编辑</button>
+              <button @click="renameEngTemplate(t)">改名</button>
               <button @click="duplicateEngTemplate(t)">复制</button>
               <button class="danger" @click="deleteEngTemplate(t)">删除</button>
             </div>

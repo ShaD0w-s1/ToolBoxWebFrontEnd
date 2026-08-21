@@ -645,20 +645,22 @@ const airDedupeGroups = computed<AirDedupeGroup[]>(() => {
 
 // —— 模板加载 ——
 const showTplModal = ref(false);
+const tplMode = ref<"load" | "save">("load");
 const templates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: GanttPrepState }>>([]);
 const templatesLoading = ref(false);
 const saveTplInputRef = ref<HTMLInputElement | null>(null);
-async function openTplModal(focusSave = false): Promise<void> {
+async function openTplModal(mode: "load" | "save" = tplMode.value): Promise<void> {
+  tplMode.value = mode;
   showTplModal.value = true;
   templatesLoading.value = true;
   try {
     const res = await backend.listEngTemplates();
-    templates.value = Array.isArray(res.data) ? res.data : [];
+    templates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "模板加载失败");
   } finally {
     templatesLoading.value = false;
-    if (focusSave) nextTick(() => saveTplInputRef.value?.focus());
+    if (mode === "save") nextTick(() => saveTplInputRef.value?.focus());
   }
 }
 function applyTemplate(t: { name: string; state: GanttPrepState }): void {
@@ -1078,7 +1080,7 @@ async function saveAsTemplate(): Promise<void> {
     await backend.createEngTemplate({ name, state: JSON.parse(JSON.stringify(s)) });
     props.store.notify(`已保存模板：${name}`);
     saveTplName.value = "";
-    await openTplModal();
+    await openTplModal(tplMode.value);
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "模板保存失败");
   }
@@ -1089,7 +1091,7 @@ async function overwriteTemplate(t: { _id: string; name: string }): Promise<void
   try {
     await backend.updateEngTemplate(t._id, { name: t.name, state: JSON.parse(JSON.stringify(s)) });
     props.store.notify(`已覆盖模板：${t.name}`);
-    await openTplModal();
+    await openTplModal(tplMode.value);
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "模板覆盖失败");
   }
@@ -1104,13 +1106,15 @@ async function deleteTemplate(t: { _id: string; name: string }): Promise<void> {
     props.store.notify(e instanceof Error ? e.message : "模板删除失败");
   }
 }
-async function duplicateTemplate(t: { _id: string }): Promise<void> {
+async function renameTemplate(t: { _id: string; name: string; state: GanttPrepState }): Promise<void> {
+  const name = window.prompt("请输入新模板名称", t.name)?.trim();
+  if (!name || name === t.name) return;
   try {
-    await backend.duplicateEngTemplate(t._id);
-    props.store.notify("模板已复制");
-    await openTplModal();
+    await backend.updateEngTemplate(t._id, { name, state: t.state });
+    props.store.notify(`模板已改名为：${name}`);
+    await openTplModal(tplMode.value);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板复制失败");
+    props.store.notify(e instanceof Error ? e.message : "模板改名失败");
   }
 }
 
@@ -1440,8 +1444,8 @@ async function importAllXlsx(event: Event): Promise<void> {
       </div>
       <!-- 子页功能按钮：统一放在子页标题行下首行 -->
       <div class="subpage-toolbar">
-        <button class="ghost" @click="openTplModal(false)">调取模板</button>
-        <button class="ghost" @click="openTplModal(true)">保存模板</button>
+        <button class="ghost" @click="openTplModal('load')">调取模板</button>
+        <button class="ghost" @click="openTplModal('save')">保存模板</button>
         <span class="toolbar-sep" />
         <template v-if="tab === 'form'">
           <button class="ghost" @click="exportDocx">导出 Word</button>
@@ -1848,23 +1852,25 @@ async function importAllXlsx(event: Event): Promise<void> {
         </div>
       </template>
 
-      <!-- 模板库弹窗（调取/保存共用：可加载、覆盖保存已有模板、新增模板命名） -->
+      <!-- 模板库弹窗：调取模式=仅加载；保存模式=保存为新模板 + 覆盖/改名/删除 -->
       <div v-if="showTplModal" class="gp-modal" @click.self="showTplModal = false">
         <div class="gp-modal-card">
-          <div class="gp-modal-head"><h3>模板库</h3><button class="icon-btn" @click="showTplModal = false">×</button></div>
-          <div class="gp-save-tpl-row">
+          <div class="gp-modal-head"><h3>{{ tplMode === 'load' ? '调取模板' : '保存模板' }}</h3><button class="icon-btn" @click="showTplModal = false">×</button></div>
+          <div v-if="tplMode === 'save'" class="gp-save-tpl-row">
             <input ref="saveTplInputRef" v-model="saveTplName" placeholder="新模板名称" @keydown.enter="saveAsTemplate" />
             <button class="primary" @click="saveAsTemplate">保存为新模板</button>
           </div>
           <p v-if="templatesLoading" class="gp-empty">加载中…</p>
           <template v-else-if="templates.length">
             <div v-for="t in templates" :key="t._id" class="gp-tpl-row">
-              <div class="gp-tpl-info" @click="applyTemplate(t)"><strong>{{ t.name }}</strong><span>{{ t.state.charts.length }} DAY · {{ t.state.charts.reduce((n, c) => n + c.cards.length, 0) }} 工序</span></div>
+              <div class="gp-tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>{{ t.state.charts.length }} DAY · {{ t.state.charts.reduce((n, c) => n + c.cards.length, 0) }} 工序</span></div>
               <div class="gp-tpl-actions">
-                <button class="ghost" @click="applyTemplate(t)">加载</button>
-                <button class="ghost" @click="overwriteTemplate(t)">覆盖</button>
-                <button class="ghost" @click="duplicateTemplate(t)">复制</button>
-                <button class="ghost danger" @click="deleteTemplate(t)">删除</button>
+                <button v-if="tplMode === 'load'" class="ghost" @click="applyTemplate(t)">加载</button>
+                <template v-else>
+                  <button class="ghost" @click="overwriteTemplate(t)">覆盖</button>
+                  <button class="ghost" @click="renameTemplate(t)">改名</button>
+                  <button class="danger" @click="deleteTemplate(t)">删除</button>
+                </template>
               </div>
             </div>
           </template>
@@ -2206,6 +2212,8 @@ textarea.textwrap {
 .gp-tpl-row { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line, #dde2ec); cursor: pointer; }
 .gp-tpl-row:hover { background: #f5f9ff; }
 .gp-tpl-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.gp-tpl-info.clickable { cursor: pointer; }
+.gp-tpl-info.clickable:hover strong { color: var(--blue, #4472c4); }
 .gp-tpl-info strong { font-size: 14px; color: var(--text, #222); }
 .gp-tpl-info span { font-size: 12px; color: var(--muted, #697386); }
 .gp-tpl-actions { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
