@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
 import { backend } from "../api";
@@ -1213,6 +1213,53 @@ function toggleNote(id: string): void {
   expandedNotes.value = n;
 }
 
+// ===== 填空框上传中动画：输入后（防抖+异步上传未完成）在框上叠加灰蒙 + "……" =====
+const saveTarget = ref<HTMLElement | null>(null);
+const maskVisible = ref(false);
+const maskStyle = ref<Record<string, string>>({});
+function updateSaveMask(): void {
+  const el = saveTarget.value;
+  if (!el || !maskVisible.value) return;
+  const r = el.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) {
+    maskVisible.value = false;
+    return;
+  }
+  maskStyle.value = {
+    left: `${r.left}px`, top: `${r.top}px`,
+    width: `${r.width}px`, height: `${r.height}px`,
+    borderRadius: getComputedStyle(el).borderRadius || "6px",
+  };
+}
+/** 根容器 @input 事件委托：任意填空框输入 → 记录目标并立即显示上传中蒙版。 */
+function onAnyInput(e: Event): void {
+  const t = e.target as HTMLElement | null;
+  if (!t) return;
+  if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) {
+    saveTarget.value = t;
+    maskVisible.value = true;
+    updateSaveMask();
+  }
+}
+// 上传完成（remoteSaving true→false）→ 蒙版淡出
+watch(() => props.store.remoteSaving.value, (v, old) => {
+  if (old === true && v === false) {
+    maskVisible.value = false;
+    saveTarget.value = null;
+  }
+});
+function onSaveMaskMove(): void { updateSaveMask(); }
+onMounted(() => {
+  window.addEventListener("scroll", onSaveMaskMove, true);
+  window.addEventListener("resize", onSaveMaskMove);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("scroll", onSaveMaskMove, true);
+  window.removeEventListener("resize", onSaveMaskMove);
+});
+
 // ===== 导出：meta 文本行（复用） =====
 function metaLines(): string[] {
   const m = meta.value; if (!m) return [];
@@ -1774,7 +1821,9 @@ async function importAllXlsx(event: Event): Promise<void> {
 </script>
 
 <template>
-  <div class="gantt-page" :class="{ 'gantt-wide': tab === 'gantt' }">
+  <div class="gantt-page" :class="{ 'gantt-wide': tab === 'gantt' }" @input="onAnyInput">
+    <!-- 填空框上传中蒙版：输入后上传未完成时叠加灰蒙 + "……" -->
+    <div v-if="maskVisible" class="save-mask" :style="maskStyle"><span class="dots"><i></i><i></i><i></i></span></div>
     <!-- 参与人名单侧边栏 -->
     <aside v-if="state" class="participant-panel">
       <h3>参与人名单</h3>
@@ -2674,6 +2723,22 @@ textarea.textwrap {
 
 /* ===== 手册清单头 ===== */
 .gp-docs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+
+/* ===== 填空框上传中蒙版（灰蒙 + "……"） ===== */
+.save-mask {
+  position: fixed; z-index: 9000; pointer-events: none;
+  background: rgba(232,232,237,.78); box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .15s ease;
+}
+.save-mask .dots { display: inline-flex; gap: 4px; align-items: center; }
+.save-mask .dots i {
+  width: 5px; height: 5px; border-radius: 50%; background: #60646c;
+  opacity: .25; transform: scale(.8); animation: saveDotBlink 1.1s ease-in-out infinite;
+}
+.save-mask .dots i:nth-child(2) { animation-delay: .18s; }
+.save-mask .dots i:nth-child(3) { animation-delay: .36s; }
+@keyframes saveDotBlink { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
 
 /* ===== 模板弹窗 ===== */
 .gp-modal { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.35); padding: 20px; }

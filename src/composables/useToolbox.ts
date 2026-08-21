@@ -99,7 +99,7 @@ export function useToolbox() {
   let announcementDirty = false;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
-  let remoteSaving = false;
+  const remoteSaving = ref(false);
   let remotePending = false;
   const dirtyProjects = new Set<string>();
   const dirtyTemplates = new Set<AircraftType>();
@@ -328,11 +328,11 @@ export function useToolbox() {
   }
 
   async function saveRemote(): Promise<void> {
-    if (remoteSaving) {
+    if (remoteSaving.value) {
       remotePending = true;
       return;
     }
-    remoteSaving = true;
+    remoteSaving.value = true;
     const projectIds = [...dirtyProjects];
     const templateTypes = [...dirtyTemplates];
     const materialTemplateTypes = [...dirtyMaterialTemplates];
@@ -371,7 +371,7 @@ export function useToolbox() {
       cloud.state = "err";
       notify(errorMessage(error, "保存失败"));
     } finally {
-      remoteSaving = false;
+      remoteSaving.value = false;
       if (remotePending || hasDirtyData()) {
         remotePending = false;
         clearTimeout(saveTimer);
@@ -1649,7 +1649,7 @@ export function useToolbox() {
    *  注意：不做「保存后重设基线」——那会越过别端的变更导致漏同步；
    *  保存后的轮询会检测到自己的写入并触发一次合并，等价于把最新远端拉齐。 */
   async function pollOnce(): Promise<void> {
-    if (pollingPaused || syncing.value || remoteSaving) { scheduleNextPoll(); return; }
+    if (pollingPaused || syncing.value || remoteSaving.value) { scheduleNextPoll(); return; }
     try {
       const result = await backend.poll(lastRevision);
       lastRevision = String(result.revision || lastRevision);
@@ -1688,7 +1688,7 @@ export function useToolbox() {
    *  lastRevision 只在真正触发 loadRemote 时才前进——若正忙（同步/保存中），
    *  不前移基线，让下一轮 watch/轮询再次触发，避免「基线已前进但未拉取」导致漏同步。 */
   function applyWatchRevision(seq: string): void {
-    if (seq && seq !== lastRevision && !syncing.value && !remoteSaving) {
+    if (seq && seq !== lastRevision && !syncing.value && !remoteSaving.value) {
       lastRevision = seq;
       void loadRemote(true, false);
     }
@@ -1891,7 +1891,7 @@ export function useToolbox() {
     lookupAircraftRow, fetchAircraftInfo,
     normalizeAircraftReg, openAircraftUpdate, closeAircraftUpdate, saveAircraftToLib, maybePromptAircraftUpdate, maybePromptAircraftDiff, aircraftUpdate,
     renamePrepTitle, addPrepItem, removePrepItem,
-    startAutoSync, startPolling, stopPolling, setEditingField, isFlashing, syncing,
+    startAutoSync, startPolling, stopPolling, setEditingField, isFlashing, syncing, remoteSaving,
     unlockAircraftInfo, startWatch, stopWatch, syncRealtimeMode, watchActive,
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
