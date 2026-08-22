@@ -136,6 +136,7 @@ function exportTableXlsx(): void {
       <datalist id="aircraft-numbers">
         <option v-for="num in store.aircraftNumbers.value" :key="num" :value="num" />
       </datalist>
+      <div class="prep-divider" aria-hidden="true"></div>
       <!-- 第二组：指令号/工作内容/地点 -->
       <div class="prep-grid">
         <label v-for="field in baseFields2" :key="field.key" class="prep-field">
@@ -143,6 +144,7 @@ function exportTableXlsx(): void {
           <input v-model="prep.base[field.key]" @input="store.persist" />
         </label>
       </div>
+      <div class="prep-divider" aria-hidden="true"></div>
       <!-- 落地航班 + 落地时间 + 次日起飞时间 + 后三天过夜航班3格（6列行，修复 4） -->
       <div class="prep-grid prep-grid-6">
         <label class="prep-field"><span class="field-label">落地航班</span><input v-model="prep.base.落地航班" @input="store.persist" /></label>
@@ -179,6 +181,8 @@ function exportTableXlsx(): void {
             <span class="field-label">{{ cell.key }}</span>
             <input v-model="prep.roles[cell.key]" @input="store.persist" />
           </label>
+          <!-- Divider：起落架区域放行行后（航材负责人前）、工卡负责人行后（航后负责前） -->
+          <div v-if="rowIndex === 1 || rowIndex === 4" class="prep-divider" aria-hidden="true"></div>
         </template>
       </div>
       <label v-for="key in PREP_PERSONNEL_FULL_ROWS" :key="key" class="prep-personnel-fullrow">
@@ -247,6 +251,8 @@ function exportTableXlsx(): void {
 .prep-grid-6 { grid-template-columns: repeat(6, 1fr); }
 .prep-field { display: flex; flex-direction: column; gap: 4px; }
 .prep-field input { padding: 6px 8px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 14px; }
+/* Divider 分隔线：基础信息各组之间；人员安排网格内跨 4 列（起落架行后、工卡负责人行后） */
+.prep-divider { height: 1px; background: #dde2ec; grid-column: 1 / -1; margin: 4px 0 10px; }
 
 /* 需求 4：ETOPS/ELT-DT 有非 N/A 数据时红色加粗 */
 .special-config { color: #c0392b !important; font-weight: 700 !important; }

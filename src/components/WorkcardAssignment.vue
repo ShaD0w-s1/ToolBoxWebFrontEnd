@@ -262,15 +262,19 @@ onMounted(() => {
       </div>
 
       <div class="wa-card-head">
-        <h4>{{ section }} 工卡安排</h4>
+        <h4>
+          <button
+            class="wa-indent-arrow"
+            :class="{ off: !waCardExpanded[section] }"
+            :title="waCardExpanded[section] ? '缩进工卡安排' : '放出工卡安排'"
+            @click="waCardExpanded[section] = !waCardExpanded[section]"
+          >{{ waCardExpanded[section] ? '▾' : '▸' }}</button>
+          {{ section }} 工卡安排
+        </h4>
         <div class="wa-card-actions">
           <!-- 需求 2：工卡修改部位按钮，点击后显示“部位”选项列 -->
           <button class="ghost wa-move-toggle" @click="showMove[section] = !showMove[section]">
             {{ showMove[section] ? '完成修改部位' : '工卡修改部位' }}
-          </button>
-          <!-- 工卡安排缩进/放出（仅本地运行状态，不同步云端） -->
-          <button class="ghost wa-indent-toggle" @click="waCardExpanded[section] = !waCardExpanded[section]">
-            {{ waCardExpanded[section] ? '缩进工卡安排' : '放出工卡安排' }}
           </button>
         </div>
       </div>
@@ -341,10 +345,14 @@ onMounted(() => {
 .wa-section:not(.wa-unassigned) { border-left: 6px solid var(--sec-color, #e6e9f0); }
 .wa-section h4 { margin: 4px 0 10px; font-size: 14px; background: var(--sec-bg, #f5f7fb); color: #2f3b52; padding: 5px 10px; border-radius: 6px; display: inline-block; }
 
-/* 工卡安排标题行（含“工卡修改部位”“缩进/放出”按钮） */
+/* 工卡安排标题行（含“工卡修改部位”按钮） */
 .wa-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
-.wa-card-head h4 { margin: 0; background: var(--sec-bg, #f5f7fb); color: #2f3b52; padding: 5px 10px; border-radius: 6px; display: inline-block; }
+.wa-card-head h4 { margin: 0; background: var(--sec-bg, #f5f7fb); color: #2f3b52; padding: 5px 10px; border-radius: 6px; display: inline-flex; align-items: center; }
 .wa-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
+/* 工卡安排标题前的缩进/放出箭头 */
+.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--line, #dde2ec); border-radius: 5px; background: #fff; color: #5a6b85; font-size: 12px; line-height: 1; cursor: pointer; flex-shrink: 0; }
+.wa-indent-arrow:hover { border-color: #4472c4; color: #2f5597; }
+.wa-indent-arrow.off { color: #a8b2c4; }
 
 /* Segmented 分段视图选择器（全部/人员安排/FC/LG/AV CB/ENG） */
 .wa-segment { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: #eef1f6; border-radius: 999px; margin: 0 0 16px; }
