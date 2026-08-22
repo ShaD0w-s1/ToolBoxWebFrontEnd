@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, nextTick, reactive, ref } from "vue";
+import { computed, onMounted, nextTick, reactive, ref, watch } from "vue";
 import {
   WORKCARD_SECTIONS,
   WORKCARD_COLUMNS,
@@ -29,6 +29,18 @@ const showMove = reactive<Record<WorkcardSection, boolean>>({
   LG: false,
   "AV CB": false,
   ENG: false,
+});
+
+/** Segmented 分段视图：全部 / 人员安排 / 各部位（仅本地 UI 状态，不写入数据、不同步云端）。 */
+const WA_SEGMENTS = ["全部", "人员安排", "FC", "LG", "AV CB", "ENG"] as const;
+type WaSegment = (typeof WA_SEGMENTS)[number];
+const waSegment = ref<WaSegment>("全部");
+/** 各部位工卡安排「缩进/放出」（默认放出；仅本地运行状态，不参与 persist/合并）。 */
+const waCardExpanded = reactive<Record<WorkcardSection, boolean>>({ FC: true, LG: true, "AV CB": true, ENG: true });
+// 选「人员安排」时工卡安排统一缩进；切回「全部/部位」统一放出
+watch(waSegment, (v) => {
+  const keys = Object.keys(waCardExpanded) as WorkcardSection[];
+  for (const k of keys) waCardExpanded[k] = v !== "人员安排";
 });
 
 /** grid 列宽：显示部位列 9 列 / 隐藏部位列 8 列。工卡分级列用 CSS 变量，移动端加倍。 */
@@ -174,8 +186,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 需求 1：未分配部位 -->
-    <section class="wa-section wa-unassigned">
+    <!-- 需求 1：未分配部位（仅「全部」视图显示） -->
+    <section v-if="waSegment === '全部'" class="wa-section wa-unassigned">
       <h4>未分配部位</h4>
       <div class="table-wrap">
         <div class="wa-grid wa-grid-unassigned">
@@ -203,7 +215,18 @@ onMounted(() => {
       </div>
     </section>
 
-    <section v-for="section in WORKCARD_SECTIONS" :key="section" class="wa-section" :style="{ '--sec-color': sectionHex(section), '--sec-bg': sectionRgba(section, 0.5) }">
+    <!-- Segmented 分段视图：全部 / 人员安排 / FC / LG / AV CB / ENG（仅本地状态，不同步） -->
+    <div class="wa-segment">
+      <button v-for="opt in WA_SEGMENTS" :key="opt" class="wa-seg-btn" :class="{ on: waSegment === opt }" @click="waSegment = opt">{{ opt }}</button>
+    </div>
+
+    <section
+      v-for="section in WORKCARD_SECTIONS"
+      :key="section"
+      v-show="waSegment === '全部' || waSegment === '人员安排' || waSegment === section"
+      class="wa-section"
+      :style="{ '--sec-color': sectionHex(section), '--sec-bg': sectionRgba(section, 0.5) }"
+    >
       <h4>{{ section }} 人员安排</h4>
 
       <!-- 人员安排布局 -->
@@ -240,12 +263,18 @@ onMounted(() => {
 
       <div class="wa-card-head">
         <h4>{{ section }} 工卡安排</h4>
-        <!-- 需求 2：工卡修改部位按钮，点击后显示“部位”选项列 -->
-        <button class="ghost wa-move-toggle" @click="showMove[section] = !showMove[section]">
-          {{ showMove[section] ? '完成修改部位' : '工卡修改部位' }}
-        </button>
+        <div class="wa-card-actions">
+          <!-- 需求 2：工卡修改部位按钮，点击后显示“部位”选项列 -->
+          <button class="ghost wa-move-toggle" @click="showMove[section] = !showMove[section]">
+            {{ showMove[section] ? '完成修改部位' : '工卡修改部位' }}
+          </button>
+          <!-- 工卡安排缩进/放出（仅本地运行状态，不同步云端） -->
+          <button class="ghost wa-indent-toggle" @click="waCardExpanded[section] = !waCardExpanded[section]">
+            {{ waCardExpanded[section] ? '缩进工卡安排' : '放出工卡安排' }}
+          </button>
+        </div>
       </div>
-      <div class="table-wrap">
+      <div v-if="waCardExpanded[section]" class="table-wrap">
         <div class="wa-grid" :style="{ gridTemplateColumns: showMove[section] ? GRID_WITH_MOVE : GRID_NO_MOVE }">
           <!-- 表头 -->
           <div class="wa-cell wa-head">序号</div>
@@ -299,7 +328,7 @@ onMounted(() => {
           <div v-if="!assignment.sections[section].cards.length" class="wa-empty">暂无工卡，可在二级页首行“依据工卡清单”导入，或点“+ 添加工卡”。</div>
         </div>
       </div>
-      <button class="ghost add-card" @click="addCard(section)">+ 添加工卡</button>
+      <button v-if="waCardExpanded[section]" class="ghost add-card" @click="addCard(section)">+ 添加工卡</button>
     </section>
   </div>
 </template>
@@ -312,9 +341,16 @@ onMounted(() => {
 .wa-section:not(.wa-unassigned) { border-left: 6px solid var(--sec-color, #e6e9f0); }
 .wa-section h4 { margin: 4px 0 10px; font-size: 14px; background: var(--sec-bg, #f5f7fb); color: #2f3b52; padding: 5px 10px; border-radius: 6px; display: inline-block; }
 
-/* 工卡安排标题行（含“工卡修改部位”按钮） */
-.wa-card-head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 10px; }
+/* 工卡安排标题行（含“工卡修改部位”“缩进/放出”按钮） */
+.wa-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
 .wa-card-head h4 { margin: 0; background: var(--sec-bg, #f5f7fb); color: #2f3b52; padding: 5px 10px; border-radius: 6px; display: inline-block; }
+.wa-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* Segmented 分段视图选择器（全部/人员安排/FC/LG/AV CB/ENG） */
+.wa-segment { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: #eef1f6; border-radius: 999px; margin: 0 0 16px; }
+.wa-seg-btn { border: none; background: transparent; border-radius: 999px; padding: 6px 16px; font-size: 13px; color: #5a6b85; cursor: pointer; font-family: inherit; }
+.wa-seg-btn:hover { color: #2f5597; }
+.wa-seg-btn.on { background: #fff; color: #2f5597; font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
 
 /* 人员安排布局 */
 .wa-personnel { margin-bottom: 10px; }
