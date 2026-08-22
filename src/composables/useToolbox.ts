@@ -101,7 +101,7 @@ export function useToolbox() {
   // 一级页面按项目名称搜索（模糊、忽略大小写）。
   const nameQuery = ref("");
   const cloud = reactive<{ text: string; state: CloudState; available: boolean }>({ text: "连接中…", state: "warn", available: false });
-  const toast = reactive({ message: "", visible: false });
+  const toast = reactive({ message: "", visible: false, level: "info" as "info" | "ok" | "err" });
   const shared = ref(false);
   /** 导出图片时临时强制展开所有部位卡片，保证长图完整。 */
   const forceExpandAll = ref(false);
@@ -244,8 +244,9 @@ export function useToolbox() {
     nextId = maximum + 1;
   }
 
-  function notify(message: string): void {
+  function notify(message: string, level: "info" | "ok" | "err" = "info"): void {
     toast.message = message;
+    toast.level = level;
     toast.visible = true;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { toast.visible = false; }, 2200);

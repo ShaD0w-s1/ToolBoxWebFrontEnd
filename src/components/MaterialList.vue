@@ -140,7 +140,7 @@ async function onImportFile(event: Event): Promise<void> {
     if (!imported.items.length) { props.store.notify("未解析到航材数据"); return; }
     if (!window.confirm(`确认用导入的 ${imported.items.length} 项覆盖当前航材清单？`)) return;
     props.store.replaceMaterialActive(imported);
-    props.store.notify("航材清单导入完成");
+    props.store.notify("航材清单导入完成", "ok");
   } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
 }
 
@@ -153,7 +153,7 @@ async function onImportNewSections(event: Event): Promise<void> {
   try {
     const imported = await importMaterialList(file);
     const { addedCats, addedItems } = props.store.mergeMaterialSections(imported);
-    props.store.notify(`导入新部位完成：新增部位 ${addedCats} 个，补充航材 ${addedItems} 项`);
+    props.store.notify(`导入新部位完成：新增部位 ${addedCats} 个，补充航材 ${addedItems} 项`, "ok");
   } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
 }
 
@@ -167,7 +167,7 @@ async function onImportSupplement(event: Event): Promise<void> {
     const imported = await importMaterialList(file);
     if (!imported.items.length) { props.store.notify("未解析到航材数据"); return; }
     const { updated, added } = props.store.mergeMaterialImport(imported);
-    props.store.notify(`导入补充完成：覆盖 ${updated} 项，新增 ${added} 项`);
+    props.store.notify(`导入补充完成：覆盖 ${updated} 项，新增 ${added} 项`, "ok");
   } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
 }
 
@@ -177,7 +177,7 @@ async function clearMaterialList(): Promise<void> {
   if (!project) return;
   if (!window.confirm("确认清空航材清单的所有部位与航材？此操作不可撤销！")) return;
   await props.store.clearMaterialListNow();
-  props.store.notify("航材清单已清空并同步");
+  props.store.notify("航材清单已清空并同步", "ok");
 }
 
 /** 单独项目 + 无机型信息时，开放航材清单机型选择（两子页同步手动选机型）。 */
@@ -208,7 +208,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
     props.store.notify(parts.length ? `已按卡筛选：${parts.join("、")}` : "航材清单无需变更");
     await props.store.loadRemote();
   } catch (error) {
-    props.store.notify(error instanceof Error ? error.message : "按卡筛选失败");
+    props.store.notify(error instanceof Error ? error.message : "按卡筛选失败", "err");
   }
 }
 </script>

@@ -421,7 +421,7 @@ function exportCurrentState(displayCats?: string[]): void {
     <button class="primary" @click="saveShared">保存到本地</button>
     <button @click="cancelShared">取消</button>
   </aside>
-  <div class="toast" :class="{ show: store.toast.visible }">{{ store.toast.message }}</div>
+  <div class="toast" :class="[store.toast.visible ? 'show' : '', store.toast.level]">{{ store.toast.message }}</div>
 
   <AircraftUpdateModal :store="store" />
 

@@ -19,6 +19,7 @@ import { projectShareUrl } from "../services/sharing";
 import NameCompare from "./NameCompare.vue";
 import ControlDocMaintain from "./ControlDocMaintain.vue";
 import ProjectFormModal from "./ProjectFormModal.vue";
+import MultiSelect from "./MultiSelect.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-all": []; share: [] }>();
@@ -100,7 +101,7 @@ async function openSiteAdmin(): Promise<void> {
   const list = await props.store.unlockSiteAdmin(pwd);
   accountsLoading.value = false;
   if (list === null) {
-    props.store.notify("AIRNAV 密码错误，无法进入");
+    props.store.notify("AIRNAV 密码错误，无法进入", "err");
     return;
   }
   accounts.value = list;
@@ -115,7 +116,7 @@ async function openEngTemplates(): Promise<void> {
     const res = await backend.listEngTemplates();
     engTemplates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板列表加载失败");
+    props.store.notify(e instanceof Error ? e.message : "模板列表加载失败", "err");
   } finally {
     engTemplatesLoading.value = false;
   }
@@ -133,9 +134,9 @@ async function deleteEngTemplate(t: { _id: string; name: string }): Promise<void
   try {
     await backend.deleteEngTemplate(t._id);
     engTemplates.value = engTemplates.value.filter((x) => x._id !== t._id);
-    props.store.notify("模板已删除");
+    props.store.notify("模板已删除", "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "删除失败");
+    props.store.notify(e instanceof Error ? e.message : "删除失败", "err");
   }
 }
 
@@ -147,9 +148,9 @@ async function duplicateEngTemplate(t: { _id: string; name: string }): Promise<v
       engTemplates.value.unshift(doc as { _id: string; id: string; name: string; savedAt: string; state: GanttPrepState });
       engTemplates.value.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
     }
-    props.store.notify("模板已复制");
+    props.store.notify("模板已复制", "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "复制失败");
+    props.store.notify(e instanceof Error ? e.message : "复制失败", "err");
   }
 }
 
@@ -164,7 +165,7 @@ async function renameEngTemplate(t: { _id: string; name: string }): Promise<void
     engTemplates.value.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
     props.store.notify("模板已改名");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "改名失败");
+    props.store.notify(e instanceof Error ? e.message : "改名失败", "err");
   }
 }
 
@@ -191,7 +192,7 @@ async function openStandaloneTemplates(): Promise<void> {
     const res = await backend.listStandaloneTemplates();
     standaloneTemplates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板列表加载失败");
+    props.store.notify(e instanceof Error ? e.message : "模板列表加载失败", "err");
   } finally {
     standaloneTemplatesLoading.value = false;
   }
@@ -208,9 +209,9 @@ async function deleteStandaloneTemplate(t: { _id: string; name: string }): Promi
   try {
     await backend.deleteStandaloneTemplate(t._id);
     standaloneTemplates.value = standaloneTemplates.value.filter((x) => x._id !== t._id);
-    props.store.notify("模板已删除");
+    props.store.notify("模板已删除", "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "删除失败");
+    props.store.notify(e instanceof Error ? e.message : "删除失败", "err");
   }
 }
 
@@ -222,9 +223,9 @@ async function duplicateStandaloneTemplate(t: { _id: string; name: string }): Pr
       standaloneTemplates.value.unshift(doc as { _id: string; id: string; name: string; savedAt: string; state: StandalonePrepSheet });
       standaloneTemplates.value.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
     }
-    props.store.notify("模板已复制");
+    props.store.notify("模板已复制", "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "复制失败");
+    props.store.notify(e instanceof Error ? e.message : "复制失败", "err");
   }
 }
 
@@ -239,7 +240,7 @@ async function renameStandaloneTemplate(t: { _id: string; name: string }): Promi
     standaloneTemplates.value.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
     props.store.notify("模板已改名");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "改名失败");
+    props.store.notify(e instanceof Error ? e.message : "改名失败", "err");
   }
 }
 
@@ -296,12 +297,6 @@ function clearDateRange(): void {
   props.store.dateFrom.value = "";
   props.store.dateTo.value = "";
 }
-function clearTypeFilter(): void {
-  props.store.typeFilter.value = [];
-}
-function clearTeamFilter(): void {
-  props.store.teamFilters.value = [];
-}
 </script>
 
 <template>
@@ -344,36 +339,26 @@ function clearTeamFilter(): void {
               <input type="date" :value="store.dateFrom.value" aria-label="起始日期" @change="store.dateFrom.value = ($event.target as HTMLInputElement).value; clampDateRange('from')" />
               <span class="side-range-sep">至</span>
               <input type="date" :value="store.dateTo.value" aria-label="结束日期" @change="store.dateTo.value = ($event.target as HTMLInputElement).value; clampDateRange('to')" />
+              <button v-if="store.dateFrom.value || store.dateTo.value" class="side-clear-x" title="清空日期范围" @click="clearDateRange">×</button>
             </div>
-            <button class="side-clear" @click="clearDateRange">清空</button>
           </div>
 
           <div class="side-field">
             <span class="side-label">项目名称（模糊搜索）</span>
-            <div class="side-input-row">
-              <input v-model="store.nameQuery.value" placeholder="搜索项目名称" aria-label="按项目名称搜索" />
-              <button class="side-clear" @click="store.nameQuery.value = ''">清空</button>
+            <div class="side-search-wrap">
+              <input v-model="store.nameQuery.value" class="inp" placeholder="搜索项目名称" aria-label="按项目名称搜索" />
+              <button v-if="store.nameQuery.value" class="side-clear-x" title="清空搜索" @click="store.nameQuery.value = ''">×</button>
             </div>
           </div>
 
           <div class="side-field">
-            <span class="side-label">项目类型（下拉多选）</span>
-            <div class="side-input-row">
-              <select multiple class="side-multi" v-model="store.typeFilter.value" aria-label="按项目类型多选筛选">
-                <option v-for="t in PROJECT_TYPES" :key="t" :value="t">{{ t }}</option>
-              </select>
-              <button class="side-clear" @click="clearTypeFilter">清空</button>
-            </div>
+            <span class="side-label">项目类型</span>
+            <MultiSelect :options="[...PROJECT_TYPES]" v-model="store.typeFilter.value" placeholder="类型：全部" />
           </div>
 
           <div class="side-field">
-            <span class="side-label">执行班组（下拉多选）</span>
-            <div class="side-input-row">
-              <select multiple class="side-multi" v-model="store.teamFilters.value" aria-label="按执行班组多选筛选">
-                <option v-for="team in TEAMS" :key="team" :value="team">{{ team }}</option>
-              </select>
-              <button class="side-clear" @click="clearTeamFilter">清空</button>
-            </div>
+            <span class="side-label">执行班组</span>
+            <MultiSelect :options="[...TEAMS]" v-model="store.teamFilters.value" placeholder="班组：全部" />
           </div>
         </aside>
 
@@ -639,25 +624,41 @@ function clearTeamFilter(): void {
   padding: 14px; position: sticky; top: 8px;
 }
 .list-main { flex: 1 1 66.6667%; min-width: 0; }
-.side-new { width: 100%; }
+.side-new {
+  width: 100%; min-height: 72px; /* 2 倍标准按钮高度（36→72） */
+  font-size: 17px; font-weight: 700; border-radius: var(--r-lg);
+  letter-spacing: .5px;
+}
 .side-row { display: flex; gap: 8px; }
 .side-row button { flex: 1; }
 .side-divider { height: 1px; background: var(--line); margin: 2px 0; }
 .side-title { font-size: 14px; font-weight: 700; color: var(--n8); }
 .side-field { display: flex; flex-direction: column; gap: 6px; }
 .side-label { font-size: 12px; color: var(--n6); }
-.side-date-range { display: flex; align-items: center; gap: 6px; }
-.side-date-range input { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 12.5px; }
-.side-range-sep { color: var(--n6); font-size: 12px; flex: 0 0 auto; }
-.side-input-row { display: flex; gap: 6px; align-items: stretch; }
-.side-input-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; }
-.side-multi { flex: 1; min-width: 0; height: 76px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; }
-.side-clear {
-  flex: 0 0 auto; align-self: flex-end; min-height: 30px; padding: 4px 12px;
-  border: 1px solid var(--line); border-radius: var(--r-sm);
-  background: var(--n1); color: var(--n7); font-size: 12.5px;
+/* 日期范围 picker：容器一体化（双 date input + 红色 × 内嵌） */
+.side-date-range {
+  position: relative; display: flex; align-items: center; gap: 6px;
+  padding: 0 8px; min-height: 38px;
+  border: 1px solid var(--n4); border-radius: var(--r-md); background: #fff;
 }
-.side-clear:hover { background: var(--blue-bg); color: var(--blue-dark); }
+.side-date-range:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(68, 114, 196, .16); }
+.side-date-range input {
+  flex: 1; min-width: 0; height: 30px; padding: 0 2px;
+  border: none; background: transparent; font-size: 12.5px; color: var(--n9);
+}
+.side-date-range input:focus { outline: none; }
+.side-range-sep { color: var(--n6); font-size: 12px; flex: 0 0 auto; }
+/* 名称搜索：input + 内嵌红色 × */
+.side-search-wrap { position: relative; display: flex; align-items: center; }
+.side-search-wrap .inp { width: 100%; padding-right: 34px; }
+/* 红色 ×（内嵌于各搜索/选择组件） */
+.side-clear-x {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
+  background: var(--danger-bg); color: var(--danger); font-size: 14px; line-height: 1;
+  cursor: pointer; z-index: 2;
+}
+.side-clear-x:hover { background: #f9dcdc; }
 .list-main-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .list-main-head .list-status { margin: 0; }
 

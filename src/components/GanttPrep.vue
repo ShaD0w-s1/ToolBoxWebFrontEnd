@@ -560,9 +560,9 @@ async function importWorkDocList(event: Event): Promise<void> {
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
     const wp = parseWorkDocRows(rows);
     save();
-    props.store.notify(`工卡清单导入完成：工包 ${wp} 条`);
+    props.store.notify(`工卡清单导入完成：工包 ${wp} 条`, "ok");
   } catch (err) {
-    props.store.notify(err instanceof Error ? err.message : "解析失败");
+    props.store.notify(err instanceof Error ? err.message : "解析失败", "err");
   }
 }
 
@@ -760,7 +760,7 @@ async function openTplModal(mode: "load" | "save" = tplMode.value): Promise<void
     const res = await backend.listEngTemplates();
     templates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板加载失败");
+    props.store.notify(e instanceof Error ? e.message : "模板加载失败", "err");
   } finally {
     templatesLoading.value = false;
     if (mode === "save") nextTick(() => saveTplInputRef.value?.focus());
@@ -771,7 +771,7 @@ function applyTemplate(t: { name: string; state: GanttPrepState }): void {
   if (!window.confirm(`确认加载模板“${t.name}”？将覆盖当前甘特准备单内容。`)) return;
   props.store.applyGanttTemplate(t.state, t.name);
   showTplModal.value = false;
-  props.store.notify(`已加载模板：${t.name}`);
+  props.store.notify(`已加载模板：${t.name}`, "ok");
 }
 
 // ===== 拖拽交互（对照 gantt-web 迁移） =====
@@ -1195,11 +1195,11 @@ async function saveAsTemplate(): Promise<void> {
   if (!name) { props.store.notify("请输入模板名称"); return; }
   try {
     await backend.createEngTemplate({ name, state: stripNamesForTemplate(s) });
-    props.store.notify(`已保存模板：${name}`);
+    props.store.notify(`已保存模板：${name}`, "ok");
     saveTplName.value = "";
     await openTplModal(tplMode.value);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板保存失败");
+    props.store.notify(e instanceof Error ? e.message : "模板保存失败", "err");
   }
 }
 async function overwriteTemplate(t: { _id: string; name: string }): Promise<void> {
@@ -1210,7 +1210,7 @@ async function overwriteTemplate(t: { _id: string; name: string }): Promise<void
     props.store.notify(`已覆盖模板：${t.name}`);
     await openTplModal(tplMode.value);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板覆盖失败");
+    props.store.notify(e instanceof Error ? e.message : "模板覆盖失败", "err");
   }
 }
 async function deleteTemplate(t: { _id: string; name: string }): Promise<void> {
@@ -1218,9 +1218,9 @@ async function deleteTemplate(t: { _id: string; name: string }): Promise<void> {
   try {
     await backend.deleteEngTemplate(t._id);
     templates.value = templates.value.filter((x) => x._id !== t._id);
-    props.store.notify("模板已删除");
+    props.store.notify("模板已删除", "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板删除失败");
+    props.store.notify(e instanceof Error ? e.message : "模板删除失败", "err");
   }
 }
 async function renameTemplate(t: { _id: string; name: string; state: GanttPrepState }): Promise<void> {
@@ -1228,10 +1228,10 @@ async function renameTemplate(t: { _id: string; name: string; state: GanttPrepSt
   if (!name || name === t.name) return;
   try {
     await backend.updateEngTemplate(t._id, { name, state: t.state });
-    props.store.notify(`模板已改名为：${name}`);
+    props.store.notify(`模板已改名为：${name}`, "ok");
     await openTplModal(tplMode.value);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板改名失败");
+    props.store.notify(e instanceof Error ? e.message : "模板改名失败", "err");
   }
 }
 
@@ -1490,10 +1490,10 @@ async function exportAllImage(): Promise<void> {
     }
     out.toBlob((blob) => {
       if (blob) downloadBlob(blob, `换发准备单_${tab.value === "gantt" ? "甘特图" : "表单"}_${stampDate()}.jpg`);
-      else props.store.notify("图片导出失败");
+      else props.store.notify("图片导出失败", "err");
     }, "image/jpeg", 0.92);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "图片导出失败");
+    props.store.notify(e instanceof Error ? e.message : "图片导出失败", "err");
   } finally {
     savedHeights.forEach((x) => {
       x.el.style.height = x.h;
@@ -1554,7 +1554,7 @@ async function exportAllXlsx(): Promise<void> {
     XLSX.utils.book_append_sheet(wb, ws3, "责任信息");
     XLSX.writeFile(wb, `换发准备单_${stampDate()}.xlsx`);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败");
+    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
 // 手册清单表格导出：工包工卡 + 换发工卡 + 串件工卡 合并导出（串件工卡单独一个 sheet）
@@ -1586,7 +1586,7 @@ async function exportDocsXlsx(): Promise<void> {
     }
     XLSX.writeFile(wb, `手册清单_${stampDate()}.xlsx`);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败");
+    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
 // 换发工卡导出（数据表单：序号/工卡号/工卡名称）
@@ -1605,7 +1605,7 @@ async function exportEngXlsx(): Promise<void> {
     XLSX.utils.book_append_sheet(wb, ws, "换发工卡");
     XLSX.writeFile(wb, `换发工卡_${stampDate()}.xlsx`);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败");
+    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
 // 换发工卡导入：追加 docs.eng（兼容 带序号三列 / 无序号两列 / 含表头）
@@ -1634,9 +1634,9 @@ async function importEngXlsx(event: Event): Promise<void> {
     });
     save();
     engImportOpen.value = false;
-    props.store.notify(`换发工卡导入完成：${n} 条`);
+    props.store.notify(`换发工卡导入完成：${n} 条`, "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "解析失败");
+    props.store.notify(e instanceof Error ? e.message : "解析失败", "err");
   }
 }
 // 串件工卡导出（数据表单：序号/类型/串件内容/拆装/工卡号/工卡名称；拆装行独立）
@@ -1658,7 +1658,7 @@ async function exportSpXlsx(): Promise<void> {
     XLSX.utils.book_append_sheet(wb, ws, "串件工卡");
     XLSX.writeFile(wb, `串件工卡_${stampDate()}.xlsx`);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败");
+    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
 // 串件工卡导入：按 类型+内容+拆装 匹配现有行更新工卡号/名称；未匹配则新建串件安排
@@ -1703,9 +1703,9 @@ async function importSpXlsx(event: Event): Promise<void> {
     });
     save();
     spImportOpen.value = false;
-    props.store.notify(`串件工卡导入完成：${n} 条`);
+    props.store.notify(`串件工卡导入完成：${n} 条`, "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "解析失败");
+    props.store.notify(e instanceof Error ? e.message : "解析失败", "err");
   }
 }
 // 串件航材/工具表格导出
@@ -1728,7 +1728,7 @@ async function exportPartsXlsx(): Promise<void> {
     XLSX.utils.book_append_sheet(wb, ws, isAir ? "串件航材" : "串件工具");
     XLSX.writeFile(wb, `${isAir ? "串件航材" : "串件工具"}_${stampDate()}.xlsx`);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败");
+    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
 // 串件航材/工具表格导入：列 卡片/件号/名称/数量/备注（工具无件号列）；按卡片名匹配，不存在则新建卡片
@@ -1765,9 +1765,9 @@ async function importPartsXlsx(event: Event): Promise<void> {
       n++;
     });
     save();
-    props.store.notify(`串件${isAir ? "航材" : "工具"}导入完成：${n} 条`);
+    props.store.notify(`串件${isAir ? "航材" : "工具"}导入完成：${n} 条`, "ok");
   } catch (err) {
-    props.store.notify(err instanceof Error ? err.message : "解析失败");
+    props.store.notify(err instanceof Error ? err.message : "解析失败", "err");
   }
 }
 // 串件工具清单「下载现场管控单」：下载「定检工具现场管控单(单项工作).docx」（优先按文件名，其次按类型「单独项目」）
@@ -1788,7 +1788,7 @@ async function downloadSpControlDoc(): Promise<void> {
     anchor.click();
     anchor.remove();
   } catch (error) {
-    props.store.notify(error instanceof Error ? error.message : "下载失败");
+    props.store.notify(error instanceof Error ? error.message : "下载失败", "err");
   }
 }
 async function importAllXlsx(event: Event): Promise<void> {
@@ -1846,9 +1846,9 @@ async function importAllXlsx(event: Event): Promise<void> {
       });
     });
     save();
-    props.store.notify(`xlsx 导入完成：工序 ${added} 条`);
+    props.store.notify(`xlsx 导入完成：工序 ${added} 条`, "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "xlsx 解析失败");
+    props.store.notify(e instanceof Error ? e.message : "xlsx 解析失败", "err");
   }
 }
 </script>

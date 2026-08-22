@@ -60,7 +60,7 @@ async function openTplModal(mode: "load" | "save" = tplMode.value): Promise<void
     const res = await backend.listStandaloneTemplates();
     templates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板加载失败");
+    props.store.notify(e instanceof Error ? e.message : "模板加载失败", "err");
   } finally {
     templatesLoading.value = false;
     if (mode === "save") nextTick(() => saveTplInputRef.value?.focus());
@@ -90,9 +90,9 @@ async function deleteTemplate(t: { _id: string; name: string }): Promise<void> {
   try {
     await backend.deleteStandaloneTemplate(t._id);
     templates.value = templates.value.filter((x) => x._id !== t._id);
-    props.store.notify("模板已删除");
+    props.store.notify("模板已删除", "ok");
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板删除失败");
+    props.store.notify(e instanceof Error ? e.message : "模板删除失败", "err");
   }
 }
 async function renameTemplate(t: { _id: string; name: string; state: StandalonePrepSheet }): Promise<void> {
@@ -100,10 +100,10 @@ async function renameTemplate(t: { _id: string; name: string; state: StandaloneP
   if (!name || name === t.name) return;
   try {
     await backend.updateStandaloneTemplate(t._id, { name, state: t.state });
-    props.store.notify(`模板已改名为：${name}`);
+    props.store.notify(`模板已改名为：${name}`, "ok");
     await openTplModal(tplMode.value);
   } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "模板改名失败");
+    props.store.notify(e instanceof Error ? e.message : "模板改名失败", "err");
   }
 }
 

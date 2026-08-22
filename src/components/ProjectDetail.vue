@@ -217,7 +217,7 @@ async function clearToolList(): Promise<void> {
   if (!project) return;
   if (!window.confirm("确认清空工具清单的所有部位与物品？此操作不可撤销！")) return;
   await props.store.clearToolListNow();
-  props.store.notify("工具清单已清空并同步");
+  props.store.notify("工具清单已清空并同步", "ok");
 }
 
 /** 单独项目 + 无机型信息时，开放工具/航材清单机型选择（两子页同步手动选机型）。 */
@@ -252,7 +252,7 @@ async function downloadControlDoc(): Promise<void> {
     anchor.click();
     anchor.remove();
   } catch (error) {
-    props.store.notify(error instanceof Error ? error.message : "下载失败");
+    props.store.notify(error instanceof Error ? error.message : "下载失败", "err");
   }
 }
 
@@ -262,9 +262,9 @@ async function finishLibrary(): Promise<void> {
   if (type) {
     try {
       await props.store.saveLibraryNow(type);
-      props.store.notify(`${type} 工具标准库已完成保存`);
+      props.store.notify(`${type} 工具标准库已完成保存`, "ok");
     } catch {
-      props.store.notify("保存失败，但已留存本地");
+      props.store.notify("保存失败，但已留存本地", "err");
     }
   }
   props.store.backToList();
@@ -303,7 +303,7 @@ async function applyWorkCardListFile(event: Event): Promise<void> {
     // 后端已写入云端并 _bump_revision，拉取权威结果（其它端由轮询/watch 同步）。
     await props.store.loadRemote();
   } catch (error) {
-    props.store.notify(error instanceof Error ? error.message : "解析表格失败");
+    props.store.notify(error instanceof Error ? error.message : "解析表格失败", "err");
   }
 }
 
@@ -323,7 +323,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
     props.store.notify(parts.length ? `已按卡筛选：${parts.join("、")}` : "清单无需变更");
     await props.store.loadRemote();
   } catch (error) {
-    props.store.notify(error instanceof Error ? error.message : "按卡筛选失败");
+    props.store.notify(error instanceof Error ? error.message : "按卡筛选失败", "err");
   }
 }
 </script>
