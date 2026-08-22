@@ -128,7 +128,7 @@ async function finishStdLib(): Promise<void> {
 <style scoped>
 .stdlib-table { overflow-x: auto; }
 .stdlib-table table { min-width: 720px; }
-.idx { width: 44px; text-align: center; color: #8a93a6; }
+.idx { width: 44px; text-align: center; color: var(--n6); }
 .ops { width: 64px; text-align: center; }
 td input { width: 100%; box-sizing: border-box; }
 </style>

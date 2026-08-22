@@ -339,32 +339,32 @@ onMounted(() => {
 
 <style scoped>
 .workcard-assignment { --wa-col: 220px; padding: 4px 2px 40px; }
-.wa-section { margin-bottom: 22px; background: #fff; border: 1px solid #e6e9f0; border-radius: 10px; padding: 12px 14px; }
+.wa-section { margin-bottom: 22px; background: #fff; border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
 .wa-unassigned { border-color: #f0c8a0; background: #fffaf3; }
 /* 工卡分配清单部位配色：参考工具清单（用同一套部位色，底色 50% 透明 + 左实色边条） */
-.wa-section:not(.wa-unassigned) { border-left: 6px solid var(--sec-color, #e6e9f0); }
-.wa-section h4 { margin: 4px 0 10px; font-size: 14px; background: var(--sec-bg, #f5f7fb); color: #2f3b52; padding: 5px 10px; border-radius: 6px; display: inline-block; }
+.wa-section:not(.wa-unassigned) { border-left: 6px solid var(--sec-color, var(--n3)); }
+.wa-section h4 { margin: 4px 0 10px; font-size: 14px; background: var(--sec-bg, var(--n1)); color: var(--n8); padding: 5px 10px; border-radius: var(--r-sm); display: inline-block; }
 
 /* 工卡安排标题行（含“工卡修改部位”按钮） */
 .wa-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
-.wa-card-head h4 { margin: 0; background: var(--sec-bg, #f5f7fb); color: #2f3b52; padding: 5px 10px; border-radius: 6px; display: inline-flex; align-items: center; }
+.wa-card-head h4 { margin: 0; background: var(--sec-bg, var(--n1)); color: var(--n8); padding: 5px 10px; border-radius: var(--r-sm); display: inline-flex; align-items: center; }
 .wa-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
 /* 工卡安排标题前的缩进/放出箭头 */
-.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--line, #dde2ec); border-radius: 5px; background: #fff; color: #5a6b85; font-size: 12px; line-height: 1; cursor: pointer; flex-shrink: 0; }
+.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); background: #fff; color: var(--n7); font-size: 12px; line-height: 1; cursor: pointer; flex-shrink: 0; }
 .wa-indent-arrow:hover { border-color: #4472c4; color: #2f5597; }
 .wa-indent-arrow.off { color: #a8b2c4; }
 
 /* Segmented 分段视图选择器（全部/人员安排/FC/LG/AV CB/ENG） */
-.wa-segment { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: #eef1f6; border-radius: 999px; margin: 0 0 16px; }
-.wa-seg-btn { border: none; background: transparent; border-radius: 999px; padding: 6px 16px; font-size: 13px; color: #5a6b85; cursor: pointer; font-family: inherit; }
+.wa-segment { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: #eef1f6; border-radius: var(--r-pill); margin: 0 0 16px; }
+.wa-seg-btn { border: none; background: transparent; border-radius: var(--r-pill); padding: 6px 16px; font-size: 13px; color: var(--n7); cursor: pointer; font-family: inherit; }
 .wa-seg-btn:hover { color: #2f5597; }
 .wa-seg-btn.on { background: #fff; color: #2f5597; font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
 
 /* 人员安排布局 */
 .wa-personnel { margin-bottom: 10px; }
 .wa-person { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: #000; }
-.wa-person span { font-size: 12px; color: #6b7280; }
-.wa-person input { padding: 6px 8px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 14px; }
+.wa-person span { font-size: 12px; color: var(--n7); }
+.wa-person input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
 .wa-person-top { margin-bottom: 8px; }
 .wa-person-top .wa-full { margin-bottom: 6px; }
 .wa-person-second { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 12px; margin-bottom: 8px; }
@@ -374,18 +374,18 @@ onMounted(() => {
 .add-arrange { margin: 2px 0 8px; }
 .wa-arrange-list { margin-bottom: 8px; }
 .wa-arrange-row { display: flex; gap: 6px; align-items: center; max-width: calc(var(--wa-col) * 1.7); margin-bottom: 6px; }
-.wa-arrange-name { flex: 0.7 1 0; min-width: 0; padding: 6px 8px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 14px; }
-.wa-arrange-person { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 14px; }
-.wa-arrange-del { flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: 6px; font-size: 16px; cursor: pointer; }
+.wa-arrange-name { flex: 0.7 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
+.wa-arrange-person { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
+.wa-arrange-del { flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: 16px; cursor: pointer; }
 
 /* 工卡安排表格（比例列宽 + 宽列换行显示） */
 .table-wrap { overflow-x: auto; }
 .wa-grid {
   display: grid;
   gap: 1px;
-  background: #e6e9f0;
-  border: 1px solid #e6e9f0;
-  border-radius: 8px;
+  background: var(--n3);
+  border: 1px solid var(--n3);
+  border-radius: var(--r-md);
   overflow: hidden;
   min-width: 760px;
 }
@@ -394,12 +394,12 @@ onMounted(() => {
   min-width: 520px;
 }
 .wa-cell { background: #fff; padding: 4px 6px; display: flex; align-items: stretch; }
-.wa-head { background: #f5f7fb; font-weight: 600; font-size: 13px; color: #000; align-items: center; }
+.wa-head { background: var(--n1); font-weight: 600; font-size: 13px; color: #000; align-items: center; }
 .wa-ops { justify-content: center; }
 .wa-cell input,
 .wa-cell select {
   width: 100%; box-sizing: border-box; padding: 5px 6px;
-  border: 1px solid #d7dbe4; border-radius: 5px; font-size: 13px; min-width: 0;
+  border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; min-width: 0;
 }
 /* 工卡分级列：网页版字号与工卡名称一致（13px），移动端在 media query 内缩小 */
 .wa-cell select {
@@ -413,7 +413,7 @@ onMounted(() => {
   content: ""; position: absolute; right: 6px; top: 50%;
   width: 0; height: 0; pointer-events: none;
   border-left: 4px solid transparent; border-right: 4px solid transparent;
-  border-top: 5px solid #6b7280; transform: translateY(-50%);
+  border-top: 5px solid var(--n7); transform: translateY(-50%);
 }
 .wa-level-select {
   appearance: none;
@@ -438,7 +438,7 @@ onMounted(() => {
 .wa-cell input:disabled { background: #f2f4f7; color: #98a2b3; }
 .wa-cell.wa-wrap textarea {
   width: 100%; box-sizing: border-box; padding: 5px 6px;
-  border: 1px solid #d7dbe4; border-radius: 5px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px;
   resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word;
   line-height: 1.7; min-width: 0; font-family: inherit;
 }

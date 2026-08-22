@@ -457,6 +457,6 @@ async function runToolFilterByWorkcard(): Promise<void> {
   font-size: 13px;
   margin-left: 4px;
 }
-.clear-btn { border: 0; background: transparent; color: #888; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; }
+.clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; }
 .clear-btn:hover { color: #d92020; }
 </style>

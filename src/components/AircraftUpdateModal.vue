@@ -80,19 +80,19 @@ async function save(): Promise<void> {
 .aum-card {
   display: flex; flex-direction: column; gap: 12px;
   width: min(420px, calc(100% - 48px));
-  padding: 22px 26px; background: #fff; border-radius: 12px;
+  padding: 22px 26px; background: #fff; border-radius: var(--r-lg);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
-.aum-card h3 { margin: 0; font-size: 17px; color: #2f3b52; }
+.aum-card h3 { margin: 0; font-size: 17px; color: var(--n8); }
 .aum-tip { margin: 0; font-size: 12px; color: #98a2b3; }
 .aum-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .aum-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #5f6b7a; }
 .aum-field input {
-  min-height: 36px; padding: 7px 11px; border: 1px solid #8eaadb; border-radius: 8px;
+  min-height: 36px; padding: 7px 11px; border: 1px solid var(--focus); border-radius: var(--r-md);
   font-size: 14px; color: #2f5597; background: #fff; box-sizing: border-box; width: 100%;
 }
 /* 未填报字段：红底红边提示 */
-.aum-field.aum-error input { background: #fdecea; border-color: #e74c3c; }
+.aum-field.aum-error input { background: var(--danger-bg); border-color: #e74c3c; }
 .aum-field.aum-error span { color: #e74c3c; }
 .aum-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 </style>

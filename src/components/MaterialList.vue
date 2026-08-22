@@ -280,9 +280,9 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
 .summary { font-size: 13px; color: #4a5160; }
 .empty-state { padding: 24px; color: #98a2b3; text-align: center; }
 .auto-filter-warning { color: #d92020; font-weight: 700; font-size: 13px; margin-left: 4px; }
-.clear-btn { border: 0; background: transparent; color: #888; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; }
+.clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; }
 .clear-btn:hover { color: #d92020; }
 .dedupe-view { display: flex; flex-direction: column; gap: 18px; }
 .dedupe-group { display: flex; flex-direction: column; gap: 8px; }
-.dedupe-title { margin: 0 0 4px; font-size: 15px; color: #2f3b52; }
+.dedupe-title { margin: 0 0 4px; font-size: 15px; color: var(--n8); }
 </style>

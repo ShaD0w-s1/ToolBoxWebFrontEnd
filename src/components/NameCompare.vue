@@ -131,18 +131,18 @@ function addSub(side: "mat" | "tool", cat: string): void {
 .nc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .nc-head h3 { margin: 0; font-size: 15px; }
 .nc-tabs { display: flex; gap: 6px; }
-.nc-hint { margin: 0 0 12px; font-size: 12px; color: #6b7280; }
-.nc-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #e6e9f0; border: 1px solid #e6e9f0; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+.nc-hint { margin: 0 0 12px; font-size: 12px; color: var(--n7); }
+.nc-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--n3); border: 1px solid var(--n3); border-radius: var(--r-md); overflow: hidden; margin-bottom: 12px; }
 .nc-col { background: #fff; padding: 8px 10px; min-height: 36px; display: flex; align-items: center; }
-.nc-col-head { background: #f5f7fb; font-weight: 700; font-size: 13px; color: #2f3b52; }
-.nc-cat { margin-bottom: 12px; border: 1px solid #e6e9f0; border-radius: 8px; overflow: hidden; }
+.nc-col-head { background: var(--n1); font-weight: 700; font-size: 13px; color: var(--n8); }
+.nc-cat { margin-bottom: 12px; border: 1px solid var(--n3); border-radius: var(--r-md); overflow: hidden; }
 .nc-cat-head { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #eef2f9; }
 .nc-cat-input { border: none; background: #fff; padding: 8px 10px; font-size: 13px; font-weight: 700; color: #185fa5; }
-.nc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #e6e9f0; }
+.nc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--n3); }
 .nc-row-same .nc-col { background: #eaf3de; }
-.nc-sub-input { width: 100%; border: 1px solid #d7dbe4; border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+.nc-sub-input { width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 6px 8px; font-size: 13px; }
 .nc-empty { display: block; width: 100%; min-height: 30px; background: #fafafa; }
-.nc-add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #eef2f9; border-top: 1px solid #e6e9f0; }
+.nc-add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #eef2f9; border-top: 1px solid var(--n3); }
 .nc-add-row button { border: none; background: #fff; padding: 6px 8px; font-size: 12px; color: #185fa5; }
 .nc-add-row button:hover { background: #e6f1fb; }
 </style>

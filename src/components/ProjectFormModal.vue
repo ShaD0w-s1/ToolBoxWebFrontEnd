@@ -96,16 +96,16 @@ async function submit(): Promise<void> {
   width: min(380px, calc(100% - 48px));
   padding: 22px 26px;
   background: #fff;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
-.pfm-card h3 { margin: 0 0 4px; font-size: 17px; color: #2f3b52; }
+.pfm-card h3 { margin: 0 0 4px; font-size: 17px; color: var(--n8); }
 .pfm-field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #5f6b7a; }
 .pfm-field input, .pfm-field select {
   min-height: 36px;
   padding: 7px 11px;
-  border: 1px solid #8eaadb;
-  border-radius: 8px;
+  border: 1px solid var(--focus);
+  border-radius: var(--r-md);
   font-size: 14px;
   color: #2f5597;
   background: #fff;
