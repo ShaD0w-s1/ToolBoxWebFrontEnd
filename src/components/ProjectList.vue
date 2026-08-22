@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import {
   AIRCRAFT_TYPES,
   PROJECT_TYPES,
@@ -20,6 +20,7 @@ import NameCompare from "./NameCompare.vue";
 import ControlDocMaintain from "./ControlDocMaintain.vue";
 import ProjectFormModal from "./ProjectFormModal.vue";
 import MultiSelect from "./MultiSelect.vue";
+import DateRangePicker from "./DateRangePicker.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-all": []; share: [] }>();
@@ -273,29 +274,33 @@ function cancelEditAnnouncement(): void {
   editingAnnouncement.value = false;
 }
 
-// —— 左侧功能区：执行日期时段（最多 30 天）校验 + 各筛选项清空 ——
-function dateOffsetStr(base: string, delta: number): string {
-  const d = new Date(`${base}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
+// —— 项目卡片操作 split button（修订主按钮 + 下拉复制/删除） ——
+const openCardMenu = ref<string | null>(null);
+function toggleCardMenu(id: string): void {
+  openCardMenu.value = openCardMenu.value === id ? null : id;
 }
-/** 执行日期时段跨度上限 30 天：后改的一端超出时自动收回到另一端 ±30 天。 */
-function clampDateRange(changed: "from" | "to"): void {
-  const f = props.store.dateFrom.value.trim();
-  const t = props.store.dateTo.value.trim();
-  if (!f || !t) return;
-  const span = (Date.parse(`${t}T00:00:00`) - Date.parse(`${f}T00:00:00`)) / 86400000;
-  if (span > 30) {
-    if (changed === "from") props.store.dateFrom.value = dateOffsetStr(t, -30);
-    else props.store.dateTo.value = dateOffsetStr(f, 30);
-    props.store.notify("执行日期时段最多 30 天，已自动调整");
+function closeCardMenu(): void { openCardMenu.value = null; }
+onMounted(() => document.addEventListener("click", closeCardMenu));
+onBeforeUnmount(() => document.removeEventListener("click", closeCardMenu));
+
+// —— 批量删除未设置执行日期的云端项目 ——
+async function batchDeleteNoDate(): Promise<void> {
+  const list = props.store.app.value.projects.filter((p) => !p.executeDate);
+  if (!list.length) { props.store.notify("没有未设置执行日期的项目", "ok"); return; }
+  if (!window.confirm(`确认删除 ${list.length} 个未设置执行日期的项目？此操作不可撤销！`)) return;
+  let ok = 0;
+  let fail = 0;
+  for (const p of list) {
+    try {
+      if (props.store.cloud.available) await backend.deleteProject(p.id);
+      props.store.app.value.projects = props.store.app.value.projects.filter((x) => x.id !== p.id);
+      ok++;
+    } catch {
+      fail++;
+    }
   }
-}
-function clearDateRange(): void {
-  props.store.dateFrom.value = "";
-  props.store.dateTo.value = "";
+  props.store.persist();
+  props.store.notify(fail ? `已删除 ${ok} 个，失败 ${fail} 个` : `已删除 ${ok} 个未设置执行日期的项目`, fail ? "err" : "ok");
 }
 </script>
 
@@ -335,12 +340,7 @@ function clearDateRange(): void {
 
           <div class="side-field">
             <span class="side-label">执行日期（时段，最多 30 天）</span>
-            <div class="side-date-range">
-              <input type="date" :value="store.dateFrom.value" aria-label="起始日期" @change="store.dateFrom.value = ($event.target as HTMLInputElement).value; clampDateRange('from')" />
-              <span class="side-range-sep">至</span>
-              <input type="date" :value="store.dateTo.value" aria-label="结束日期" @change="store.dateTo.value = ($event.target as HTMLInputElement).value; clampDateRange('to')" />
-              <button v-if="store.dateFrom.value || store.dateTo.value" class="side-clear-x" title="清空日期范围" @click="clearDateRange">×</button>
-            </div>
+            <DateRangePicker :from="store.dateFrom.value" :to="store.dateTo.value" @update:from="store.dateFrom.value = $event" @update:to="store.dateTo.value = $event" />
           </div>
 
           <div class="side-field">
@@ -366,7 +366,10 @@ function clearDateRange(): void {
         <div class="list-main">
           <div class="list-main-head">
             <p class="list-status">共 {{ store.filteredProjects.value.length }} 个工作项目</p>
-            <button title="导出全部项目数据" @click="emit('export-all')">导出全部</button>
+            <div class="list-main-ops">
+              <button title="导出全部项目数据" @click="emit('export-all')">导出全部</button>
+              <button class="danger" title="批量删除云端储存的未设置执行日期的项目" @click="batchDeleteNoDate">清理无日期项目</button>
+            </div>
           </div>
           <div v-if="!store.filteredProjects.value.length" class="empty-state">尚无符合条件的工作项目。</div>
           <article v-for="project in store.filteredProjects.value" :key="project.id" class="project-card">
@@ -376,10 +379,13 @@ function clearDateRange(): void {
             </button>
             <span class="card-meta">{{ project.type || "未选择类型" }}</span>
             <span class="card-meta">{{ project.team || "未分配班组" }}</span>
-            <div class="actions">
-              <button @click="editProject(project)">修订</button>
-              <button @click="duplicate(project)">复制项目</button>
-              <button class="danger" @click="remove(project)">删除</button>
+            <div class="card-split" @click.stop>
+              <button class="cs-main" @click="editProject(project)">修订</button>
+              <button class="cs-arrow" title="更多操作" @click="toggleCardMenu(project.id)">▾</button>
+              <div v-if="openCardMenu === project.id" class="cs-menu">
+                <button @click="closeCardMenu(); duplicate(project)">复制项目</button>
+                <button class="danger" @click="closeCardMenu(); remove(project)">删除</button>
+              </div>
             </div>
           </article>
         </div>
@@ -634,24 +640,11 @@ function clearDateRange(): void {
 .side-divider { height: 1px; background: var(--line); margin: 2px 0; }
 .side-title { font-size: 14px; font-weight: 700; color: var(--n8); }
 .side-field { display: flex; flex-direction: column; gap: 6px; }
-.side-label { font-size: 12px; color: var(--n6); }
-/* 日期范围 picker：容器一体化（双 date input + 红色 × 内嵌） */
-.side-date-range {
-  position: relative; display: flex; align-items: center; gap: 6px;
-  padding: 0 8px; min-height: 38px;
-  border: 1px solid var(--n4); border-radius: var(--r-md); background: #fff;
-}
-.side-date-range:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(68, 114, 196, .16); }
-.side-date-range input {
-  flex: 1; min-width: 0; height: 30px; padding: 0 2px;
-  border: none; background: transparent; font-size: 12.5px; color: var(--n9);
-}
-.side-date-range input:focus { outline: none; }
-.side-range-sep { color: var(--n6); font-size: 12px; flex: 0 0 auto; }
+.side-label { font-size: 12px; font-weight: 600; color: var(--n9); }
 /* 名称搜索：input + 内嵌红色 × */
 .side-search-wrap { position: relative; display: flex; align-items: center; }
 .side-search-wrap .inp { width: 100%; padding-right: 34px; }
-/* 红色 ×（内嵌于各搜索/选择组件） */
+/* 红色 ×（内嵌于搜索组件） */
 .side-clear-x {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
@@ -659,6 +652,36 @@ function clearDateRange(): void {
   cursor: pointer; z-index: 2;
 }
 .side-clear-x:hover { background: #f9dcdc; }
+/* 右侧列表头操作组 */
+.list-main-ops { display: flex; gap: 8px; }
+/* 项目卡片操作 split button：修订主按钮 + ▾ 下拉（复制/删除） */
+.card-split { position: relative; display: inline-flex; align-items: stretch; flex: 0 0 auto; }
+.cs-main {
+  min-height: 30px; padding: 4px 14px;
+  border: 1px solid var(--blue); border-right: none; border-radius: var(--r-sm) 0 0 var(--r-sm);
+  background: var(--blue); color: #fff; font-size: var(--fs-12); font-weight: 600;
+}
+.cs-main:hover { background: var(--blue-dark); }
+.cs-arrow {
+  min-height: 30px; width: 26px; padding: 0;
+  border: 1px solid var(--blue); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: #fff; color: var(--blue-dark); font-size: 10px;
+}
+.cs-arrow:hover { background: var(--blue-bg); }
+.cs-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
+  min-width: 110px; padding: 4px;
+  background: #fff; border: 1px solid var(--n3); border-radius: var(--r-md);
+  box-shadow: var(--sh-2);
+}
+.cs-menu button {
+  display: block; width: 100%; min-height: 30px; padding: 4px 12px;
+  border: none; border-radius: var(--r-sm); background: transparent;
+  color: var(--n8); font-size: var(--fs-13); text-align: left;
+}
+.cs-menu button:hover { background: var(--blue-bg); }
+.cs-menu button.danger { color: var(--danger); }
+.cs-menu button.danger:hover { background: var(--danger-bg); }
 .list-main-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .list-main-head .list-status { margin: 0; }
 

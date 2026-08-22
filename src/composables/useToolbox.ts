@@ -80,6 +80,8 @@ export function useToolbox() {
   /** 换发/APU 甘特准备单当前子页（form/gantt/docs/airparts/tools），供 App.vue 判断是否甘特图全宽。 */
   const ganttTab = ref<"form" | "gantt" | "docs" | "airparts" | "tools">("form");
   const currentProjectId = ref<string | null>(null);
+  /** 模板编辑模式（mode="edit"）创建的临时项目 id：关闭子页回列表时自动删除记录、不保存。 */
+  const editingTemplateProjectId = ref<string | null>(null);
   const editingLibrary = ref<AircraftType | null>(null);
   const editingStdLib = ref<StandardLibKey | null>(null);
   /** 正在编辑的航材标准库机型（A320/B787）；与 editingLibrary 互斥。 */
@@ -436,6 +438,19 @@ export function useToolbox() {
   }
 
   function backToList(): void {
+    // 模板编辑临时项目：关闭子页即删除记录（无需保存），云端 best-effort 同步删除
+    const tplId = editingTemplateProjectId.value;
+    if (tplId && currentProjectId.value === tplId) {
+      editingTemplateProjectId.value = null;
+      const p = app.value.projects.find((x) => x.id === tplId);
+      if (p) {
+        app.value.projects = app.value.projects.filter((x) => x.id !== tplId);
+        if (cloud.available) {
+          backend.deleteProject(tplId).catch(() => { /* best-effort */ });
+        }
+        persist();
+      }
+    }
     screen.value = "list";
     editingLibrary.value = null;
     editingMaterialLibrary.value = null;
@@ -1817,6 +1832,8 @@ export function useToolbox() {
     await createProject(name, "A320", "换发/APU");
     const project = currentProject.value;
     if (!project) return;
+    // mode="edit"：临时项目记录，关闭子页（backToList）自动删除、不保存
+    editingTemplateProjectId.value = mode === "edit" ? project.id : null;
     project.ganttPrep = deepCopy(state);
     project.ganttPrep.currentTemplateName = mode === "edit" ? name : "";
     markField("ganttPrep");
@@ -1831,6 +1848,8 @@ export function useToolbox() {
     await createProject(name, "A320", "单独项目");
     const project = currentProject.value;
     if (!project) return;
+    // mode="edit"：临时项目记录，关闭子页（backToList）自动删除、不保存
+    editingTemplateProjectId.value = mode === "edit" ? project.id : null;
     project.standalonePrepSheet = deepCopy(state);
     markField("standalonePrepSheet");
     persist();
