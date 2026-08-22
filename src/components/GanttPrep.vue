@@ -834,8 +834,12 @@ function moveStage(chartId: string, fromIdx: number, toIdx: number): void {
   });
 }
 
+// —— 拖拽目标位置占位虚线框（fixed 定位，拖拽时预览松手落点） ——
+const dragGhost = ref<{ left: number; top: number; width: number; height: number } | null>(null);
+function clearDragGhost(): void { dragGhost.value = null; }
+
 // —— 工序卡片拖曳（move 横移改阶段/纵移调行序；resize-left/right 改起止阶段） ——
-interface CardDrag { mode: "move" | "resize-left" | "resize-right"; chartId: string; cardId: string; el: HTMLElement; startX: number; startY: number; n: number; colW: number; rowH: number; origStart: number; origEnd: number; origOrder: number; curStart: number; curEnd: number; curOrder: number }
+interface CardDrag { mode: "move" | "resize-left" | "resize-right"; chartId: string; cardId: string; el: HTMLElement; startX: number; startY: number; n: number; colW: number; rowH: number; headerH: number; gridEl: HTMLElement | null; origStart: number; origEnd: number; origOrder: number; curStart: number; curEnd: number; curOrder: number }
 let cardDrag: CardDrag | null = null;
 function onCardDragMove(e: PointerEvent): void {
   if (!cardDrag) return;
@@ -860,11 +864,22 @@ function onCardDragMove(e: PointerEvent): void {
   if (d.mode === "move") {
     d.el.style.transform = `translate(${ds * d.colW}px, ${dr * d.rowH}px)`;
     d.el.title = `目标: 阶段「${chart?.stages[d.curStart]?.name ?? ""}」→「${chart?.stages[d.curEnd]?.name ?? ""}」 行 ${d.curOrder + 1}`;
+    // 占位虚线框：目标网格单元格（阶段跨度 × 行）
+    if (d.gridEl) {
+      const r = d.gridEl.getBoundingClientRect();
+      dragGhost.value = {
+        left: r.left + d.curStart * d.colW,
+        top: r.top + d.headerH + d.curOrder * d.rowH,
+        width: (d.curEnd - d.curStart + 1) * d.colW - 4,
+        height: Math.max(24, d.rowH - 4),
+      };
+    }
   } else {
     d.el.style.transform = "";
     const slot = d.el.closest(".card-slot") as HTMLElement | null;
     if (slot) slot.style.gridColumn = `${d.curStart + 1} / ${d.curEnd + 2}`;
     d.el.title = `调整: 起始「${chart?.stages[d.curStart]?.name ?? ""}」→ 结束「${chart?.stages[d.curEnd]?.name ?? ""}」`;
+    clearDragGhost();
   }
 }
 function onCardDragEnd(): void {
@@ -883,6 +898,7 @@ function onCardDragEnd(): void {
     d.el.style.transform = "";
     save();
   }
+  clearDragGhost();
   document.body.style.userSelect = "";
   window.removeEventListener("pointermove", onCardDragMove);
   window.removeEventListener("pointerup", onCardDragEnd);
@@ -897,7 +913,9 @@ function startCardDrag(e: PointerEvent, mode: "move" | "resize-left" | "resize-r
   const grid = el.closest(".gantt-grid") as HTMLElement | null;
   const colW = grid ? grid.getBoundingClientRect().width / n : 160;
   const rowH = el.offsetHeight || 88;
-  cardDrag = { mode, chartId, cardId, el, startX: e.clientX, startY: e.clientY, n, colW, rowH, origStart: card.startStage, origEnd: card.endStage, origOrder: card.order ?? 0, curStart: card.startStage, curEnd: card.endStage, curOrder: card.order ?? 0 };
+  const headEl = grid?.querySelector(".gantt-head") as HTMLElement | null;
+  const headerH = headEl ? headEl.offsetHeight + 6 : 50;
+  cardDrag = { mode, chartId, cardId, el, startX: e.clientX, startY: e.clientY, n, colW, rowH, headerH, gridEl: grid, origStart: card.startStage, origEnd: card.endStage, origOrder: card.order ?? 0, curStart: card.startStage, curEnd: card.endStage, curOrder: card.order ?? 0 };
   document.body.style.userSelect = "none";
   el.style.opacity = "0.85";
   el.style.zIndex = "999";
@@ -999,12 +1017,18 @@ function startUnassignedDrag(e: PointerEvent, chartId: string, arrId: string, ro
 }
 
 // —— 阶段列头拖曳换序 ——
-let stageColDrag: { chartId: string; idx: number; el: HTMLElement; startX: number; colW: number; n: number; target: number } | null = null;
+let stageColDrag: { chartId: string; idx: number; el: HTMLElement; startX: number; colW: number; n: number; target: number; gridEl: HTMLElement | null } | null = null;
 function onStageColDragMove(e: PointerEvent): void {
   if (!stageColDrag) return;
-  const ds = Math.round((e.clientX - stageColDrag.startX) / stageColDrag.colW);
-  stageColDrag.target = clamp(stageColDrag.idx + ds, 0, stageColDrag.n - 1);
-  stageColDrag.el.style.transform = `translateX(${ds * stageColDrag.colW}px)`;
+  const d = stageColDrag;
+  const ds = Math.round((e.clientX - d.startX) / d.colW);
+  d.target = clamp(d.idx + ds, 0, d.n - 1);
+  d.el.style.transform = `translateX(${ds * d.colW}px)`;
+  // 占位虚线框：目标整列（含表头，工序卡片一起移动）
+  if (d.gridEl) {
+    const r = d.gridEl.getBoundingClientRect();
+    dragGhost.value = { left: r.left + d.target * d.colW, top: r.top, width: d.colW - 4, height: r.height };
+  }
 }
 function onStageColDragEnd(): void {
   if (stageColDrag) {
@@ -1014,6 +1038,7 @@ function onStageColDragEnd(): void {
     d.el.style.transform = "";
     if (d.target !== d.idx) { moveStage(d.chartId, d.idx, d.target); save(); }
   }
+  clearDragGhost();
   document.body.style.userSelect = "";
   window.removeEventListener("pointermove", onStageColDragMove);
   window.removeEventListener("pointerup", onStageColDragEnd);
@@ -1025,7 +1050,7 @@ function startStageColDrag(e: PointerEvent, chartId: string, idx: number): void 
   const el = (e.currentTarget as HTMLElement).closest(".gantt-head") as HTMLElement;
   const grid = el.closest(".gantt-grid") as HTMLElement | null;
   const colW = grid ? grid.getBoundingClientRect().width / chart.stages.length : 160;
-  stageColDrag = { chartId, idx, el, startX: e.clientX, colW, n: chart.stages.length, target: idx };
+  stageColDrag = { chartId, idx, el, startX: e.clientX, colW, n: chart.stages.length, target: idx, gridEl: grid };
   document.body.style.userSelect = "none";
   el.style.opacity = "0.85";
   el.style.zIndex = "999";
@@ -1053,9 +1078,23 @@ function insertStage(chartId: string, idx: number): void {
 let formCardDrag: { chartId: string; cardId: string; el: HTMLElement; startY: number; rowH: number; origOrder: number; curOrder: number } | null = null;
 function onFormCardDragMove(e: PointerEvent): void {
   if (!formCardDrag) return;
-  const dr = Math.round((e.clientY - formCardDrag.startY) / formCardDrag.rowH);
-  formCardDrag.curOrder = Math.max(0, formCardDrag.origOrder + dr);
-  formCardDrag.el.style.transform = `translateY(${dr * formCardDrag.rowH}px)`;
+  const d = formCardDrag;
+  const dr = Math.round((e.clientY - d.startY) / d.rowH);
+  d.curOrder = Math.max(0, d.origOrder + dr);
+  d.el.style.transform = `translateY(${dr * d.rowH}px)`;
+  // 占位虚线框：目标行位置（排除自身后，第 curOrder 个之前）
+  const container = d.el.parentElement;
+  if (container) {
+    const rows = Array.from(container.querySelectorAll<HTMLElement>(".form-card-row")).filter((r) => r !== d.el);
+    const r0 = d.el.getBoundingClientRect();
+    let top: number;
+    if (d.curOrder >= rows.length) {
+      top = rows.length ? rows[rows.length - 1].getBoundingClientRect().bottom + 3 : r0.top;
+    } else {
+      top = rows[d.curOrder].getBoundingClientRect().top;
+    }
+    dragGhost.value = { left: r0.left, top, width: r0.width, height: r0.height };
+  }
 }
 function onFormCardDragEnd(): void {
   if (formCardDrag) {
@@ -1067,6 +1106,7 @@ function onFormCardDragEnd(): void {
     formCardDrag.el.style.zIndex = "";
     save();
   }
+  clearDragGhost();
   document.body.style.userSelect = "";
   window.removeEventListener("pointermove", onFormCardDragMove);
   window.removeEventListener("pointerup", onFormCardDragEnd);
@@ -1861,6 +1901,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 
 <template>
   <div class="gantt-page" :class="{ 'gantt-wide': tab === 'gantt' }" @input="onAnyInput">
+    <!-- 拖拽目标位置占位虚线框 -->
+    <div v-if="dragGhost" class="drag-ghost" :style="{ left: dragGhost.left + 'px', top: dragGhost.top + 'px', width: dragGhost.width + 'px', height: dragGhost.height + 'px' }"></div>
     <!-- 填空框上传中蒙版：输入后上传未完成时叠加灰蒙 + "……" -->
     <div v-if="maskVisible" class="save-mask" :style="maskStyle"><span class="dots"><i></i><i></i><i></i></span></div>
     <!-- 参与人名单侧边栏 -->
@@ -1936,11 +1978,15 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <label class="gpf"><span class="gpf-label">FSN</span><input v-model="a.fsn" @change="onAircraftFieldEdited(a)" @input="save" /></label>
                 <label class="gpf"><span class="gpf-label">MSN</span><input v-model="a.msn" @change="onAircraftFieldEdited(a)" @input="save" /></label>
                 <label class="gpf"><span class="gpf-label">发动机</span><input v-model="a.engine" @change="onAircraftFieldEdited(a)" @input="save" /></label>
-                <label class="gpf"><span class="gpf-label">机型</span><input v-model="a.type" @change="onAircraftFieldEdited(a)" @input="save" /></label>
+                <label class="gpf"><span class="gpf-label">机型</span>
+                  <div class="meta-type-row">
+                    <input v-model="a.type" @change="onAircraftFieldEdited(a)" @input="save" />
+                    <button class="icon-btn meta-x" title="删除该飞机" @click="removeAircraft(a.id)">×</button>
+                  </div>
+                </label>
                 <label class="gpf"><span class="gpf-label">ETOPS</span><input v-model="a.etops" @change="onAircraftFieldEdited(a)" @input="save" /></label>
                 <label class="gpf"><span class="gpf-label">ELT-DT</span><input v-model="a.eltDt" @change="onAircraftFieldEdited(a)" @input="save" /></label>
               </div>
-              <div class="meta-group-foot"><button class="icon-btn" title="删除该飞机" @click="removeAircraft(a.id)">×</button></div>
               <hr v-if="i < aircrafts.length - 1" class="meta-divider" />
             </div>
             <button class="gp-add" @click="addAircraft">+ 新增飞机</button>
@@ -2592,6 +2638,14 @@ async function importAllXlsx(event: Event): Promise<void> {
 .stage-capsules { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .stage-capsule { font-size: 11.5px; font-weight: 600; color: var(--blue-dark, #2f5597); background: var(--blue-light, #d9e1f2); border: 1px solid var(--blue, #4472c4); border-radius: var(--r-pill); padding: 2px 10px; }
 
+/* ===== 拖拽目标位置占位虚线框 ===== */
+.drag-ghost {
+  position: fixed; z-index: 998; pointer-events: none;
+  border: 2px dashed var(--blue, #4472c4); border-radius: var(--r-md);
+  background: rgba(68, 114, 196, .10);
+  box-shadow: 0 0 0 1px rgba(68, 114, 196, .15);
+}
+
 /* ===== 甘特卡片（工序=灰渐变至白 / 串件=橙渐变至白，从顶部渐变到负责行后全白） ===== */
 .gantt-card {
   margin: 2px; padding: 0; border-radius: var(--r-md); background: #fff;
@@ -2664,10 +2718,16 @@ async function importAllXlsx(event: Event): Promise<void> {
   height: 32px; padding: 0 8px; border: 1.5px solid var(--line, #dde2ec); border-radius: var(--r-md); font-size: 13px; width: 100%;
 }
 .meta-grid input:focus, .arrange-row input:focus, .arrange-item input:focus, .component-col input:focus { border-color: var(--focus); outline: none; }
-/* 飞机卡片：去卡片框，多架之间用水平分割线 */
+/* 飞机卡片：去卡片框，多架之间用水平分割线；删除 × 在机型行末尾 */
 .meta-group { padding: 2px 0; }
-.meta-group-foot { display: flex; justify-content: flex-end; margin-top: 4px; }
-.meta-group-foot .icon-btn { min-height: 24px; min-width: 26px; }
+.meta-type-row { display: flex; align-items: center; gap: 4px; }
+.meta-type-row input { flex: 1; min-width: 0; }
+.meta-x {
+  flex: 0 0 auto; min-height: 24px; min-width: 26px; padding: 0;
+  border: 1px solid #f2cdcd; border-radius: var(--r-sm);
+  background: #fdecec; color: #b53a3a; font-size: 15px; line-height: 1;
+}
+.meta-x:hover { background: #f9dcdc; }
 .meta-divider { border: none; border-top: 1px solid var(--line, #dde2ec); margin: 14px 0 12px; }
 .meta-group-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: var(--blue-dark, #2f5597); margin-bottom: 8px; }
 /* 项目安排三行：去卡片框，行间水平虚线分割 */
@@ -2710,15 +2770,15 @@ textarea.textwrap {
 .form-stage-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .form-stage-head input { flex: 1; border: none; background: transparent; font-size: 13px; font-weight: 700; color: var(--blue-dark, #2f5597); padding: 4px; outline: none; }
 .form-stage-head input:focus { background: #fff; border-radius: 4px; box-shadow: 0 0 0 2px var(--focus); }
-.form-stage-body { display: flex; flex-direction: column; gap: 6px; }
-.form-card-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-md); padding: 6px 8px; background: #fff; }
+.form-stage-body { display: flex; flex-direction: column; gap: 4px; }
+.form-card-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); padding: 3px 6px; background: #fff; }
 /* 表单工序行：左侧纯黄（拖拽柄+标题）随标题自适应、黄色竖线分界、右半白；备注红字；串件行除外 */
 .form-card-row:not(.part-form-row) .form-card-title {
   display: flex; align-items: center; gap: 2px;
   background: #FDCA17; border-radius: var(--r-sm);
   border-right: 2px solid #C9A227;
   flex: none; max-width: 50%; min-width: 0;
-  padding: 2px 4px 2px 2px;
+  padding: 1px 3px 1px 1px;
 }
 .form-card-row:not(.part-form-row) .form-card-title .form-card-drag {
   background: transparent; border-radius: 4px; padding: 4px 6px;
@@ -2737,7 +2797,7 @@ textarea.textwrap {
   flex: none; width: 15em; min-width: 15em;
   color: var(--danger, #c0392b);
 }
-.form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 3px 6px; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); font-size: 12.5px; font-family: inherit; }
+.form-card-row input, .form-card-row textarea { flex: 1; min-width: 90px; padding: 2px 5px; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); font-size: 12.5px; font-family: inherit; }
 .form-card-row textarea { resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; }
 .form-card-row.part-form-row textarea:first-of-type { flex: 1.5; }
 .form-card-row input:focus, .form-card-row textarea:focus { border-color: var(--focus); outline: none; }
