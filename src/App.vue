@@ -1,29 +1,36 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, nextTick, ref } from "vue";
+import { onMounted, onUnmounted, nextTick, ref, watch, defineAsyncComponent } from "vue";
 import html2canvas from "html2canvas";
+import { useRouter, useRoute } from "vue-router";
 import AppHeader from "./components/AppHeader.vue";
-import ProjectList from "./components/ProjectList.vue";
-import ProjectDetail from "./components/ProjectDetail.vue";
-import ToolCart from "./components/ToolCart.vue";
-import StandardLibraryTable from "./components/StandardLibraryTable.vue";
 import AircraftUpdateModal from "./components/AircraftUpdateModal.vue";
 import {
   AIRCRAFT_TYPES,
+  STANDARD_LIB_KEYS,
   normalizeApp,
   normalizeState,
   type AircraftType,
   type AppInput,
   type Project,
+  type StandardLibKey,
   type ToolCartItem,
   type ToolState,
 } from "./domain/toolbox";
 import { useToolbox } from "./composables/useToolbox";
 import { setForceDesktop } from "./composables/useResponsiveGrid";
 import { exportJson, exportState, importCart, importState } from "./services/spreadsheet";
-import { copyText, createShareUrl, readSharePayload, projectShareUrl, type SharePayload } from "./services/sharing";
+import { copyText, createShareUrl, readSharePayload, type SharePayload } from "./services/sharing";
 import { download, exportFileName, formatDay } from "./utils/format";
 
+// 页面组件懒加载：首屏只加载列表页，二级页/标准库/工具车按需加载（SPA 路由懒加载）。
+const ProjectList = defineAsyncComponent(() => import("./components/ProjectList.vue"));
+const ProjectDetail = defineAsyncComponent(() => import("./components/ProjectDetail.vue"));
+const ToolCart = defineAsyncComponent(() => import("./components/ToolCart.vue"));
+const StandardLibraryTable = defineAsyncComponent(() => import("./components/StandardLibraryTable.vue"));
+
 const store = useToolbox();
+const router = useRouter();
+const route = useRoute();
 
 // —— 无密码身份标识弹窗 ——
 const showIdentityModal = ref(false);
@@ -194,8 +201,8 @@ async function share(scope: SharePayload["scope"]): Promise<void> {
       return;
     }
     if (scope === "detail" && !store.editingLibrary.value && store.currentProject.value) {
-      // 二级页面（工作项目）：用干净的查询格式链接，接收方按名称+日期在后端匹配打开
-      await copyText(projectShareUrl(store.currentProject.value));
+      // 二级页面（工作项目）：hash 路由直链，接收方打开后定位到该项目（刷新保持）
+      await copyText(`${baseUrl()}#/project/${encodeURIComponent(store.currentProject.value.id)}`);
       store.notify("二级页面链接已复制");
       return;
     }
@@ -235,6 +242,58 @@ function openFromQuery(): void {
     store.notify("未找到该项目，可能已被删除或尚未同步");
   }
 }
+
+// ===== SPA 路由桥接：store.screen 与 hash 路由双向同步（深链恢复 + 前进/后退 + 刷新保持） =====
+/** 根据当前 store 状态推导应展示的 hash 路径。 */
+function screenPath(): string {
+  const s = store.screen.value;
+  if (s === "cart") return "/cart";
+  if (s === "stdlib") return `/stdlib/${store.editingStdLib.value || "aircraft_info"}`;
+  if (s === "detail") {
+    if (store.editingLibrary.value) return `/library/${store.editingLibrary.value}`;
+    if (store.editingMaterialLibrary.value) return `/material/${store.editingMaterialLibrary.value}`;
+    const id = store.currentProject.value?.id;
+    return id ? `/project/${id}` : "/";
+  }
+  return "/";
+}
+/** 根据 hash 路径恢复 store 状态（调用对应 open* 函数，同步恢复 currentProjectId/editingLibrary 等）。 */
+function applyRoutePath(path: string): void {
+  if (path === "/" || path === "") { store.backToList(); return; }
+  if (path === "/cart") { store.openCart(); return; }
+  if (path.startsWith("/project/")) {
+    store.openProject(decodeURIComponent(path.slice("/project/".length)));
+    return;
+  }
+  if (path.startsWith("/library/")) {
+    const t = decodeURIComponent(path.slice("/library/".length)) as AircraftType;
+    if (AIRCRAFT_TYPES.includes(t)) store.openLibrary(t);
+    return;
+  }
+  if (path.startsWith("/material/")) {
+    const t = decodeURIComponent(path.slice("/material/".length)) as AircraftType;
+    if (AIRCRAFT_TYPES.includes(t)) store.openMaterialLibrary(t);
+    return;
+  }
+  if (path.startsWith("/stdlib/")) {
+    const k = decodeURIComponent(path.slice("/stdlib/".length)) as StandardLibKey;
+    if (STANDARD_LIB_KEYS.includes(k)) store.openStdLib(k);
+    return;
+  }
+}
+// 双向同步：screen 变化 → 同步 URL；URL 变化（手动改 hash / 前进后退）→ 恢复 screen。
+let routeSyncing = false;
+watch(() => store.screen.value, () => {
+  if (routeSyncing) return;
+  const target = screenPath();
+  if (route.path === target) return;
+  routeSyncing = true;
+  router.replace(target).finally(() => { routeSyncing = false; });
+});
+watch(() => route.path, (path) => {
+  if (routeSyncing) return;
+  applyRoutePath(path);
+});
 
 /** 将分享数据先载入内存，用户确认保存后才写入本地缓存。 */
 async function applySharedPayload(): Promise<void> {
@@ -282,7 +341,9 @@ onMounted(async () => {
     await applySharedPayload();
   } else {
     await store.loadRemote();
-    openFromQuery();
+    // 深链恢复：优先 hash 路由（新格式），无具体路径时退回旧 ?p= 分享格式
+    if (route.path && route.path !== "/") applyRoutePath(route.path);
+    else openFromQuery();
   }
   // 无密码身份标识：首次（或本设备无身份）时弹窗输入姓名
   if (!store.identityReady.value) showIdentityModal.value = true;

@@ -415,11 +415,28 @@ async function runToolFilterByWorkcard(): Promise<void> {
 
     <ProjectFormModal v-if="editTarget" :store="store" mode="edit" :project="editTarget" @close="editTarget = null" />
   </section>
+  <section v-else class="detail-loading">
+    <div class="sync-spinner" aria-hidden="true"></div>
+    <p>数据加载中…</p>
+    <button class="ghost" @click="store.backToList">← 返回列表</button>
+  </section>
 </template>
 
 <style scoped>
 /* 项目类型选择框：白底蓝字（全局 .type-select 已定义，此处仅保留 option 兜底） */
 .type-select option { background: #fff; color: #333; }
+/* 深链直开/数据未就绪时的加载空态 */
+.detail-loading {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; min-height: 60vh; color: #697386;
+}
+.detail-loading p { margin: 0; font-size: 15px; }
+.detail-loading .sync-spinner {
+  width: 30px; height: 30px; border: 3px solid #e5e7eb; border-top-color: #2563eb;
+  border-radius: 50%; animation: detail-spin .8s linear infinite;
+}
+@keyframes detail-spin { to { transform: rotate(360deg); } }
+
 /* 工具清单子页：红色提醒（标题后内联） */
 .auto-filter-warning {
   color: #d92020;
