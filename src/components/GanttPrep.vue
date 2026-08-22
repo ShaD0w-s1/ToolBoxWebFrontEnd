@@ -1930,8 +1930,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <!-- 全局飞机/项目信息 -->
           <section class="gp-section">
             <div class="gp-sec-title">飞机信息</div>
-            <div v-for="(a, i) in aircrafts" :key="a.id" class="meta-group-card">
-              <div class="meta-group-head"><span>飞机 {{ i + 1 }}</span><button class="icon-btn" @click="removeAircraft(a.id)">×</button></div>
+            <div v-for="(a, i) in aircrafts" :key="a.id" class="meta-group">
               <div class="meta-grid meta-grid-4">
                 <label class="gpf"><span class="gpf-label">机号</span><input v-model="a.reg" list="gp-aircraft-numbers" @change="onAircraftRegChange(a)" @input="save" /></label>
                 <label class="gpf"><span class="gpf-label">FSN</span><input v-model="a.fsn" @change="onAircraftFieldEdited(a)" @input="save" /></label>
@@ -1941,6 +1940,8 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <label class="gpf"><span class="gpf-label">ETOPS</span><input v-model="a.etops" @change="onAircraftFieldEdited(a)" @input="save" /></label>
                 <label class="gpf"><span class="gpf-label">ELT-DT</span><input v-model="a.eltDt" @change="onAircraftFieldEdited(a)" @input="save" /></label>
               </div>
+              <div class="meta-group-foot"><button class="icon-btn" title="删除该飞机" @click="removeAircraft(a.id)">×</button></div>
+              <hr v-if="i < aircrafts.length - 1" class="meta-divider" />
             </div>
             <button class="gp-add" @click="addAircraft">+ 新增飞机</button>
           </section>
@@ -1952,9 +1953,11 @@ async function importAllXlsx(event: Event): Promise<void> {
               <label class="gpf"><span class="gpf-label">值班组</span><textarea class="textwrap" rows="1" v-model="(arrangement as any).dutyGroup" @input="save"></textarea></label>
               <label class="gpf"><span class="gpf-label">执行地点</span><textarea class="textwrap" rows="1" v-model="(arrangement as any).location" @input="save"></textarea></label>
             </div>
+            <div class="arrange-divider" />
             <div class="arrange-row arrange-participants-row">
               <label class="gpf"><span class="gpf-label">参与人员</span><textarea class="participant-input textwrap" rows="1" v-model="participantInput" placeholder="例如：张三、李四（停止编辑即同步名单）" @keydown="onParticipantInputKeydown" @blur="onParticipantInputBlur"></textarea></label>
             </div>
+            <div class="arrange-divider" />
             <div class="arrange-row arrange-row-2">
               <label class="gpf"><span class="gpf-label">指令号</span><textarea class="textwrap" rows="1" v-model="(arrangement as any).orderNo" @input="save"></textarea></label>
               <label class="gpf"><span class="gpf-label">指令名称</span><textarea class="textwrap" rows="1" v-model="(arrangement as any).orderName" @input="save"></textarea></label>
@@ -1973,7 +1976,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="gp-sec-title">部件卡片</div>
             <div v-for="(c, i) in components" :key="c.id" class="component-card">
               <div class="meta-group-head">
-                <label class="gpf component-name-wrap"><span class="gpf-label">部件卡片 {{ i + 1 }} 名称</span><input v-model="c.name" class="component-name-input" @input="save" /></label>
+                <label class="gpf component-name-wrap"><input v-model="c.name" class="component-name-input" :placeholder="`部件卡片 ${i + 1} 名称`" @input="save" /></label>
                 <button class="icon-btn" @click="removeComponent(c.id)">×</button>
               </div>
               <div class="component-cols">
@@ -2661,11 +2664,15 @@ async function importAllXlsx(event: Event): Promise<void> {
   height: 32px; padding: 0 8px; border: 1.5px solid var(--line, #dde2ec); border-radius: var(--r-md); font-size: 13px; width: 100%;
 }
 .meta-grid input:focus, .arrange-row input:focus, .arrange-item input:focus, .component-col input:focus { border-color: var(--focus); outline: none; }
-/* 飞机卡片轮廓 */
-.meta-group-card { border: 1px solid var(--line, #dde2ec); border-radius: var(--r-lg); padding: 10px 12px; margin-bottom: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+/* 飞机卡片：去卡片框，多架之间用水平分割线 */
+.meta-group { padding: 2px 0; }
+.meta-group-foot { display: flex; justify-content: flex-end; margin-top: 4px; }
+.meta-group-foot .icon-btn { min-height: 24px; min-width: 26px; }
+.meta-divider { border: none; border-top: 1px solid var(--line, #dde2ec); margin: 14px 0 12px; }
 .meta-group-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: var(--blue-dark, #2f5597); margin-bottom: 8px; }
-/* 项目安排按行绘制卡片轮廓 */
-.arrange-row { display: grid; gap: 10px; margin-bottom: 10px; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-md); padding: 8px 10px; background: #fff; }
+/* 项目安排三行：去卡片框，行间水平虚线分割 */
+.arrange-row { display: grid; gap: 10px; margin-bottom: 10px; }
+.arrange-divider { border: none; border-top: 1px dashed var(--line, #dde2ec); margin: 2px 0 12px; }
 .arrange-row-3 { grid-template-columns: repeat(3, 1fr); }
 .arrange-row-2 { grid-template-columns: repeat(2, 1fr); }
 .arrange-participants-row { grid-template-columns: 1fr; }
