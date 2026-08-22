@@ -44,7 +44,7 @@ async function finishCart(): Promise<void> {
       <button class="primary" @click="add">+ 添加物品</button>
       <label class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
       <button @click="emit('share')">分享本页</button>
-      <button @click="store.refresh()">刷新</button>
+      <button title="强制同步数据" @click="store.refresh()">刷新</button>
       <span class="spacer" />
       <button class="ghost" @click="finishCart">完成</button>
     </div>

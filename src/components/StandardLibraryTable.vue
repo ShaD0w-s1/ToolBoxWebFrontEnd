@@ -93,7 +93,7 @@ async function finishStdLib(): Promise<void> {
         <button @click="triggerImport">导入.xlsx</button>
         <input ref="importInput" hidden type="file" accept=".xlsx,.xls" @change="onImport" />
         <button @click="exportXlsx">导出.xlsx</button>
-        <button @click="store.refresh()">刷新</button>
+        <button title="强制同步数据" @click="store.refresh()">刷新</button>
         <span class="spacer" />
         <button class="ghost" @click="finishStdLib">完成</button>
       </div>

@@ -298,7 +298,7 @@ function cancelEditAnnouncement(): void {
         <button class="primary" @click="startNew">+ 新建工作项目</button>
         <button @click="emit('export-all')">导出全部</button>
         <button @click="emit('share')">分享本页</button>
-        <button @click="store.refresh()">刷新</button>
+        <button title="强制同步数据" @click="store.refresh()">刷新</button>
         <span class="spacer" />
         <input v-model="store.nameQuery.value" class="project-name-input" placeholder="搜索项目名称" aria-label="按项目名称搜索" />
         <select v-model="store.teamFilter.value" aria-label="按班组筛选">

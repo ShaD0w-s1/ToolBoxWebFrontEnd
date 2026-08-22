@@ -321,10 +321,10 @@ async function runToolFilterByWorkcard(): Promise<void> {
       <!-- 二级页首行共享按钮（所有项目类型公用，修复 3）。单独项目/换发·APU 隐藏「依据工卡清单」（不走工卡流程）；
            换发/APU 的 分享/保存/刷新/清空数据 已并入 GanttPrep 自身 L1 工具条（输入框靠左、功能按钮靠右）。 -->
       <div v-if="store.currentProject.value && !store.editingLibrary.value && !isEngApu" class="toolbar top-row">
-        <label v-if="!isStandalone && !isEngApu" class="button primary">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="applyWorkCardListFile" /></label>
+        <label v-if="!isStandalone && !isEngApu" class="button primary" title="导入 AMES线控平台-打印其他 中的《例行工卡清单》（八大件的工卡清单），网页会根据表单自动导入工卡并关联工具、航材">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="applyWorkCardListFile" /></label>
         <button @click="emit('share')">分享本页</button>
-        <button @click="store.saveNow()">保存</button>
-        <button @click="store.refresh()">刷新</button>
+        <button title="强制推送后台" @click="store.saveNow()">保存</button>
+        <button title="强制同步数据" @click="store.refresh()">刷新</button>
         <span v-if="!isEngApu" class="spacer" />
         <span v-if="!isEngApu" class="hint">导入 AMES线控平台-打印其他 中的《例行工卡清单》</span>
         <button class="danger" @click="clearProjectAll">清空数据</button>

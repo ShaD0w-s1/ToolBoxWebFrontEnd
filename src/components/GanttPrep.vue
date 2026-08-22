@@ -1875,8 +1875,8 @@ async function importAllXlsx(event: Event): Promise<void> {
         <span class="toolbar-sep" />
         <div class="subpage-actions top-actions">
           <button class="ghost" @click="emit('share')">分享本页</button>
-          <button class="ghost" @click="props.store.saveNow()">保存</button>
-          <button class="ghost" @click="props.store.refresh()">刷新</button>
+          <button class="ghost" title="强制推送后台" @click="props.store.saveNow()">保存</button>
+          <button class="ghost" title="强制同步数据" @click="props.store.refresh()">刷新</button>
           <button class="danger" @click="clearGanttAll">清空数据</button>
         </div>
       </div>
@@ -2196,7 +2196,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <section class="gp-card">
             <div class="gp-docs-head">
               <div class="gp-sec-title">工包工卡</div>
-              <label class="button primary">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="importWorkDocList" /></label>
+              <label class="button primary" title="导入 AMES线控平台-打印其他 中的《例行工卡清单》（八大件的工卡清单），网页会根据表单自动导入工卡并关联工具、航材">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="importWorkDocList" /></label>
             </div>
             <table class="parts-table">
               <thead><tr><th>工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
