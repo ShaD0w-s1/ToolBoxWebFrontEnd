@@ -630,10 +630,9 @@ function clearGanttAll(): void {
   if (!window.confirm("确认清空本项目的全部数据（含甘特准备单与模板引用）？此操作不可撤销。")) return;
   props.store.clearProjectAllData();
 }
-// 进入串件 tab 时，把表单串件内容同步成卡片，并重置搜索/胶囊、撑高物品输入栏
+// 进入串件 tab 时，把表单串件内容同步成卡片，并重置搜索、撑高物品输入栏
 function onPartTabEnter(): void {
   syncPartCardsFromCharts(partKind.value);
-  partFilter.value = new Set();
   partSearch.value = "";
   // 备注有数据的物品自动展开备注行（保留用户手动展开的空备注状态）
   const s = state.value;
@@ -645,33 +644,54 @@ function onPartTabEnter(): void {
   expandedNotes.value = new Set(prev);
   autoSizeAllParts();
 }
-// ===== 清单卡片搜索（模糊搜索 + 多选胶囊） =====
+// ===== 清单卡片搜索（AutoComplete：卡片名/件号/名称候选）+ 卡片折叠 =====
 const partSearch = ref("");
-const partFilter = ref<Set<string>>(new Set());
-const partCapsules = computed<string[]>(() => {
+const partSuggestOpen = ref(false);
+const partSuggestOptions = computed<Array<{ label: string; kind: "card" | "pn" | "name" }>>(() => {
   const s = state.value; if (!s) return [];
-  return [...new Set((tab.value === "airparts" ? s.airParts : s.toolParts).map((c) => c.name).filter((n) => n.trim() !== ""))];
+  const list = tab.value === "airparts" ? s.airParts : s.toolParts;
+  const opts: Array<{ label: string; kind: "card" | "pn" | "name" }> = [];
+  const seen = new Set<string>();
+  list.forEach((c) => {
+    const cn = (c.name || "").trim();
+    if (cn && !seen.has("card:" + cn)) { seen.add("card:" + cn); opts.push({ label: cn, kind: "card" }); }
+    (c.items || []).forEach((it) => {
+      const pn = String(it.pn || "").trim();
+      if (pn && !seen.has("pn:" + pn)) { seen.add("pn:" + pn); opts.push({ label: pn, kind: "pn" }); }
+      const nm = String(it.name || "").trim();
+      if (nm && !seen.has("name:" + nm)) { seen.add("name:" + nm); opts.push({ label: nm, kind: "name" }); }
+    });
+  });
+  return opts;
 });
+const partSuggestFiltered = computed(() => {
+  const q = partSearch.value.trim().toLowerCase();
+  const all = partSuggestOptions.value;
+  if (!q) return all.slice(0, 40);
+  return all.filter((o) => o.label.toLowerCase().includes(q)).slice(0, 40);
+});
+function selectPartSuggest(opt: { label: string; kind: string }): void {
+  partSearch.value = opt.label;
+  partSuggestOpen.value = false;
+}
 const visiblePartCards = computed<GanttPartList[]>(() => {
   const s = state.value; if (!s) return [];
   const all = tab.value === "airparts" ? s.airParts : s.toolParts;
-  let list = all;
-  if (partFilter.value.size) list = list.filter((c) => partFilter.value.has(c.name));
   const q = partSearch.value.trim().toLowerCase();
-  if (q) {
-    list = list.filter((c) =>
-      c.name.toLowerCase().includes(q) ||
-      (c.items || []).some((it) =>
-        String(it.pn || "").toLowerCase().includes(q) || String(it.name || "").toLowerCase().includes(q)
-      )
-    );
-  }
-  return list;
+  if (!q) return all;
+  return all.filter((c) =>
+    c.name.toLowerCase().includes(q) ||
+    (c.items || []).some((it) =>
+      String(it.pn || "").toLowerCase().includes(q) || String(it.name || "").toLowerCase().includes(q)
+    )
+  );
 });
-function togglePartFilter(name: string): void {
-  const s = new Set(partFilter.value);
-  if (s.has(name)) s.delete(name); else s.add(name);
-  partFilter.value = s;
+// 卡片折叠（默认展开）
+const collapsedCards = ref<Set<string>>(new Set());
+function toggleCardCollapse(id: string): void {
+  const s = new Set(collapsedCards.value);
+  if (s.has(id)) s.delete(id); else s.add(id);
+  collapsedCards.value = s;
 }
 // ===== 物品卡片输入栏自动撑高（参考 A检 m-item onAutoSize） =====
 function onPartAutoSize(event: Event): void {
@@ -2266,11 +2286,23 @@ async function importAllXlsx(event: Event): Promise<void> {
               </span>
             </div>
           </div>
-          <!-- 卡片搜索：模糊搜索卡片名/件号/名称 + 多选胶囊筛选 -->
+          <!-- 卡片搜索：AutoComplete（卡片名 / 件号 / 名称候选） -->
           <div class="part-search-bar">
-            <input v-model="partSearch" class="part-search-input" placeholder="搜索卡片名 / 件号 / 名称（模糊匹配）" />
-            <div v-if="partCapsules.length" class="part-capsules">
-              <button v-for="n in partCapsules" :key="n" class="part-capsule" :class="{ on: partFilter.has(n) }" @click="togglePartFilter(n)">{{ n }}</button>
+            <div class="part-search-wrap">
+              <input
+                v-model="partSearch"
+                class="part-search-input"
+                placeholder="搜索卡片名 / 件号 / 名称（自动补全）"
+                @focus="partSuggestOpen = true"
+                @input="partSuggestOpen = true"
+                @blur="partSuggestOpen = false"
+              />
+              <div v-if="partSuggestOpen && partSuggestFiltered.length" class="part-suggest">
+                <button v-for="opt in partSuggestFiltered" :key="opt.kind + ':' + opt.label" class="part-suggest-item" @mousedown.prevent="selectPartSuggest(opt)">
+                  <span class="psi-label">{{ opt.label }}</span>
+                  <span class="psi-kind" :class="opt.kind">{{ opt.kind === 'card' ? '卡片' : opt.kind === 'pn' ? '件号' : '名称' }}</span>
+                </button>
+              </div>
             </div>
           </div>
           <!-- 重复航材检查：按件号跨卡片分组，重复 ≥2 次列出 -->
@@ -2288,10 +2320,12 @@ async function importAllXlsx(event: Event): Promise<void> {
           </section>
           <section v-for="card in visiblePartCards" :key="card.id" class="gp-card pt-card" :style="{ borderLeft: '6px solid ' + partCardColorOf(card), background: partCardBgOf(card) }">
             <div class="pt-card-head" :style="{ background: partCardHeadOf(card) }">
+              <button class="pt-collapse" :title="collapsedCards.has(card.id) ? '展开卡片' : '折叠卡片'" @click="toggleCardCollapse(card.id)">{{ collapsedCards.has(card.id) ? '▸' : '▾' }}</button>
               <input v-model="card.name" class="pt-card-name" placeholder="卡片名称(可输入或搜索串件内容)" list="gp-part-contents" @input="save" />
               <span class="pt-count">{{ card.items.length }} 项</span>
               <button class="icon-btn" @click="removePartList(partKind, card.id)">×</button>
             </div>
+            <template v-if="!collapsedCards.has(card.id)">
             <div class="pt-items">
               <div v-for="it in card.items" :key="it.id" class="pt-item" :class="{ 'pt-item-air': tab === 'airparts', 'pt-item-tool': tab === 'tools' }">
                 <label v-if="tab === 'airparts'" class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.pn" class="m-name" @input="onPartAutoSize"></textarea></label>
@@ -2306,6 +2340,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <div v-if="!card.items.length" class="pt-empty">暂无物品 — 点击「+ 增加物品」</div>
             </div>
             <button class="gp-add" @click="addPartItem(partKind, card.id)">+ 增加物品</button>
+            </template>
           </section>
           <div v-if="!visiblePartCards.length" class="pt-empty-all">暂无卡片 — 点上方「+ 新增卡片」</div>
         </div>
@@ -2678,14 +2713,22 @@ textarea.textwrap {
 .pt-items { padding: 4px 0 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .pt-empty { color: var(--muted, #697386); font-size: 12.5px; text-align: center; padding: 10px 0; }
 .pt-empty-all { text-align: center; color: var(--muted, #697386); padding: 40px 0; font-size: 13px; }
-/* 卡片搜索栏：模糊搜索输入 + 多选胶囊 */
-.part-search-bar { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; padding: 10px 12px; background: #fff; border: 1px solid var(--line, #dde2ec); border-radius: 10px; }
+/* 卡片搜索栏：AutoComplete 输入 + 下拉候选 */
+.part-search-bar { margin: 0 0 12px; padding: 10px 12px; background: #fff; border: 1px solid var(--line, #dde2ec); border-radius: 10px; }
+.part-search-wrap { position: relative; }
 .part-search-input { height: 34px; padding: 0 12px; border: 1.5px solid var(--line, #dde2ec); border-radius: 8px; font-size: 13.5px; width: 100%; box-sizing: border-box; font-family: inherit; }
 .part-search-input:focus { outline: none; border-color: var(--focus, #8eaadb); box-shadow: 0 0 0 3px rgba(142, 170, 219, .18); }
-.part-capsules { display: flex; flex-wrap: wrap; gap: 6px; }
-.part-capsule { border: 1px solid var(--line, #dde2ec); background: #fff; border-radius: 999px; padding: 3px 12px; font-size: 12.5px; color: var(--muted, #697386); cursor: pointer; }
-.part-capsule:hover { border-color: var(--blue, #4472c4); color: var(--blue-dark, #2f5597); }
-.part-capsule.on { background: var(--blue, #4472c4); border-color: var(--blue, #4472c4); color: #fff; }
+.part-suggest { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid var(--line, #dde2ec); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .12); padding: 4px; }
+.part-suggest-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: none; background: transparent; border-radius: 7px; cursor: pointer; text-align: left; }
+.part-suggest-item:hover { background: var(--blue-light, #eaf1fa); }
+.psi-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text, #222); }
+.psi-kind { flex-shrink: 0; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #eef2f8; color: var(--muted, #697386); }
+.psi-kind.card { background: #e3edfb; color: #2f5597; }
+.psi-kind.pn { background: #fdecec; color: #b53a3a; }
+.psi-kind.name { background: #e8f5e9; color: #2e7d32; }
+/* 卡片折叠按钮 */
+.pt-collapse { flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line, #dde2ec); border-radius: 6px; background: rgba(255, 255, 255, .8); color: var(--muted, #697386); font-size: 13px; line-height: 1; cursor: pointer; }
+.pt-collapse:hover { border-color: var(--blue, #4472c4); color: var(--blue-dark, #2f5597); }
 /* 物品卡片：参考 A检 航材清单 m-item 样式（件号/名称/数量带字段标签 + 自动换行） */
 .pt-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: stretch; border: 1px solid #e6e9f0; border-radius: 8px; padding: 6px 8px; background: #fff; word-break: break-word; }
 .pt-item-tool { grid-template-columns: 2fr 0.6fr auto; }
