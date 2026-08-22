@@ -45,7 +45,7 @@ import {
   type ToolItem,
   type ToolState,
 } from "../domain/toolbox";
-import { formatDay, parseDay } from "../utils/format";
+import { parseDay } from "../utils/format";
 
 const STORAGE_KEY = "categoryItemManager.v2";
 
@@ -84,9 +84,20 @@ export function useToolbox() {
   const editingStdLib = ref<StandardLibKey | null>(null);
   /** 正在编辑的航材标准库机型（A320/B787）；与 editingLibrary 互斥。 */
   const editingMaterialLibrary = ref<AircraftType | null>(null);
-  // 一级页面执行日期查询框：date input（YYYY-MM-DD），空=不筛选；筛选时转 YYYYMMDD 与 project.executeDate 精确比对。
-  const searchDay = ref("");
-  const teamFilter = ref("");
+  // 一级页筛选：执行日期时段（dateFrom/dateTo，YYYY-MM-DD；默认今日-5 ~ 今日+30，跨度上限 30 天由 UI 约束）。
+  function dayOffsetStr(offset: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+  const dateFrom = ref(dayOffsetStr(-5));
+  const dateTo = ref(dayOffsetStr(30));
+  /** 项目类型多选（PROJECT_TYPES 子集）。 */
+  const typeFilter = ref<string[]>([]);
+  /** 执行班组多选（TEAMS 子集）。 */
+  const teamFilters = ref<string[]>([]);
   // 一级页面按项目名称搜索（模糊、忽略大小写）。
   const nameQuery = ref("");
   const cloud = reactive<{ text: string; state: CloudState; available: boolean }>({ text: "连接中…", state: "warn", available: false });
@@ -200,15 +211,21 @@ export function useToolbox() {
   });
   const filteredProjects = computed(() => {
     const name = nameQuery.value.trim().toLowerCase();
-    // 基准执行日期：查询栏选定值，否则默认当日；显示「执行日期」前后 5 天内的项目。
-    const base = parseDay(searchDay.value.trim() || formatDay(Date.now()));
+    const typeSet = new Set(typeFilter.value);
+    const teamSet = new Set(teamFilters.value);
+    // 执行日期时段：from/to（YYYY-MM-DD），空端不限；执行日期需落在闭区间 [from, to] 内。
+    const from = dateFrom.value.trim() ? parseDay(dateFrom.value.trim()) : null;
+    const to = dateTo.value.trim() ? parseDay(dateTo.value.trim()) : null;
     return app.value.projects.filter((project) => {
-      if (teamFilter.value && project.team !== teamFilter.value) return false;
+      if (typeSet.size && !typeSet.has(project.type || "")) return false;
+      if (teamSet.size && !teamSet.has(project.team)) return false;
       if (name && !project.name.toLowerCase().includes(name)) return false;
-      if (!base) return true;
+      if (!from && !to) return true;
       const ed = parseDay(project.executeDate.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"));
       if (!ed) return false;
-      return Math.abs(ed.getTime() - base.getTime()) <= 5 * 86400000;
+      if (from && ed.getTime() < from.getTime()) return false;
+      if (to && ed.getTime() > to.getTime()) return false;
+      return true;
     });
   });
 
@@ -1874,7 +1891,7 @@ export function useToolbox() {
     app, screen, listTab, detailTab, ganttTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
     active, materialActive, materialCategories, standardMaterialCategories, mStandardSubs,
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
-    searchDay, teamFilter, nameQuery, filteredProjects, cloud, toast, shared,
+    dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toast, shared,
     notify, persist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
     createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
     itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,

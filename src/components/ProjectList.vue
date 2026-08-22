@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import {
   AIRCRAFT_TYPES,
+  PROJECT_TYPES,
   STANDARD_LIB_KEYS,
   STANDARD_LIB_META,
   TEAMS,
@@ -270,6 +271,37 @@ function saveAnnouncement(): void {
 function cancelEditAnnouncement(): void {
   editingAnnouncement.value = false;
 }
+
+// —— 左侧功能区：执行日期时段（最多 30 天）校验 + 各筛选项清空 ——
+function dateOffsetStr(base: string, delta: number): string {
+  const d = new Date(`${base}T00:00:00`);
+  d.setDate(d.getDate() + delta);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+/** 执行日期时段跨度上限 30 天：后改的一端超出时自动收回到另一端 ±30 天。 */
+function clampDateRange(changed: "from" | "to"): void {
+  const f = props.store.dateFrom.value.trim();
+  const t = props.store.dateTo.value.trim();
+  if (!f || !t) return;
+  const span = (Date.parse(`${t}T00:00:00`) - Date.parse(`${f}T00:00:00`)) / 86400000;
+  if (span > 30) {
+    if (changed === "from") props.store.dateFrom.value = dateOffsetStr(t, -30);
+    else props.store.dateTo.value = dateOffsetStr(f, 30);
+    props.store.notify("执行日期时段最多 30 天，已自动调整");
+  }
+}
+function clearDateRange(): void {
+  props.store.dateFrom.value = "";
+  props.store.dateTo.value = "";
+}
+function clearTypeFilter(): void {
+  props.store.typeFilter.value = [];
+}
+function clearTeamFilter(): void {
+  props.store.teamFilters.value = [];
+}
 </script>
 
 <template>
@@ -294,36 +326,79 @@ function cancelEditAnnouncement(): void {
     </nav>
 
     <template v-if="store.listTab.value === 'tools'">
-      <div class="toolbar list-toolbar">
-        <button class="primary" @click="startNew">+ 新建工作项目</button>
-        <button @click="emit('export-all')">导出全部</button>
-        <button @click="emit('share')">分享本页</button>
-        <button title="强制同步数据" @click="store.refresh()">刷新</button>
-        <span class="spacer" />
-        <input v-model="store.nameQuery.value" class="project-name-input" placeholder="搜索项目名称" aria-label="按项目名称搜索" />
-        <select v-model="store.teamFilter.value" aria-label="按班组筛选">
-          <option value="">班组：全部</option>
-          <option v-for="team in TEAMS" :key="team">{{ team }}</option>
-        </select>
-        <input type="date" v-model="store.searchDay.value" class="date-search" aria-label="按执行日期查询" />
-        <button @click="store.searchDay.value = ''; store.teamFilter.value = ''; store.nameQuery.value = ''">清除</button>
-      </div>
+      <!-- 项目列表子页：现有宽度内左右分栏（左 1/3 功能区，右 2/3 列表） -->
+      <div class="list-split">
+        <!-- 左侧 1/3：功能按钮区 -->
+        <aside class="list-side">
+          <button class="primary side-new" @click="startNew">+ 新建工作项目</button>
+          <div class="side-row">
+            <button title="复制本页链接，对方打开后自动定位" @click="emit('share')">分享本页</button>
+            <button title="强制同步数据" @click="store.refresh()">刷新</button>
+          </div>
+          <div class="side-divider" />
+          <div class="side-title">筛选条件</div>
 
-      <p class="list-status">共 {{ store.filteredProjects.value.length }} 个工作项目</p>
-      <div v-if="!store.filteredProjects.value.length" class="empty-state">尚无符合条件的工作项目。</div>
-      <article v-for="project in store.filteredProjects.value" :key="project.id" class="project-card">
-        <button class="project-main" @click="openInNewTab(project)">
-          <strong>{{ project.name }}</strong>
-          <span>{{ project.aircraftType }} · {{ project.executeDate || "未设置执行日期" }}</span>
-        </button>
-        <span class="card-meta">{{ project.type || "未选择类型" }}</span>
-        <span class="card-meta">{{ project.team || "未分配班组" }}</span>
-        <div class="actions">
-          <button @click="editProject(project)">修订</button>
-          <button @click="duplicate(project)">复制项目</button>
-          <button class="danger" @click="remove(project)">删除</button>
+          <div class="side-field">
+            <span class="side-label">执行日期（时段，最多 30 天）</span>
+            <div class="side-date-range">
+              <input type="date" :value="store.dateFrom.value" aria-label="起始日期" @change="store.dateFrom.value = ($event.target as HTMLInputElement).value; clampDateRange('from')" />
+              <span class="side-range-sep">至</span>
+              <input type="date" :value="store.dateTo.value" aria-label="结束日期" @change="store.dateTo.value = ($event.target as HTMLInputElement).value; clampDateRange('to')" />
+            </div>
+            <button class="side-clear" @click="clearDateRange">清空</button>
+          </div>
+
+          <div class="side-field">
+            <span class="side-label">项目名称（模糊搜索）</span>
+            <div class="side-input-row">
+              <input v-model="store.nameQuery.value" placeholder="搜索项目名称" aria-label="按项目名称搜索" />
+              <button class="side-clear" @click="store.nameQuery.value = ''">清空</button>
+            </div>
+          </div>
+
+          <div class="side-field">
+            <span class="side-label">项目类型（下拉多选）</span>
+            <div class="side-input-row">
+              <select multiple class="side-multi" v-model="store.typeFilter.value" aria-label="按项目类型多选筛选">
+                <option v-for="t in PROJECT_TYPES" :key="t" :value="t">{{ t }}</option>
+              </select>
+              <button class="side-clear" @click="clearTypeFilter">清空</button>
+            </div>
+          </div>
+
+          <div class="side-field">
+            <span class="side-label">执行班组（下拉多选）</span>
+            <div class="side-input-row">
+              <select multiple class="side-multi" v-model="store.teamFilters.value" aria-label="按执行班组多选筛选">
+                <option v-for="team in TEAMS" :key="team" :value="team">{{ team }}</option>
+              </select>
+              <button class="side-clear" @click="clearTeamFilter">清空</button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 右侧 2/3：项目列表 -->
+        <div class="list-main">
+          <div class="list-main-head">
+            <p class="list-status">共 {{ store.filteredProjects.value.length }} 个工作项目</p>
+            <button title="导出全部项目数据" @click="emit('export-all')">导出全部</button>
+          </div>
+          <div v-if="!store.filteredProjects.value.length" class="empty-state">尚无符合条件的工作项目。</div>
+          <article v-for="project in store.filteredProjects.value" :key="project.id" class="project-card">
+            <button class="project-main" @click="openInNewTab(project)">
+              <strong>{{ project.name }}</strong>
+              <span>{{ project.aircraftType }} · {{ project.executeDate || "未设置执行日期" }}</span>
+            </button>
+            <span class="card-meta">{{ project.type || "未选择类型" }}</span>
+            <span class="card-meta">{{ project.team || "未分配班组" }}</span>
+            <div class="actions">
+              <button @click="editProject(project)">修订</button>
+              <button @click="duplicate(project)">复制项目</button>
+              <button class="danger" @click="remove(project)">删除</button>
+            </div>
+          </article>
         </div>
-      </article>
+      </div>
     </template>
 
     <div v-else class="database-grid">
@@ -554,4 +629,42 @@ function cancelEditAnnouncement(): void {
 .eng-tpl-info span { font-size: 12px; color: #8a94a3; }
 .eng-tpl-actions { display: flex; gap: 6px; flex: 0 0 auto; }
 .eng-tpl-actions button { min-height: 28px; padding: 3px 10px; font-size: 12px; }
+
+/* ===== 项目列表子页：左 1/3 功能区 + 右 2/3 列表 ===== */
+.list-split { display: flex; gap: 16px; align-items: flex-start; }
+.list-side {
+  flex: 0 0 33.3333%; min-width: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 14px; position: sticky; top: 8px;
+}
+.list-main { flex: 1 1 66.6667%; min-width: 0; }
+.side-new { width: 100%; }
+.side-row { display: flex; gap: 8px; }
+.side-row button { flex: 1; }
+.side-divider { height: 1px; background: var(--line); margin: 2px 0; }
+.side-title { font-size: 14px; font-weight: 700; color: var(--n8); }
+.side-field { display: flex; flex-direction: column; gap: 6px; }
+.side-label { font-size: 12px; color: var(--n6); }
+.side-date-range { display: flex; align-items: center; gap: 6px; }
+.side-date-range input { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 12.5px; }
+.side-range-sep { color: var(--n6); font-size: 12px; flex: 0 0 auto; }
+.side-input-row { display: flex; gap: 6px; align-items: stretch; }
+.side-input-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; }
+.side-multi { flex: 1; min-width: 0; height: 76px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; }
+.side-clear {
+  flex: 0 0 auto; align-self: flex-end; min-height: 30px; padding: 4px 12px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--n1); color: var(--n7); font-size: 12.5px;
+}
+.side-clear:hover { background: var(--blue-bg); color: var(--blue-dark); }
+.list-main-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.list-main-head .list-status { margin: 0; }
+
+/* 移动端：分栏改为上下堆叠 */
+@media (max-width: 860px) {
+  .list-split { flex-direction: column; }
+  .list-side { flex: none; width: 100%; position: static; }
+  .list-main { flex: none; width: 100%; }
+}
 </style>
