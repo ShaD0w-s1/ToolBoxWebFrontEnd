@@ -3,13 +3,41 @@
   background: #f4f6fb;
   font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
+  /* 品牌主色（保留） */
   --blue: #4472c4;
   --blue-dark: #2f5597;
   --blue-light: #d9e1f2;
+  --blue-bg: #eef3fb;
   --line: #dde2ec;
   --muted: #697386;
   --danger: #c0392b;
+  --danger-bg: #fdecea;
   --card: #fff;
+  /* 语义色（补充） */
+  --warn: #b07d10;
+  --warn-bg: #fff7e0;
+  --ok: #2e7d32;
+  --ok-bg: #e8f5e9;
+  /* 中性色阶（UI/UX 审计规范新增） */
+  --n0: #ffffff; --n1: #f7f9fc; --n2: #f0f3f8; --n3: #e6eaf2; --n4: #dde2ec;
+  --n5: #b9c1cf; --n6: #8a93a6; --n7: #697386; --n8: #3d4657; --n9: #1f2a44; --n10: #141b2e;
+  /* 字号阶梯 */
+  --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-15: 15px;
+  --fs-16: 16px; --fs-18: 18px; --fs-21: 21px; --fs-24: 24px;
+  /* 间距刻度（8px 基准） */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-7: 32px;
+  /* 圆角（收敛 4 级） */
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+  /* 阴影 */
+  --sh-1: 0 1px 2px rgba(20, 27, 46, .05);
+  --sh-2: 0 2px 8px rgba(20, 27, 46, .07);
+  --sh-3: 0 8px 24px rgba(20, 27, 46, .12);
+  /* 动效 */
+  --t-fast: .15s; --t-med: .2s;
+  /* 业务语义色（换发/APU 定稿，全局可用） */
+  --proc-yellow: #FDCA17; --proc-yellow-line: #C9A227;
+  --sp-orange: #E8A44D; --sp-orange-deep: #c2701a;
+  --day-bg: #E8F1FC;
 }
 
 * { box-sizing: border-box; }
@@ -45,18 +73,20 @@ main.gantt-full { width: calc(100% - 32px); max-width: none; }
 button, .button, .field, .check, .toolbar select {
   min-height: 36px;
   border: 1px solid #8eaadb;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   padding: 7px 13px;
   color: var(--blue-dark);
   background: #fff;
   font-size: 13px;
   font-weight: 650;
+  transition: background-color var(--t-fast) ease, border-color var(--t-fast) ease, color var(--t-fast) ease, box-shadow var(--t-fast) ease, transform .12s ease;
 }
 button:hover, .button:hover { background: var(--blue-light); }
 button.primary, .primary { color: #fff; border-color: var(--blue); background: var(--blue); }
 button.primary:hover { background: var(--blue-dark); }
 button.danger, .danger { color: var(--danger); border-color: #e6a0a0; }
-button.danger:hover { background: #fdecea; }
+button.danger:hover { background: var(--danger-bg); }
+button:active:not(:disabled), .button:active:not(:disabled) { transform: translateY(1px); }
 .spacer { flex: 1; }
 
 /* ===== 最小动效（纯 CSS，仅 transform/opacity/color，不触发布局重排） =====
@@ -129,9 +159,13 @@ button.ghost:hover, .ghost:hover { background: var(--blue-light); }
 .library-card > div { display: flex; flex: 1; flex-direction: column; }
 .empty-state { padding: 34px; border: 1px dashed #b8c0d0; border-radius: 12px; color: var(--muted); background: #fff; text-align: center; }
 
-.detail-head { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+.detail-head { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; padding: 13px 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: #fff; box-shadow: var(--sh-1); }
 .detail-head > div:not(.summary) { display: flex; flex-direction: column; }
 .detail-head strong { font-size: 17px; }
+/* 面包屑（UI/UX 审计规范新增）：项目列表 / 项目名 / 子页 */
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.breadcrumb .sep { color: var(--n5); }
+.breadcrumb .cur { color: var(--n9); font-weight: 600; }
 /* “添加部位”下拉：保持蓝色主按钮外观（覆盖 .toolbar select 的透明背景规则） */
 .toolbar select.add-cat { background: var(--blue); color: #fff; border-color: var(--blue); }
 .toolbar select.add-cat:hover { background: var(--blue-dark); }

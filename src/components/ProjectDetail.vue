@@ -43,6 +43,12 @@ const subPage = ref<"prep" | "workcard" | "material" | "tools" | "gantt">("prep"
 watch(() => props.store.currentProject.value?.id, () => {
   subPage.value = props.store.currentProject.value?.type === "换发/APU" ? "gantt" : "prep";
 }, { immediate: true });
+/** 面包屑：当前子页标签（UI/UX 审计规范新增）。 */
+const subPageLabel = computed(() => {
+  if (props.store.editingLibrary.value || props.store.editingMaterialLibrary.value) return "机型标准数据库";
+  const map: Record<string, string> = { prep: "工作准备单", workcard: "工卡分配清单", material: "航材清单", tools: "工具清单", gantt: "换发/APU 准备单" };
+  return map[subPage.value] || "";
+});
 
 // 子页 → 顶层字段映射：切换子页时同步「正在编辑的字段」，供字段级 dirty 追踪 / 合并使用。
 function fieldForSubPage(): "data" | "materialList" | "prepSheet" | "workcardAssignment" | "standalonePrepSheet" | "ganttPrep" {
@@ -304,6 +310,13 @@ async function runToolFilterByWorkcard(): Promise<void> {
 <template>
   <section v-if="store.active.value || store.editingMaterialLibrary.value" ref="capture">
     <div class="detail-sticky">
+      <div v-if="store.currentProject.value" class="breadcrumb">
+        <span class="cur" style="cursor:pointer" @click="store.backToList">项目列表</span>
+        <span class="sep">/</span>
+        <span>{{ store.detailTitle.value }}</span>
+        <span class="sep">/</span>
+        <span class="cur">{{ subPageLabel }}</span>
+      </div>
       <header class="detail-head">
         <button @click="store.backToList">← 返回</button>
         <div>
