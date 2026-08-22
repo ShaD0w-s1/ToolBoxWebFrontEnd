@@ -108,7 +108,13 @@ async function submit(): Promise<void> {
   border-radius: var(--r-md);
   font-size: 14px;
   color: #2f5597;
-  background: #fff;
+  background: var(--n1);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
+}
+.pfm-field input:hover, .pfm-field select:hover { border-color: var(--n5); }
+.pfm-field input:focus, .pfm-field select:focus {
+  outline: none; background: #fff; border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(68, 114, 196, .16);
 }
 .pfm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 </style>
