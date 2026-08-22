@@ -178,7 +178,7 @@ async function supplementStdLib(sub: string): Promise<void> {
 
 <style scoped>
 /* 部位名行内输入框（与“工作”名输入栏一致：透明底、悬停/聚焦显边框、加粗） */
-.cat-name { flex: 0 1 auto; min-width: 90px; max-width: 220px; padding: 4px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: 15px; color: inherit; }
+.cat-name { flex: 0 1 auto; min-width: 90px; max-width: 220px; padding: 4px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-16); color: inherit; }
 .cat-name:hover, .cat-name:focus { border-color: var(--focus); background: #fff; }
 /* 合并后：StandardPicker 在 sub-head 内作为工作名输入框，占满可用宽度 */
 .sub-head :deep(.standard-combo) {
@@ -195,7 +195,7 @@ async function supplementStdLib(sub: string): Promise<void> {
   border-radius: var(--r-sm);
   background: transparent;
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: inherit;
 }
 .sub-head :deep(.standard-input:hover),

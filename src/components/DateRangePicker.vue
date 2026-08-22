@@ -130,7 +130,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .drp-trigger:hover { border-color: var(--n5); }
 .drp-trigger.on { border-color: var(--blue); }
 .drp-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.drp-arrow { font-size: 10px; color: var(--n6); transition: transform var(--t-fast); }
+.drp-arrow { font-size: var(--fs-10); color: var(--n6); transition: transform var(--t-fast); }
 .drp-arrow.up { transform: rotate(180deg); }
 .drp-menu {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 60;
@@ -142,7 +142,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .drp-nav-title { font-size: var(--fs-13); font-weight: 600; color: var(--n8); }
 .drp-nav-btn {
   width: 26px; height: 26px; padding: 0; border: 1px solid var(--n3); border-radius: var(--r-sm);
-  background: var(--n1); color: var(--n8); font-size: 14px; line-height: 1;
+  background: var(--n1); color: var(--n8); font-size: var(--fs-14); line-height: 1;
 }
 .drp-nav-btn:hover { background: var(--blue-bg); color: var(--blue-dark); }
 .drp-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }

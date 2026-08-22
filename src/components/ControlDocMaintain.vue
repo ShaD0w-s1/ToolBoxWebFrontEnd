@@ -120,15 +120,15 @@ async function onDelete(doc: ControlDoc): Promise<void> {
 <style scoped>
 .cdm { padding: 4px 0 24px; }
 .cdm-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.cdm-head h3 { margin: 0; font-size: 15px; }
+.cdm-head h3 { margin: 0; font-size: var(--fs-16); }
 .cdm-upload { display: flex; gap: 8px; margin-bottom: 8px; }
 .cdm-upload select { min-height: 32px; padding: 4px 8px; border: 1px solid var(--focus); border-radius: var(--r-md); }
-.cdm-hint { margin: 0 0 12px; font-size: 12px; color: var(--n7); }
-.cdm-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--n3); border-radius: var(--r-md); overflow: hidden; font-size: 13px; }
+.cdm-hint { margin: 0 0 12px; font-size: var(--fs-12); color: var(--n7); }
+.cdm-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--n3); border-radius: var(--r-md); overflow: hidden; font-size: var(--fs-13); }
 .cdm-table th, .cdm-table td { padding: 8px 10px; border-bottom: 1px solid var(--n3); text-align: left; }
 .cdm-table th { background: var(--n1); font-weight: 600; color: var(--n8); }
 .cdm-name { word-break: break-all; }
-.cdm-id { font-family: monospace; font-size: 11px; color: #697386; word-break: break-all; max-width: 260px; }
+.cdm-id { font-family: monospace; font-size: var(--fs-11); color: #697386; word-break: break-all; max-width: 260px; }
 .cdm-ops { display: flex; gap: 6px; }
-.cdm-ops button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
+.cdm-ops button { min-height: 28px; padding: 3px 8px; font-size: var(--fs-12); }
 </style>

@@ -237,20 +237,20 @@ function exportTableXlsx(): void {
 
 <style scoped>
 .prep-sheet { padding: 4px 2px 40px; }
-.prep-title { margin: 0; font-size: 18px; cursor: pointer; padding: 4px 6px; border-radius: var(--r-sm); }
+.prep-title { margin: 0; font-size: var(--fs-18); cursor: pointer; padding: 4px 6px; border-radius: var(--r-sm); }
 .prep-title:hover { background: #eef2fa; }
-.prep-title-input { font-size: 18px; padding: 4px 8px; border: 1px solid #6f8ad6; border-radius: var(--r-sm); min-width: 240px; }
+.prep-title-input { font-size: var(--fs-18); padding: 4px 8px; border: 1px solid #6f8ad6; border-radius: var(--r-sm); min-width: 240px; }
 
 .prep-block { margin-bottom: 18px; background: #fff; border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
-.prep-block h4 { margin: 0 0 10px; font-size: 14px; background: var(--blue); color: #fff; padding: 8px 12px; border-radius: var(--r-md); }
+.prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: #fff; padding: 8px 12px; border-radius: var(--r-md); }
 
 /* 需求 1：固定命名字体颜色为黑色 */
-.field-label { font-size: 13px; color: #000; font-weight: 500; }
+.field-label { font-size: var(--fs-13); color: #000; font-weight: 500; }
 
 .prep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 14px; margin-bottom: 8px; }
 .prep-grid-6 { grid-template-columns: repeat(6, 1fr); }
 .prep-field { display: flex; flex-direction: column; gap: 4px; }
-.prep-field input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
+.prep-field input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
 /* Divider 分隔线：基础信息各组之间；人员安排网格内跨 4 列（起落架行后、工卡负责人行后） */
 .prep-divider { height: 1px; background: #dde2ec; grid-column: 1 / -1; margin: 4px 0 10px; }
 
@@ -258,33 +258,33 @@ function exportTableXlsx(): void {
 .special-config { color: #c0392b !important; font-weight: 700 !important; }
 
 /* 后三天过夜航班 — 缩小输入格宽度避免 6 列行超宽（修复 1） */
-.prep-grid-6 .prep-field input { padding: 4px 6px; font-size: 13px; }
+.prep-grid-6 .prep-field input { padding: 4px 6px; font-size: var(--fs-13); }
 .prep-overnight-inputs { display: flex; align-items: center; gap: 2px; }
-.prep-overnight-inputs input { flex: 1; min-width: 0; padding: 4px 4px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 12px; }
-.connector { color: var(--n6); font-size: 12px; flex: 0 0 auto; }
+.prep-overnight-inputs input { flex: 1; min-width: 0; padding: 4px 4px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-12); }
+.connector { color: var(--n6); font-size: var(--fs-12); flex: 0 0 auto; }
 
 /* 人员安排 4 列 */
 .prep-personnel-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
 .prep-personnel-cell { display: flex; flex-direction: column; gap: 4px; }
-.prep-personnel-cell input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
+.prep-personnel-cell input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .prep-personnel-fullrow { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
-.prep-personnel-fullrow input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
+.prep-personnel-fullrow input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
 
 /* 杂项 4 列 */
 .prep-misc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .prep-misc-cell { display: flex; flex-direction: column; gap: 4px; }
-.prep-misc-cell input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
+.prep-misc-cell input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
 
 /* 需求 3：动态新增格子 — 名称 0.7 列，内容 1.3→3.7 列（flex 让内容可扩展） */
 .prep-extra-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .prep-extra-item { display: flex; gap: 6px; align-items: stretch; }
-.extra-title { flex: 0 0 14%; min-width: 70px; max-width: 120px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
-.extra-value { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
-.danger-cell { flex: 0 0 auto; padding: 6px 10px; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: 12px; cursor: pointer; }
+.extra-title { flex: 0 0 14%; min-width: 70px; max-width: 120px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.extra-value { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.danger-cell { flex: 0 0 auto; padding: 6px 10px; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: var(--fs-12); cursor: pointer; }
 
 .prep-block-actions { margin-top: 10px; display: flex; gap: 8px; }
 .prep-text { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-.prep-text textarea { min-height: 56px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; resize: vertical; }
+.prep-text textarea { min-height: 56px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); resize: vertical; }
 
 /* 移动端/平板适配（≤1024px）：4 列行显示 2 列，6 列行显示 3 列；填字格宽度不超过网页一半（2列=半宽，3列=1/3） */
 @media (max-width: 1024px) {

@@ -62,12 +62,12 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .ms-trigger.on { border-color: var(--blue); }
 .ms-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ms-count { font-size: var(--fs-11); background: var(--blue); color: #fff; border-radius: var(--r-pill); padding: 0 7px; line-height: 16px; }
-.ms-arrow { font-size: 10px; color: var(--n6); transition: transform var(--t-fast); }
+.ms-arrow { font-size: var(--fs-10); color: var(--n6); transition: transform var(--t-fast); }
 .ms-arrow.up { transform: rotate(180deg); }
 .ms-clear {
   position: absolute; right: 26px; top: 50%; transform: translateY(-50%);
   width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%;
-  background: var(--danger-bg); color: var(--danger); font-size: 13px; line-height: 1;
+  background: var(--danger-bg); color: var(--danger); font-size: var(--fs-13); line-height: 1;
 }
 .ms-clear:hover { background: #f9dcdc; }
 .ms-menu {

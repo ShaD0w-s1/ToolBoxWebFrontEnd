@@ -99,14 +99,14 @@ async function submit(): Promise<void> {
   border-radius: var(--r-lg);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
-.pfm-card h3 { margin: 0 0 4px; font-size: 17px; color: var(--n8); }
-.pfm-field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #5f6b7a; }
+.pfm-card h3 { margin: 0 0 4px; font-size: var(--fs-18); color: var(--n8); }
+.pfm-field { display: flex; flex-direction: column; gap: 5px; font-size: var(--fs-13); color: #5f6b7a; }
 .pfm-field input, .pfm-field select {
   min-height: 36px;
   padding: 7px 11px;
   border: 1px solid var(--focus);
   border-radius: var(--r-md);
-  font-size: 14px;
+  font-size: var(--fs-14);
   color: #2f5597;
   background: var(--n1);
   transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);

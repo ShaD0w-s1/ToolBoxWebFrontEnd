@@ -22,7 +22,7 @@
   --n0: #ffffff; --n1: #f7f9fc; --n2: #f0f3f8; --n3: #e6eaf2; --n4: #dde2ec;
   --n5: #b9c1cf; --n6: #8a93a6; --n7: #697386; --n8: #3d4657; --n9: #1f2a44; --n10: #141b2e;
   /* 字号阶梯 */
-  --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-15: 15px;
+  --fs-10: 10px; --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-15: 15px;
   --fs-16: 16px; --fs-18: 18px; --fs-21: 21px; --fs-24: 24px;
   /* 间距刻度（8px 基准） */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-7: 32px;
@@ -71,7 +71,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
   background: var(--proc-yellow, #FDCA17); color: #000;
-  border-radius: var(--r-pill); font-size: 10px; font-weight: 700; line-height: 1;
+  border-radius: var(--r-pill); font-size: var(--fs-10); font-weight: 700; line-height: 1;
 }
 
 main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 48px; }
@@ -109,6 +109,8 @@ button:active:not(:disabled), .button:active:not(:disabled) { transform: transla
 .inp-err:focus { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(192, 57, 43, .14); }
 .inp-lg { min-height: 40px; font-size: var(--fs-14); }
 .inp-sm { min-height: 30px; padding: 4px 10px; font-size: var(--fs-12); border-radius: var(--r-sm); }
+/* 备注栏字体统一红色（UI_DESIGN_SPEC §2.5：备注=红色提示语义；含 placeholder 含"备注"的所有 textarea） */
+textarea[placeholder*="备注"] { color: var(--danger, #c0392b); }
 /* 组件内散落单行输入框收敛兜底（组件 scoped 特殊样式优先级更高，此处统一共性）
    ⚠️ 用 :where() 包裹使特异性归零，避免覆盖组件内类选择器（如甘特阶段名白字、表单黄底） */
 input:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"])) {

@@ -574,7 +574,7 @@ async function batchDeleteNoDate(): Promise<void> {
   background: linear-gradient(90deg, #fff8e1, #fff3c4);
   border: 1px solid #f0d878;
   border-radius: var(--r-md);
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 .announcement-label {
   font-weight: 700;
@@ -596,30 +596,30 @@ async function batchDeleteNoDate(): Promise<void> {
   padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  font-size: 14px;
+  font-size: var(--fs-14);
 }
 .library-actions { display: flex; gap: 6px; }
-.library-actions button { min-height: 28px; padding: 3px 7px; font-size: 12px; }
+.library-actions button { min-height: 28px; padding: 3px 7px; font-size: var(--fs-12); }
 .db-group { margin-bottom: 20px; }
-.db-group-title { font-size: 14px; font-weight: 700; color: var(--n8); margin: 0 0 8px; padding-left: 4px; border-left: 4px solid #378add; }
+.db-group-title { font-size: var(--fs-14); font-weight: 700; color: var(--n8); margin: 0 0 8px; padding-left: 4px; border-left: 4px solid #378add; }
 .db-group-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .compare-card { border-color: #378add; }
 .site-admin-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; background: rgba(17, 24, 39, 0.45); }
 .site-admin-card { width: min(560px, calc(100% - 48px)); max-height: none; margin: 24px auto; padding: 20px 24px; background: #fff; border-radius: var(--r-lg); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
 .site-admin-newtpl { display: flex; gap: 8px; margin-bottom: 12px; }
-.site-admin-newtpl input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; }
+.site-admin-newtpl input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); }
 .site-admin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.site-admin-head h3 { margin: 0; font-size: 16px; color: var(--n8); }
-.site-admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.site-admin-head h3 { margin: 0; font-size: var(--fs-16); color: var(--n8); }
+.site-admin-table { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
 .site-admin-table th, .site-admin-table td { padding: 7px 10px; border-bottom: 1px solid #eef1f5; text-align: left; }
 .site-admin-table th { color: #5f6b7a; font-weight: 600; background: #f6f8fb; }
 .site-admin-empty { color: #8a94a3; text-align: center; padding: 20px 0; margin: 0; }
 .eng-tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #eef1f5; border-radius: var(--r-md); margin-bottom: 8px; }
 .eng-tpl-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.eng-tpl-info strong { font-size: 14px; color: var(--n8); }
-.eng-tpl-info span { font-size: 12px; color: #8a94a3; }
+.eng-tpl-info strong { font-size: var(--fs-14); color: var(--n8); }
+.eng-tpl-info span { font-size: var(--fs-12); color: #8a94a3; }
 .eng-tpl-actions { display: flex; gap: 6px; flex: 0 0 auto; }
-.eng-tpl-actions button { min-height: 28px; padding: 3px 10px; font-size: 12px; }
+.eng-tpl-actions button { min-height: 28px; padding: 3px 10px; font-size: var(--fs-12); }
 
 /* ===== 项目列表子页：左 1/3 功能区 + 右 2/3 列表 ===== */
 .list-split { display: flex; gap: 16px; align-items: flex-start; }
@@ -632,15 +632,15 @@ async function batchDeleteNoDate(): Promise<void> {
 .list-main { flex: 1 1 66.6667%; min-width: 0; }
 .side-new {
   width: 100%; min-height: 72px; /* 2 倍标准按钮高度（36→72） */
-  font-size: 17px; font-weight: 700; border-radius: var(--r-lg);
+  font-size: var(--fs-18); font-weight: 700; border-radius: var(--r-lg);
   letter-spacing: .5px;
 }
 .side-row { display: flex; gap: 8px; }
 .side-row button { flex: 1; }
 .side-divider { height: 1px; background: var(--line); margin: 2px 0; }
-.side-title { font-size: 14px; font-weight: 700; color: var(--n8); }
+.side-title { font-size: var(--fs-14); font-weight: 700; color: var(--n8); }
 .side-field { display: flex; flex-direction: column; gap: 6px; }
-.side-label { font-size: 12px; font-weight: 600; color: var(--n9); }
+.side-label { font-size: var(--fs-12); font-weight: 600; color: var(--n9); }
 /* 名称搜索：input + 内嵌红色 × */
 .side-search-wrap { position: relative; display: flex; align-items: center; }
 .side-search-wrap .inp { width: 100%; padding-right: 34px; }
@@ -648,7 +648,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .side-clear-x {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
-  background: var(--danger-bg); color: var(--danger); font-size: 14px; line-height: 1;
+  background: var(--danger-bg); color: var(--danger); font-size: var(--fs-14); line-height: 1;
   cursor: pointer; z-index: 2;
 }
 .side-clear-x:hover { background: #f9dcdc; }
@@ -665,7 +665,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .cs-arrow {
   min-height: 30px; width: 26px; padding: 0;
   border: 1px solid var(--blue); border-radius: 0 var(--r-sm) var(--r-sm) 0;
-  background: #fff; color: var(--blue-dark); font-size: 10px;
+  background: #fff; color: var(--blue-dark); font-size: var(--fs-10);
 }
 .cs-arrow:hover { background: var(--blue-bg); }
 .cs-menu {

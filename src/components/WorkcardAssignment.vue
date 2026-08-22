@@ -343,28 +343,28 @@ onMounted(() => {
 .wa-unassigned { border-color: #f0c8a0; background: #fffaf3; }
 /* 工卡分配清单部位配色：参考工具清单（用同一套部位色，底色 50% 透明 + 左实色边条） */
 .wa-section:not(.wa-unassigned) { border-left: 6px solid var(--sec-color, var(--n3)); }
-.wa-section h4 { margin: 4px 0 10px; font-size: 14px; background: var(--sec-bg, var(--n1)); color: var(--n8); padding: 5px 10px; border-radius: var(--r-sm); display: inline-block; }
+.wa-section h4 { margin: 4px 0 10px; font-size: var(--fs-14); background: var(--sec-bg, var(--n1)); color: var(--n8); padding: 5px 10px; border-radius: var(--r-sm); display: inline-block; }
 
 /* 工卡安排标题行（含“工卡修改部位”按钮） */
 .wa-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
 .wa-card-head h4 { margin: 0; background: var(--sec-bg, var(--n1)); color: var(--n8); padding: 5px 10px; border-radius: var(--r-sm); display: inline-flex; align-items: center; }
 .wa-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
 /* 工卡安排标题前的缩进/放出箭头 */
-.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); background: #fff; color: var(--n7); font-size: 12px; line-height: 1; cursor: pointer; flex-shrink: 0; }
+.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); background: #fff; color: var(--n7); font-size: var(--fs-12); line-height: 1; cursor: pointer; flex-shrink: 0; }
 .wa-indent-arrow:hover { border-color: #4472c4; color: #2f5597; }
 .wa-indent-arrow.off { color: #a8b2c4; }
 
 /* Segmented 分段视图选择器（全部/人员安排/FC/LG/AV CB/ENG） */
 .wa-segment { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: #eef1f6; border-radius: var(--r-pill); margin: 0 0 16px; }
-.wa-seg-btn { border: none; background: transparent; border-radius: var(--r-pill); padding: 6px 16px; font-size: 13px; color: var(--n7); cursor: pointer; font-family: inherit; }
+.wa-seg-btn { border: none; background: transparent; border-radius: var(--r-pill); padding: 6px 16px; font-size: var(--fs-13); color: var(--n7); cursor: pointer; font-family: inherit; }
 .wa-seg-btn:hover { color: #2f5597; }
 .wa-seg-btn.on { background: #fff; color: #2f5597; font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
 
 /* 人员安排布局 */
 .wa-personnel { margin-bottom: 10px; }
-.wa-person { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: #000; }
-.wa-person span { font-size: 12px; color: var(--n7); }
-.wa-person input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
+.wa-person { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-13); color: #000; }
+.wa-person span { font-size: var(--fs-12); color: var(--n7); }
+.wa-person input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .wa-person-top { margin-bottom: 8px; }
 .wa-person-top .wa-full { margin-bottom: 6px; }
 .wa-person-second { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 12px; margin-bottom: 8px; }
@@ -374,9 +374,9 @@ onMounted(() => {
 .add-arrange { margin: 2px 0 8px; }
 .wa-arrange-list { margin-bottom: 8px; }
 .wa-arrange-row { display: flex; gap: 6px; align-items: center; max-width: calc(var(--wa-col) * 1.7); margin-bottom: 6px; }
-.wa-arrange-name { flex: 0.7 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
-.wa-arrange-person { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 14px; }
-.wa-arrange-del { flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: 16px; cursor: pointer; }
+.wa-arrange-name { flex: 0.7 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.wa-arrange-person { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.wa-arrange-del { flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: var(--fs-16); cursor: pointer; }
 
 /* 工卡安排表格（比例列宽 + 宽列换行显示） */
 .table-wrap { overflow-x: auto; }
@@ -394,16 +394,16 @@ onMounted(() => {
   min-width: 520px;
 }
 .wa-cell { background: #fff; padding: 4px 6px; display: flex; align-items: stretch; }
-.wa-head { background: var(--n1); font-weight: 600; font-size: 13px; color: #000; align-items: center; }
+.wa-head { background: var(--n1); font-weight: 600; font-size: var(--fs-13); color: #000; align-items: center; }
 .wa-ops { justify-content: center; }
 .wa-cell input,
 .wa-cell select {
   width: 100%; box-sizing: border-box; padding: 5px 6px;
-  border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; min-width: 0;
+  border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0;
 }
 /* 工卡分级列：网页版字号与工卡名称一致（13px），移动端在 media query 内缩小 */
 .wa-cell select {
-  padding: 4px 1px; font-size: 13px;
+  padding: 4px 1px; font-size: var(--fs-13);
 }
 /* 需求 2/3：工卡分级下拉——箭头区域底色透明。
    注意：早期用 svg data-uri 背景画箭头，但 iOS Safari 把 svg 绘入 canvas 会污染画布，
@@ -433,18 +433,18 @@ onMounted(() => {
 }
 /* 未分配部位表格的"部位"select 字体放大到与工卡名称一致（13px） */
 .wa-grid-unassigned .wa-cell select {
-  padding: 5px 6px; font-size: 13px;
+  padding: 5px 6px; font-size: var(--fs-13);
 }
 .wa-cell input:disabled { background: #f2f4f7; color: #98a2b3; }
 .wa-cell.wa-wrap textarea {
   width: 100%; box-sizing: border-box; padding: 5px 6px;
-  border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13);
   resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word;
   line-height: 1.7; min-width: 0; font-family: inherit;
 }
 /* 需求 1：操作列 × 按钮缩小到可见即可 */
-.wa-x { width: 18px; height: 18px; line-height: 1; padding: 0; font-size: 11px; }
-.wa-empty { grid-column: 1 / -1; background: #fff; padding: 12px; color: #98a2b3; font-size: 13px; text-align: center; }
+.wa-x { width: 18px; height: 18px; line-height: 1; padding: 0; font-size: var(--fs-11); }
+.wa-empty { grid-column: 1 / -1; background: #fff; padding: 12px; color: #98a2b3; font-size: var(--fs-13); text-align: center; }
 .add-card { margin-top: 8px; }
 
 /* 移动端：第二行 4 格 → 2 列；新增安排行满宽；工卡安排字体减小、工卡分级可见 */
@@ -453,14 +453,14 @@ onMounted(() => {
   .wa-arrange-row { max-width: 100%; }
   /* 需求 2：手机端所有文字字体减小约 4 号，工卡分级列宽加倍确保可见 */
   .wa-grid { min-width: 520px; --wa-level: 1fr; }
-  .wa-head { font-size: 9px; }
+  .wa-head { font-size: var(--fs-10); }
   .wa-cell input,
-  .wa-cell select { font-size: 9px; padding: 3px 2px; }
-  .wa-cell select { font-size: 8px; padding: 2px 1px; }
+  .wa-cell select { font-size: var(--fs-10); padding: 3px 2px; }
+  .wa-cell select { font-size: var(--fs-10); padding: 2px 1px; }
   .wa-cell select.wa-level-select { padding: 2px 1px; padding-right: 12px; }
   .wa-level-wrap::after { right: 3px; border-left-width: 3px; border-right-width: 3px; border-top-width: 4px; }
-  .wa-cell.wa-wrap textarea { font-size: 9px; padding: 3px 2px; line-height: 1.5; }
-  .wa-x { width: 20px; height: 20px; font-size: 12px; }
+  .wa-cell.wa-wrap textarea { font-size: var(--fs-10); padding: 3px 2px; line-height: 1.5; }
+  .wa-x { width: 20px; height: 20px; font-size: var(--fs-12); }
   .wa-grid-unassigned { min-width: 360px; }
 }
 </style>

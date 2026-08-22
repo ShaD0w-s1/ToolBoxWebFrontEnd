@@ -93,7 +93,7 @@ function blurHide(): void {
 .ns-wrap { position: relative; flex: 1 1 0; min-width: 0; width: 100%; }
 .ns-input {
   width: 100%; min-height: 28px; padding: 0 6px; border: 1px solid var(--line, #dde2ec);
-  border-radius: var(--r-sm); font-size: 13px; background: #fff; resize: none; overflow: hidden;
+  border-radius: var(--r-sm); font-size: var(--fs-13); background: #fff; resize: none; overflow: hidden;
   line-height: 1.4; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap;
   font-family: inherit; box-sizing: border-box; field-sizing: content; display: block;
 }
@@ -103,6 +103,6 @@ function blurHide(): void {
   list-style: none; background: #fff; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-md);
   box-shadow: 0 8px 24px rgba(0,0,0,.12); max-height: 220px; overflow-y: auto;
 }
-.ns-list li { padding: 6px 10px; font-size: 13px; color: var(--blue-dark, #2f5597); border-radius: var(--r-sm); cursor: pointer; }
+.ns-list li { padding: 6px 10px; font-size: var(--fs-13); color: var(--blue-dark, #2f5597); border-radius: var(--r-sm); cursor: pointer; }
 .ns-list li:hover { background: var(--blue-light, #d9e1f2); }
 </style>

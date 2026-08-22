@@ -274,15 +274,15 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
 .material-list { padding: 4px 2px 40px; }
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 12px; }
 .add-cat { min-width: 140px; }
-.field { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.field { display: flex; align-items: center; gap: 6px; font-size: var(--fs-13); }
 .dedupe-toggle { cursor: pointer; user-select: none; white-space: nowrap; }
 .dedupe-toggle input { accent-color: var(--blue); cursor: pointer; }
-.summary { font-size: 13px; color: #4a5160; }
+.summary { font-size: var(--fs-13); color: #4a5160; }
 .empty-state { padding: 24px; color: #98a2b3; text-align: center; }
-.auto-filter-warning { color: #d92020; font-weight: 700; font-size: 13px; margin-left: 4px; }
-.clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; }
+.auto-filter-warning { color: #d92020; font-weight: 700; font-size: var(--fs-13); margin-left: 4px; }
+.clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: var(--fs-16); line-height: 1; padding: 0 2px; margin-left: 2px; }
 .clear-btn:hover { color: #d92020; }
 .dedupe-view { display: flex; flex-direction: column; gap: 18px; }
 .dedupe-group { display: flex; flex-direction: column; gap: 8px; }
-.dedupe-title { margin: 0 0 4px; font-size: 15px; color: var(--n8); }
+.dedupe-title { margin: 0 0 4px; font-size: var(--fs-16); color: var(--n8); }
 </style>

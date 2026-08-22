@@ -501,7 +501,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 14px; min-height: 60vh; color: #697386;
 }
-.detail-loading p { margin: 0; font-size: 15px; }
+.detail-loading p { margin: 0; font-size: var(--fs-16); }
 .detail-loading .sync-spinner {
   width: 30px; height: 30px; border: 3px solid #e5e7eb; border-top-color: #2563eb;
   border-radius: 50%; animation: detail-spin .8s linear infinite;
@@ -512,25 +512,25 @@ async function runToolFilterByWorkcard(): Promise<void> {
 .auto-filter-warning {
   color: #d92020;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--fs-13);
   margin-left: 4px;
 }
-.clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; }
+.clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: var(--fs-16); line-height: 1; padding: 0 2px; margin-left: 2px; }
 .clear-btn:hover { color: #d92020; }
 /* 重复工具梳理：按名称分组聚拢，数量/备注可编辑、可删除 */
-.dedupe-toggle { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--n8); cursor: pointer; user-select: none; white-space: nowrap; }
+.dedupe-toggle { display: flex; align-items: center; gap: 4px; font-size: var(--fs-13); color: var(--n8); cursor: pointer; user-select: none; white-space: nowrap; }
 .dedupe-toggle input { width: 15px; height: 15px; accent-color: var(--blue); }
 .dedupe-view { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
 .dedupe-group { display: flex; flex-direction: column; gap: 8px; }
-.dedupe-title { margin: 0 0 4px; font-size: 15px; color: var(--n8); }
+.dedupe-title { margin: 0 0 4px; font-size: var(--fs-16); color: var(--n8); }
 .tool-dedupe-card { border: 1px solid #f0d9b8; background: #fff6e8; border-radius: var(--r-lg); overflow: hidden; }
 .tool-dedupe-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: #fbead2; }
-.tool-dedupe-head strong { font-size: 14px; color: var(--blue-dark); }
-.tool-dedupe-count { font-size: 12px; font-weight: 700; color: #b45309; }
+.tool-dedupe-head strong { font-size: var(--fs-14); color: var(--blue-dark); }
+.tool-dedupe-count { font-size: var(--fs-12); font-weight: 700; color: #b45309; }
 .tool-dedupe-row { display: grid; grid-template-columns: 1.2fr 0.5fr auto 2fr; gap: 6px; align-items: center; padding: 6px 10px; border-top: 1px dashed #f0d9b8; }
-.tool-dedupe-type { font-size: 13px; color: var(--n8); padding: 4px 8px; background: #f4f6fb; border-radius: var(--r-sm); min-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tool-dedupe-qty { width: 100%; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; box-sizing: border-box; }
-.tool-dedupe-del { width: 26px; height: 26px; padding: 0; border: 1px solid #f2cdcd; border-radius: var(--r-sm); background: #fdecec; color: #b53a3a; font-size: 16px; line-height: 1; cursor: pointer; }
+.tool-dedupe-type { font-size: var(--fs-13); color: var(--n8); padding: 4px 8px; background: #f4f6fb; border-radius: var(--r-sm); min-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool-dedupe-qty { width: 100%; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); box-sizing: border-box; }
+.tool-dedupe-del { width: 26px; height: 26px; padding: 0; border: 1px solid #f2cdcd; border-radius: var(--r-sm); background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1; cursor: pointer; }
 .tool-dedupe-del:hover { background: #f9dcdc; }
-.tool-dedupe-note { min-height: 30px; padding: 4px 7px; border: 1px dashed var(--line); border-radius: var(--r-sm); font-size: 12px; resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; background: #fff; }
+.tool-dedupe-note { min-height: 30px; padding: 4px 7px; border: 1px dashed var(--line); border-radius: var(--r-sm); font-size: var(--fs-12); resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; background: #fff; }
 </style>
