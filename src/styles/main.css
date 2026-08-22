@@ -66,6 +66,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .identity-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: var(--r-pill); font-size: var(--fs-12); font-weight: 700; color: #fff; background: rgb(255 255 255 / 20%); border: 1px solid rgb(255 255 255 / 38%); cursor: pointer; transition: background .25s; }
 .identity-badge:hover { background: rgb(255 255 255 / 32%); }
 .identity-badge .badge-icon { width: 13px; height: 13px; }
+/* 账号胶囊在线人数徽标：纯黄底黑字（1~99，超 99 显示 99+） */
+.online-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+  background: var(--proc-yellow, #FDCA17); color: #000;
+  border-radius: var(--r-pill); font-size: 10px; font-weight: 700; line-height: 1;
+}
 
 main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 48px; }
 /* 换发/APU 甘特页：放宽到全尺寸（参与人名单贴左，甘特图占满剩余）。 */

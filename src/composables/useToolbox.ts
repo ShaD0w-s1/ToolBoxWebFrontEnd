@@ -142,6 +142,23 @@ export function useToolbox() {
   const IDENTITY_KEY = "toolbox_identity_name";
   const identityName = ref<string>(localStorage.getItem(IDENTITY_KEY) || "");
   const identityReady = computed(() => !!identityName.value);
+  // —— 网站同时在线人数（账号胶囊黄色徽标）：每 60s 身份心跳保活 last_seen + 拉取 online-count（后端按 5 分钟窗口统计）——
+  const onlineCount = ref(0);
+  let onlineTimer: ReturnType<typeof setInterval> | undefined;
+  async function pingOnline(): Promise<void> {
+    if (identityName.value.trim()) {
+      try { await backend.recordIdentity(identityName.value.trim()); } catch { /* 心跳失败忽略 */ }
+    }
+    try {
+      const res = await backend.onlineCount();
+      onlineCount.value = Number((res.data as { count?: number } | undefined)?.count) || 0;
+    } catch { /* 计数失败忽略，保留上次值 */ }
+  }
+  function startOnlinePing(): void {
+    if (onlineTimer) return;
+    onlineTimer = setInterval(() => { void pingOnline(); }, 60000);
+    void pingOnline();
+  }
 
   // —— 更新机型标准库弹窗（机号+FSN+MSN+发动机+机型+ETOPS+ELT-DT 全必填，确认后更新/补充标准库）——
   const aircraftUpdate = ref<AircraftInfoPayload | null>(null);
@@ -527,6 +544,7 @@ export function useToolbox() {
         // 后端记录失败不阻塞本地身份（离线/后端不可用时仍可用）
       }
     }
+    void pingOnline(); // 设置身份后立即心跳并刷新在线人数
     notify(`已登录：${trimmed}`);
     return true;
   }
@@ -1932,7 +1950,7 @@ export function useToolbox() {
     unlockAircraftInfo, startWatch, stopWatch, syncRealtimeMode, watchActive,
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
-    identityName, identityReady, setIdentity, unlockSiteAdmin,
+    identityName, identityReady, setIdentity, unlockSiteAdmin, onlineCount, startOnlinePing,
     saveGantt, applyGanttTemplate, openEngTemplateForEdit,
     saveStandaloneTemplate, applyStandaloneTemplate, openStandaloneTemplateForEdit,
   };

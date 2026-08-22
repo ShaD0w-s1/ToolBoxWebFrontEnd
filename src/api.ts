@@ -118,6 +118,7 @@ export const backend = {
       "/api/identity/accounts/",
       { headers: { "X-Airnav-Token": token } },
     ),
+  onlineCount: () => request<ApiEnvelope<{ count: number }>>("/api/online-count/"),
   listEngTemplates: () =>
     request<ApiEnvelope<Array<{ _id: string; id: string; name: string; savedAt: string; state: GanttPrepState }>>>("/api/eng-templates/"),
   createEngTemplate: (payload: { name: string; state: GanttPrepState }) =>

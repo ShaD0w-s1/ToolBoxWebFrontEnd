@@ -5,7 +5,7 @@ interface CloudStatus {
   available: boolean;
 }
 
-defineProps<{ cloud: CloudStatus; watchActive: boolean; identityName: string }>();
+defineProps<{ cloud: CloudStatus; watchActive: boolean; identityName: string; onlineCount: number }>();
 defineEmits<{ "switch-identity": [] }>();
 </script>
 
@@ -22,6 +22,7 @@ defineEmits<{ "switch-identity": [] }>();
           <path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
         </svg>
         {{ identityName || "未登录" }}
+        <span v-if="onlineCount > 0" class="online-badge" :title="`同时在线 ${onlineCount} 人`">{{ onlineCount > 99 ? '99+' : onlineCount }}</span>
       </button>
       <span class="status-badge" :class="cloud.state" :title="cloud.text">
         <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

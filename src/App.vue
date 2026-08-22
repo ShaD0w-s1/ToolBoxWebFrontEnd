@@ -349,6 +349,8 @@ onMounted(async () => {
   if (!store.identityReady.value) showIdentityModal.value = true;
   // 启动每 2 秒自动同步（推送本地变更到云端，不覆盖本地编辑）
   store.startAutoSync(2000);
+  // 在线人数心跳 + 徽标轮询（60s 身份保活 + online-count）
+  store.startOnlinePing();
   // 根据远端配置启动 watch 实时推送或轮询（loadRemote 成功后内部已按配置启动，
   // 此处兜底：若 loadRemote 因故未成功，确保至少轮询在跑）。幂等，可安全重复调用。
   store.syncRealtimeMode();
@@ -374,7 +376,7 @@ function exportCurrentState(displayCats?: string[]): void {
 </script>
 
 <template>
-  <AppHeader :cloud="store.cloud" :watch-active="store.watchActive.value" :identity-name="store.identityName.value" @switch-identity="switchIdentity" />
+  <AppHeader :cloud="store.cloud" :watch-active="store.watchActive.value" :identity-name="store.identityName.value" :online-count="store.onlineCount.value" @switch-identity="switchIdentity" />
   <main :class="{ 'gantt-full': store.screen.value === 'detail' && store.currentProject.value?.type === '换发/APU' }">
     <ProjectList
       v-if="store.screen.value === 'list'"
