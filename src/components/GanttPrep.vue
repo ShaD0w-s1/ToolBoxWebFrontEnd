@@ -615,7 +615,13 @@ const partClearOpen = ref(false);
 // 手册清单 换发/串件工卡 splitbutton 下拉状态
 const engImportOpen = ref(false);
 const spImportOpen = ref(false);
-function onDocClick(): void { partClearOpen.value = false; engImportOpen.value = false; spImportOpen.value = false; }
+// 甘特阶段表头 split button 下拉（key=chartId:si，"+工序"主按钮，下拉=移DAY/+插/删除）
+const stageMenuOpen = ref<string | null>(null);
+function toggleStageMenu(chartId: string, si: number): void {
+  const key = `${chartId}:${si}`;
+  stageMenuOpen.value = stageMenuOpen.value === key ? null : key;
+}
+function onDocClick(): void { partClearOpen.value = false; engImportOpen.value = false; spImportOpen.value = false; stageMenuOpen.value = null; }
 onMounted(() => document.addEventListener("click", onDocClick));
 onUnmounted(() => document.removeEventListener("click", onDocClick));
 function clearPartList(kind: "airParts" | "toolParts"): void {
@@ -2130,13 +2136,18 @@ async function importAllXlsx(event: Event): Promise<void> {
                   <div v-for="(st, si) in chart.stages" :key="st.id" class="gantt-head" :style="{ gridColumn: si + 1, gridRow: 1 }">
                     <div class="stage-col-drag" title="拖动调整列位置" @pointerdown="startStageColDrag($event, chart.id, si)">⠿</div>
                     <input v-model="st.name" class="stage-name-input" @input="save" />
-                    <select v-if="dayOptionsExcluding(chart.id).length" class="stage-move-select" :value="''" title="迁移整个阶段到其它 DAY" @change="moveStageToChart(chart.id, si, ($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''">
-                      <option value="" disabled>移 DAY</option>
-                      <option v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" :value="c.id">{{ c.label }}</option>
-                    </select>
-                    <button class="add-card-btn" title="本列添加工序" @click="addCard(chart.id, si)">+工序</button>
-                    <button class="stage-ins-btn" title="在当前位置前插入阶段" @click="insertStage(chart.id, si)">+插</button>
-                    <button class="stage-del-btn" title="删除阶段" @click="removeStage(chart.id, si)">×</button>
+                    <span class="stage-split" @click.stop>
+                      <button class="add-card-btn stage-split-main" title="本列添加工序" @click="addCard(chart.id, si)">+工序</button>
+                      <button class="stage-split-arrow" title="更多操作" @click="toggleStageMenu(chart.id, si)">▾</button>
+                      <div v-if="stageMenuOpen === `${chart.id}:${si}`" class="stage-split-menu">
+                        <template v-if="dayOptionsExcluding(chart.id).length">
+                          <span class="ssm-label">移到其它 DAY</span>
+                          <button v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" @click="stageMenuOpen = null; moveStageToChart(chart.id, si, c.id)">{{ c.label }}</button>
+                        </template>
+                        <button @click="stageMenuOpen = null; insertStage(chart.id, si)">+ 插入阶段</button>
+                        <button class="danger" @click="stageMenuOpen = null; removeStage(chart.id, si)">× 删除阶段</button>
+                      </div>
+                    </span>
                   </div>
                   <div v-for="card in chart.cards" :key="card.id" class="card-slot" :style="{ gridColumn: `${card.startStage + 1}/${card.endStage + 2}`, gridRow: (ganttRows(chart)[card.id] ?? 0) + 2 }">
                     <div class="gantt-card">
@@ -2533,8 +2544,6 @@ async function importAllXlsx(event: Event): Promise<void> {
 }
 .stage-edge { flex-shrink: 0; width: 16px; cursor: ew-resize; background: var(--blue-light, #d9e1f2); border: 1px solid var(--line, #dde2ec); border-left: none; border-radius: 0 10px 10px 0; display: flex; align-items: center; justify-content: center; color: var(--blue-dark, #2f5597); font-weight: 700; user-select: none; touch-action: none; }
 .stage-edge:hover { background: #cdddf4; }
-.stage-ins-btn { width: auto; height: 20px; padding: 0 5px; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid var(--line, #dde2ec); background: #fff; color: var(--muted, #697386); flex-shrink: 0; }
-.form-stage-drag, .form-card-drag { cursor: grab; color: var(--muted, #697386); font-size: 12px; user-select: none; touch-action: none; flex-shrink: 0; }
 .form-stage-drag:active, .form-card-drag:active { cursor: grabbing; }
 .fc-span { flex-shrink: 0; font-size: 11px; color: var(--blue-dark, #2f5597); background: var(--blue-light, #d9e1f2); padding: 2px 8px; border-radius: 4px; }
 .gantt-head {
@@ -2549,8 +2558,29 @@ async function importAllXlsx(event: Event): Promise<void> {
 .stage-name-input { flex: 1; min-width: 0; text-align: center; border: none; background: transparent; font-size: 13.5px; font-weight: 650; padding: 2px 0; color: #fff; }
 .stage-name-input:focus { background: #fff; border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark, #2f5597); }
 .add-card-btn { width: auto; height: 20px; padding: 0 6px; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.18); color: #fff; flex-shrink: 0; }
-.stage-ins-btn { width: auto; height: 20px; padding: 0 5px; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.18); color: #fff; flex-shrink: 0; }
-.stage-del-btn { width: 22px; height: 20px; padding: 0; border-radius: 3px; font-size: 11px; line-height: 18px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.18); color: #ffe3e3; flex-shrink: 0; }
+/* 阶段表头 split button：+工序 主按钮 + ▾ 下拉（移DAY/+插/删除阶段） */
+.stage-split { position: relative; display: inline-flex; align-items: stretch; flex-shrink: 0; }
+.stage-split-main { border-radius: 3px 0 0 3px; }
+.stage-split-arrow {
+  width: 16px; height: 20px; padding: 0; font-size: 9px; line-height: 18px;
+  border: 1px solid rgba(255,255,255,.45); border-left: none; border-radius: 0 3px 3px 0;
+  background: rgba(255,255,255,.18); color: #fff; flex-shrink: 0;
+}
+.stage-split-arrow:hover { background: rgba(255,255,255,.32); }
+.stage-split-menu {
+  position: absolute; top: calc(100% + 3px); right: 0; z-index: 80;
+  min-width: 132px; padding: 5px;
+  background: #fff; border: 1px solid var(--n3); border-radius: var(--r-md); box-shadow: var(--sh-2);
+}
+.stage-split-menu .ssm-label { display: block; font-size: 10.5px; color: var(--n6); padding: 2px 8px 4px; }
+.stage-split-menu button {
+  display: block; width: 100%; min-height: 28px; padding: 4px 10px;
+  border: none; border-radius: var(--r-sm); background: transparent;
+  color: var(--n8); font-size: 12px; text-align: left;
+}
+.stage-split-menu button:hover { background: var(--blue-bg); }
+.stage-split-menu button.danger { color: var(--danger); }
+.stage-split-menu button.danger:hover { background: var(--danger-bg); }
 .stage-col-drag { cursor: grab; color: rgba(255,255,255,.85); font-size: 12px; user-select: none; touch-action: none; flex-shrink: 0; }
 .stage-col-drag:active { cursor: grabbing; }
 .corner-cell { background: #fff; border-right: 1px solid var(--line, #dde2ec); border-bottom: 1px solid var(--line, #dde2ec); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--muted, #697386); padding: 6px 8px; }
@@ -2602,9 +2632,6 @@ async function importAllXlsx(event: Event): Promise<void> {
 .day-move-select { width: 100%; height: 20px; padding: 0 4px; font-size: 10.5px; color: var(--blue-dark, #2f5597); border: 1px dashed var(--blue, #4472c4); border-radius: 4px; background: rgba(255,255,255,.75); cursor: pointer; font-family: inherit; }
 .day-move-select.form { width: auto; flex-shrink: 0; height: 24px; font-size: 11.5px; }
 .day-move-select:hover { border-style: solid; background: #fff; }
-.stage-move-select { flex-shrink: 0; width: 62px; height: 20px; padding: 0 2px; font-size: 10px; color: #fff; border: 1px solid rgba(255,255,255,.45); border-radius: 3px; background: rgba(255,255,255,.18); cursor: pointer; font-family: inherit; }
-.stage-move-select:hover { background: rgba(255,255,255,.3); }
-.stage-move-select option { color: var(--blue-dark, #2f5597); background: #fff; }
 /* 甘特卡右上角黑色关闭叉号（黄/橙标题区上可见） */
 .gantt-card .card-close {
   position: absolute; top: 3px; right: 5px; z-index: 6;

@@ -102,14 +102,15 @@ button:active:not(:disabled), .button:active:not(:disabled) { transform: transla
 .inp-err:focus { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(192, 57, 43, .14); }
 .inp-lg { min-height: 40px; font-size: var(--fs-14); }
 .inp-sm { min-height: 30px; padding: 4px 10px; font-size: var(--fs-12); border-radius: var(--r-sm); }
-/* 组件内散落单行输入框收敛兜底（组件 scoped 特殊样式优先级更高，此处统一共性） */
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
+/* 组件内散落单行输入框收敛兜底（组件 scoped 特殊样式优先级更高，此处统一共性）
+   ⚠️ 用 :where() 包裹使特异性归零，避免覆盖组件内类选择器（如甘特阶段名白字、表单黄底） */
+input:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"])) {
   font-family: inherit; color: var(--n9);
 }
-input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="date"]):not([type="number"]) {
+input:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="date"]):not([type="number"])) {
   min-height: 30px; padding: 4px 10px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-13);
 }
-input[type="date"] { min-height: 32px; padding: 0 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-12); }
+input:where([type="date"]) { min-height: 32px; padding: 0 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-12); }
 
 /* ===== 最小动效（纯 CSS，仅 transform/opacity/color，不触发布局重排） =====
    原则：140–220ms 快速反馈；不做入场 stagger；不引入 JS 动画库。 */
