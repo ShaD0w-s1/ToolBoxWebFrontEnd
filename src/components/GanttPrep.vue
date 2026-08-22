@@ -719,9 +719,10 @@ function partCardColorOf(card: GanttPartList): string {
 function partCardHeadOf(card: GanttPartList): string { return partCardColorOf(card) + "80"; } // 50% 透明度
 function partCardBgOf(card: GanttPartList): string { return partCardColorOf(card) + "33"; }  // 20% 透明度
 // 串件航材/工具清单「重复梳理」（对齐 A检 重复航材梳理）：航材按件号、工具按名称分组聚拢，重复 ≥2 归入重复组、单件归入单件组；卡片内数量/备注可编辑、可删除。
-const partDedupeMode = ref(false);
+// 开关按清单类型分开记忆：串件航材与串件工具互不联动。
+const dedupeOpen = ref<Record<"airParts" | "toolParts", boolean>>({ airParts: false, toolParts: false });
 interface PartDedupeRow { card: GanttPartList; item: GanttPartListItem }
-interface PartDedupeGroup { key: string; label: string; rows: PartDedupeRow[] }
+interface PartDedupeGroup { key: string; label: string; name: string; rows: PartDedupeRow[] }
 function partDedupeKeyOf(it: GanttPartListItem): string {
   return tab.value === "airparts" ? String(it.pn || "").trim() : String(it.name || "").trim();
 }
@@ -735,7 +736,8 @@ const partDedupeGroups = computed<PartDedupeGroup[]>(() => {
     (card.items || []).forEach((it) => {
       const key = partDedupeKeyOf(it) || `__no__${it.id}`; // 无件号/名称：每件独立一组
       let g = map.get(key);
-      if (!g) { g = { key, label: partDedupeLabelOf(it) || "（空）", rows: [] }; map.set(key, g); }
+      if (!g) { g = { key, label: partDedupeLabelOf(it) || "（空）", name: it.name || "", rows: [] }; map.set(key, g); }
+      if (!g.name && it.name) g.name = it.name;
       g.rows.push({ card, item: it });
     });
   });
@@ -2281,7 +2283,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <div class="subpage-head">
             <h3>{{ tab === 'airparts' ? '串件航材清单' : '串件工具清单' }}</h3>
             <div class="subpage-actions">
-              <label class="field dedupe-toggle"><input type="checkbox" v-model="partDedupeMode" /> {{ tab === 'airparts' ? '重复航材梳理' : '重复工具梳理' }}</label>
+              <label class="field dedupe-toggle"><input type="checkbox" v-model="dedupeOpen[partKind]" /> {{ tab === 'airparts' ? '重复航材梳理' : '重复工具梳理' }}</label>
               <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importPartsXlsx" /></label>
               <button class="ghost" @click="exportPartsXlsx">导出表格</button>
               <button v-if="tab === 'tools'" class="ghost" @click="downloadSpControlDoc">下载现场管控单</button>
@@ -2313,44 +2315,54 @@ async function importAllXlsx(event: Event): Promise<void> {
               </div>
             </div>
           </div>
-          <!-- 重复梳理（对齐 A检）：按件号(航材)/名称(工具)跨卡片分组聚拢，重复≥2 归重复组、单件归单件组；卡片内数量/备注可编辑、可删除 -->
-          <template v-if="partDedupeMode">
-            <section class="gp-card air-dedupe-card">
-              <div class="gp-sec-title">{{ tab === 'airparts' ? '重复航材' : '重复工具' }}（{{ partDuplicates.length }} 组）</div>
-              <div v-if="partDuplicates.length" class="dedupe-groups">
-                <div v-for="g in partDuplicates" :key="g.key" class="dedupe-group-card">
-                  <div class="dedupe-group-head">
-                    <strong class="ad-pn">{{ g.label }}</strong>
-                    <span class="ad-count">× {{ g.rows.length }}</span>
+          <!-- 重复梳理（对齐 A检 重复航材梳理）：按件号(航材)/名称(工具)跨卡片分组聚拢，重复≥2 归重复组、单件归单件组；
+               卡片 UI 与 A检 PartNoGroupCard 一致（浅蓝头部：键名+名称+×N；行内：所属卡片/数量/删除/备注）；
+               梳理视图与主卡片列表互斥（v-if/v-else），开关按清单类型分开记忆，不联动。 -->
+          <template v-if="dedupeOpen[partKind]">
+            <section class="pnc-section">
+              <h4 class="pnc-title">{{ tab === 'airparts' ? '重复航材' : '重复工具' }}（{{ partDuplicates.length }} 组）</h4>
+              <template v-if="partDuplicates.length">
+                <article v-for="g in partDuplicates" :key="g.key" class="pnc-card">
+                  <header class="pnc-head">
+                    <strong class="pnc-partno">{{ g.label }}</strong>
+                    <span class="pnc-name">{{ g.name }}</span>
+                    <span class="pnc-count">×{{ g.rows.length }}</span>
+                  </header>
+                  <div class="pnc-body">
+                    <div v-for="row in g.rows" :key="row.item.id" class="pnc-item">
+                      <span class="pnc-type" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
+                      <input v-model.number="row.item.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="save" />
+                      <button class="pnc-del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button>
+                      <textarea v-model="row.item.note" rows="1" class="pnc-note" placeholder="备注" @input="save"></textarea>
+                    </div>
                   </div>
-                  <div v-for="row in g.rows" :key="row.item.id" class="dedupe-row">
-                    <span class="dedupe-card-name" :title="row.card.name">{{ row.card.name || '（未命名卡片）' }}</span>
-                    <input v-model.number="row.item.qty" type="number" min="0" class="dedupe-qty" aria-label="数量" @input="save" />
-                    <textarea v-model="row.item.note" rows="1" class="dedupe-note" placeholder="备注" @input="save"></textarea>
-                    <button class="icon-btn danger" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button>
-                  </div>
-                </div>
-              </div>
+                </article>
+              </template>
               <div v-else class="pt-empty">{{ tab === 'airparts' ? '暂无重复航材。' : '暂无重复工具。' }}</div>
             </section>
-            <section v-if="partSingles.length" class="gp-card air-dedupe-card">
-              <div class="gp-sec-title">{{ tab === 'airparts' ? '单件航材' : '单件工具' }}（{{ partSingles.length }} 组）</div>
-              <div class="dedupe-groups">
-                <div v-for="g in partSingles" :key="g.key" class="dedupe-group-card">
-                  <div class="dedupe-group-head">
-                    <strong class="ad-pn">{{ g.label }}</strong>
-                    <span class="ad-count">× 1</span>
+            <section class="pnc-section">
+              <h4 class="pnc-title">{{ tab === 'airparts' ? '单件航材' : '单件工具' }}（{{ partSingles.length }} 组）</h4>
+              <template v-if="partSingles.length">
+                <article v-for="g in partSingles" :key="g.key" class="pnc-card">
+                  <header class="pnc-head">
+                    <strong class="pnc-partno">{{ g.label }}</strong>
+                    <span class="pnc-name">{{ g.name }}</span>
+                    <span class="pnc-count">×1</span>
+                  </header>
+                  <div class="pnc-body">
+                    <div v-for="row in g.rows" :key="row.item.id" class="pnc-item">
+                      <span class="pnc-type" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
+                      <input v-model.number="row.item.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="save" />
+                      <button class="pnc-del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button>
+                      <textarea v-model="row.item.note" rows="1" class="pnc-note" placeholder="备注" @input="save"></textarea>
+                    </div>
                   </div>
-                  <div v-for="row in g.rows" :key="row.item.id" class="dedupe-row">
-                    <span class="dedupe-card-name" :title="row.card.name">{{ row.card.name || '（未命名卡片）' }}</span>
-                    <input v-model.number="row.item.qty" type="number" min="0" class="dedupe-qty" aria-label="数量" @input="save" />
-                    <textarea v-model="row.item.note" rows="1" class="dedupe-note" placeholder="备注" @input="save"></textarea>
-                    <button class="icon-btn danger" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button>
-                  </div>
-                </div>
-              </div>
+                </article>
+              </template>
+              <div v-else class="pt-empty">{{ tab === 'airparts' ? '暂无单件航材。' : '暂无单件工具。' }}</div>
             </section>
           </template>
+          <template v-else>
           <section v-for="card in visiblePartCards" :key="card.id" class="gp-card pt-card" :style="{ borderLeft: '6px solid ' + partCardColorOf(card), background: partCardBgOf(card) }">
             <div class="pt-card-head" :style="{ background: partCardHeadOf(card) }">
               <button class="pt-collapse" :title="collapsedCards.has(card.id) ? '展开卡片' : '折叠卡片'" @click="toggleCardCollapse(card.id)">{{ collapsedCards.has(card.id) ? '▸' : '▾' }}</button>
@@ -2376,6 +2388,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             </template>
           </section>
           <div v-if="!visiblePartCards.length" class="pt-empty-all">暂无卡片 — 点上方「+ 新增卡片」</div>
+          </template>
         </div>
       </template>
 
@@ -2779,22 +2792,23 @@ textarea.textwrap {
 .m-op-del:hover { background: #f9dcdc; }
 .danger-text { color: var(--danger, #c0392b); }
 
-/* ===== 重复梳理（航材按件号 / 工具按名称 卡片聚拢，可编辑可删除） ===== */
+/* ===== 重复梳理（航材按件号 / 工具按名称 卡片聚拢）——UI 对齐 A检 PartNoGroupCard ===== */
 .dedupe-toggle { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text, #222); }
 .dedupe-toggle input { width: 15px; height: 15px; accent-color: var(--blue, #4472c4); }
-.air-dedupe-card { border-color: #e8a44d; }
-.dedupe-groups { display: flex; flex-direction: column; gap: 8px; }
-.dedupe-group-card { border: 1px solid #f0d9b8; background: #fff6e8; border-radius: var(--r-md); overflow: hidden; }
-.dedupe-group-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #fbead2; }
-.dedupe-group-head .ad-pn { font-size: 13.5px; }
-.dedupe-group-head .ad-count { font-size: 12px; }
-.ad-pn { font-weight: 700; color: var(--blue-dark, #2f5597); }
-.ad-count { font-weight: 700; color: #b45309; }
-.dedupe-row { display: grid; grid-template-columns: minmax(80px, 1.4fr) 64px 1fr 30px; gap: 6px; align-items: center; padding: 5px 10px; border-top: 1px dashed #f0d9b8; }
-.dedupe-card-name { font-size: 12px; color: var(--muted, #697386); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dedupe-qty { min-height: 26px; padding: 2px 6px; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); font-size: 12.5px; width: 100%; box-sizing: border-box; }
-.dedupe-note { min-height: 26px; padding: 3px 6px; border: 1px dashed var(--line, #dde2ec); border-radius: var(--r-sm); font-size: 12px; resize: none; overflow: hidden; font-family: inherit; width: 100%; box-sizing: border-box; line-height: 1.4; background: #fff; }
-.dedupe-row .icon-btn { width: 26px; height: 26px; padding: 0; }
+.pnc-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.pnc-title { margin: 0; font-size: 14px; color: var(--n8); }
+.pnc-card { border: 1px solid #dde2ec; border-radius: var(--r-lg); background: #fff; margin-bottom: 10px; overflow: hidden; }
+.pnc-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #edf2fc; }
+.pnc-partno { font-size: 14px; color: #2f5597; font-weight: 700; }
+.pnc-name { font-size: 13px; color: #4a5160; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pnc-count { margin-left: auto; font-size: 12px; color: #98a2b3; flex: 0 0 auto; }
+.pnc-body { padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
+.pnc-item { display: grid; grid-template-columns: 1.2fr 0.5fr auto 2fr; gap: 6px; align-items: center; }
+.pnc-type { font-size: 13px; color: #4a5160; padding: 4px 8px; background: #f4f6fb; border-radius: var(--r-sm); min-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pnc-qty { width: 100%; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; box-sizing: border-box; }
+.pnc-del { width: 26px; height: 26px; padding: 0; border: 1px solid #f2cdcd; border-radius: var(--r-sm); background: #fdecec; color: #b53a3a; font-size: 16px; line-height: 1; cursor: pointer; }
+.pnc-del:hover { background: #f9dcdc; }
+.pnc-note { min-height: 30px; padding: 4px 7px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 12px; resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; }
 
 /* ===== 增加一天 ===== */
 .add-day-card {
