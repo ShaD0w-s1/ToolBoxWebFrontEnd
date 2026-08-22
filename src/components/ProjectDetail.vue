@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, type Project } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, type Project, type ToolItem } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import CategorySection from "./CategorySection.vue";
 import PrepSheet from "./PrepSheet.vue";
@@ -57,6 +57,27 @@ function fieldForSubPage(): "data" | "materialList" | "prepSheet" | "workcardAss
   if (subPage.value === "workcard") return "workcardAssignment";
   if (subPage.value === "gantt") return "ganttPrep";
   return isStandalone.value ? "standalonePrepSheet" : "prepSheet";
+}
+
+// —— 工具清单「重复工具梳理」（对齐 A检 重复航材梳理）：按名称分组聚拢，重复≥2 归重复组、单件归单件组；数量/备注可编辑、可删除。——
+const toolDedupeMode = ref(false);
+interface ToolDedupeGroup { key: string; items: ToolItem[] }
+const toolDedupeGroups = computed<ToolDedupeGroup[]>(() => {
+  const items = props.store.active.value?.items || [];
+  const map = new Map<string, ToolDedupeGroup>();
+  for (const it of items) {
+    const key = (it.name || "").trim() || `__no__${it.id}`; // 无名称：每件独立一组
+    let g = map.get(key);
+    if (!g) { g = { key, items: [] }; map.set(key, g); }
+    g.items.push(it);
+  }
+  return [...map.values()].sort((a, b) => (a.key.startsWith("__no__") ? 1 : b.key.startsWith("__no__") ? -1 : a.key.localeCompare(b.key, "zh-CN")));
+});
+const toolDuplicates = computed(() => toolDedupeGroups.value.filter((g) => g.items.length >= 2));
+const toolSingles = computed(() => toolDedupeGroups.value.filter((g) => g.items.length === 1));
+function onToolDedupeNote(it: ToolItem): void {
+  props.store.markNoteDirty(it);
+  props.store.persist();
 }
 watch([subPage, isAcheck, isStandalone, isEngApu], () => props.store.setEditingField(fieldForSubPage()), { immediate: true });
 
@@ -411,12 +432,49 @@ async function runToolFilterByWorkcard(): Promise<void> {
             <button v-if="workQuery" class="clear-btn" type="button" @click="workQuery = ''" aria-label="清空">×</button>
           </label>
           <label v-if="!isLibrary" class="check"><input v-model="store.active.value.useCart" type="checkbox" @change="store.persist" /> 使用工具车</label>
+          <label v-if="!isLibrary" class="field dedupe-toggle"><input type="checkbox" v-model="toolDedupeMode" /> 重复工具梳理</label>
           <label v-if="isLibrary" class="field">部位查询
             <input list="lib-cats" v-model="libQuery" placeholder="输入/选择部位" />
             <datalist id="lib-cats"><option v-for="c in store.active.value?.categories || []" :key="c" :value="c" /></datalist>
           </label>
           <span class="spacer" />
           <div class="summary">全部合计 <b>{{ store.allTotal(displayCats) }}</b></div>
+        </div>
+
+        <!-- 重复工具梳理：按名称分组聚拢，重复≥2 归重复组、单件归单件组；数量/备注可编辑、可删除 -->
+        <div v-if="toolDedupeMode" class="dedupe-view">
+          <section class="dedupe-group">
+            <h4 class="dedupe-title">重复工具（{{ toolDuplicates.length }} 种名称）</h4>
+            <div v-for="g in toolDuplicates" :key="g.key" class="tool-dedupe-card">
+              <header class="tool-dedupe-head">
+                <strong>{{ g.key }}</strong>
+                <span class="tool-dedupe-count">× {{ g.items.length }}</span>
+              </header>
+              <div v-for="it in g.items" :key="it.id" class="tool-dedupe-row">
+                <span class="tool-dedupe-type" :title="it.cat">{{ it.sub || "固定" }}</span>
+                <input v-model.number="it.qty" type="number" min="0" class="tool-dedupe-qty" aria-label="数量" @input="store.persist" />
+                <button class="tool-dedupe-del" title="删除该工具" @click="store.deleteItem(it.id)">×</button>
+                <textarea v-model="it.note" rows="1" class="tool-dedupe-note" placeholder="备注" @input="onToolDedupeNote(it)"></textarea>
+              </div>
+            </div>
+            <div v-if="!toolDuplicates.length" class="empty-state">暂无重复工具。</div>
+          </section>
+          <section class="dedupe-group">
+            <h4 class="dedupe-title">单件工具（{{ toolSingles.length }} 种名称）</h4>
+            <div v-for="g in toolSingles" :key="g.key" class="tool-dedupe-card">
+              <header class="tool-dedupe-head">
+                <strong>{{ g.key }}</strong>
+                <span class="tool-dedupe-count">× 1</span>
+              </header>
+              <div v-for="it in g.items" :key="it.id" class="tool-dedupe-row">
+                <span class="tool-dedupe-type" :title="it.cat">{{ it.sub || "固定" }}</span>
+                <input v-model.number="it.qty" type="number" min="0" class="tool-dedupe-qty" aria-label="数量" @input="store.persist" />
+                <button class="tool-dedupe-del" title="删除该工具" @click="store.deleteItem(it.id)">×</button>
+                <textarea v-model="it.note" rows="1" class="tool-dedupe-note" placeholder="备注" @input="onToolDedupeNote(it)"></textarea>
+              </div>
+            </div>
+            <div v-if="!toolSingles.length" class="empty-state">暂无单件工具。</div>
+          </section>
         </div>
 
         <div class="category-list">
@@ -459,4 +517,20 @@ async function runToolFilterByWorkcard(): Promise<void> {
 }
 .clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; margin-left: 2px; }
 .clear-btn:hover { color: #d92020; }
+/* 重复工具梳理：按名称分组聚拢，数量/备注可编辑、可删除 */
+.dedupe-toggle { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--n8); cursor: pointer; user-select: none; white-space: nowrap; }
+.dedupe-toggle input { width: 15px; height: 15px; accent-color: var(--blue); }
+.dedupe-view { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
+.dedupe-group { display: flex; flex-direction: column; gap: 8px; }
+.dedupe-title { margin: 0 0 4px; font-size: 15px; color: var(--n8); }
+.tool-dedupe-card { border: 1px solid #f0d9b8; background: #fff6e8; border-radius: var(--r-lg); overflow: hidden; }
+.tool-dedupe-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: #fbead2; }
+.tool-dedupe-head strong { font-size: 14px; color: var(--blue-dark); }
+.tool-dedupe-count { font-size: 12px; font-weight: 700; color: #b45309; }
+.tool-dedupe-row { display: grid; grid-template-columns: 1.2fr 0.5fr auto 2fr; gap: 6px; align-items: center; padding: 6px 10px; border-top: 1px dashed #f0d9b8; }
+.tool-dedupe-type { font-size: 13px; color: var(--n8); padding: 4px 8px; background: #f4f6fb; border-radius: var(--r-sm); min-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tool-dedupe-qty { width: 100%; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 13px; box-sizing: border-box; }
+.tool-dedupe-del { width: 26px; height: 26px; padding: 0; border: 1px solid #f2cdcd; border-radius: var(--r-sm); background: #fdecec; color: #b53a3a; font-size: 16px; line-height: 1; cursor: pointer; }
+.tool-dedupe-del:hover { background: #f9dcdc; }
+.tool-dedupe-note { min-height: 30px; padding: 4px 7px; border: 1px dashed var(--line); border-radius: var(--r-sm); font-size: 12px; resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; background: #fff; }
 </style>
