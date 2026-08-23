@@ -403,8 +403,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 /* 人员安排/检测&必检/备注：淡灰底，聚焦白底 */
 .sp-process-card .sp-assign, .sp-process-card .sp-check, .sp-process-card .sp-note { background: var(--n1); }
 .sp-process-card .sp-assign:focus, .sp-process-card .sp-check:focus, .sp-process-card .sp-note:focus { background: #fff; }
-/* 人员安排：固定 12em 缩短（工作步骤加长后腾出空间） */
-.sp-process-card .sp-assign { flex: none; width: 12em; min-width: 12em; }
+/* 人员安排：flex:1 自适应，填满工序行剩余长度（检测&必检 8em / 备注 15em / × 固定宽除外） */
+.sp-process-card .sp-assign { flex: 1 1 0%; min-width: 90px; }
 /* 检测&必检：限宽约 8 个中文字符 */
 .sp-process-card .sp-check { max-width: 8em; }
 /* 备注：固定 15em 宽（参照换发二级页工序卡），红字由全局 textarea[placeholder*=备注] 生效 */
