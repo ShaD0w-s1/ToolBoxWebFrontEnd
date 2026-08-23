@@ -297,6 +297,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
             </div>
             <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell sp-assign" placeholder="人员安排"></textarea>
             <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell sp-check" placeholder="检测&必检"></textarea>
+            <textarea rows="1" v-model="r.备注" @input="onRowInput" class="sp-cell sp-note" placeholder="备注"></textarea>
             <button class="sp-del-x" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">×</button>
           </div>
         </div>
@@ -404,6 +405,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-process-card .sp-assign:focus, .sp-process-card .sp-check:focus { background: #fff; }
 /* 检测&必检：限宽约 8 个中文字符 */
 .sp-process-card .sp-check { max-width: 8em; }
+/* 备注：固定 15em 宽（参照换发二级页工序卡），红字由全局 textarea[placeholder*=备注] 生效 */
+.sp-process-card .sp-note { flex: none; width: 15em; min-width: 15em; }
 /* 删除 ×（紧凑红底圆角小按钮） */
 .sp-del-x {
   flex: 0 0 auto; width: 26px; height: 26px; padding: 0;

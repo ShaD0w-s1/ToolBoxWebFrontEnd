@@ -196,12 +196,13 @@ export interface StandaloneArrange {
   内容: string;
   人员: string;
 }
-/** 工序组里的一行（工作步骤 + 人员安排 + 检测&必检）。 */
+/** 工序组里的一行（工作步骤 + 人员安排 + 检测&必检 + 备注）。 */
 export interface StandaloneProcessRow {
   id: number;
   工作步骤: string;
   人员安排: string;
   "检测&必检": string;
+  备注: string;
 }
 /** 工序安排里的一个工序组（含若干行，整组可删除；名称可改）。 */
 export interface StandaloneProcessGroup {
@@ -538,7 +539,7 @@ export function defaultStandalonePrepSheet(): StandalonePrepSheet {
 }
 
 export function emptyProcessRow(): StandaloneProcessRow {
-  return { id: spId(), 工作步骤: "", 人员安排: "", "检测&必检": "" };
+  return { id: spId(), 工作步骤: "", 人员安排: "", "检测&必检": "", 备注: "" };
 }
 export function emptySigningRow(): StandaloneSigningRow {
   return { id: spId(), 手册号: "", 工卡名: "", 签署人: "" };
@@ -839,7 +840,7 @@ function standalonePrepSheetFromDoc(doc: Record<string, unknown>): StandalonePre
     sheet.processGroups = (raw.processGroups as Array<Record<string, unknown>>).map((g, gi) => ({
       id: spId(),
       name: String(g?.name ?? `工序组 ${gi + 1}`),
-      rows: Array.isArray(g?.rows) ? (g.rows as Array<Record<string, unknown>>).map((r) => ({ id: spId(), 工作步骤: String(r?.工作步骤 ?? ""), 人员安排: String(r?.人员安排 ?? ""), "检测&必检": String(r?.["检测&必检"] ?? "") })) : [],
+      rows: Array.isArray(g?.rows) ? (g.rows as Array<Record<string, unknown>>).map((r) => ({ id: spId(), 工作步骤: String(r?.工作步骤 ?? ""), 人员安排: String(r?.人员安排 ?? ""), "检测&必检": String(r?.["检测&必检"] ?? ""), 备注: String(r?.备注 ?? "") })) : [],
     }));
   }
   if (Array.isArray(raw.signingRows)) {
