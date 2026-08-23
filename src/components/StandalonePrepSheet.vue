@@ -295,9 +295,9 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
               <div class="sp-card-drag" title="拖动调整行序" @pointerdown="startSpRowDrag($event, gi, r.id)">⠿</div>
               <textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell" placeholder="工作步骤"></textarea>
             </div>
-            <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell" placeholder="人员安排"></textarea>
-            <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell" placeholder="检测&必检"></textarea>
-            <button class="ghost danger-cell" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">删除</button>
+            <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell sp-assign" placeholder="人员安排"></textarea>
+            <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell sp-check" placeholder="检测&必检"></textarea>
+            <button class="sp-del-x" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">×</button>
           </div>
         </div>
         <div class="prep-block-actions"><button class="ghost" @click="store.spAddProcessRow(gi)">+ 新增行</button></div>
@@ -388,17 +388,30 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   display: flex; align-items: center; gap: 2px;
   background: #FDCA17; border-radius: var(--r-sm);
   border-right: 2px solid #C9A227;
-  flex: none; max-width: 50%; min-width: 0;
+  flex: none; max-width: 85%; min-width: 0;
   padding: 2px 4px 2px 2px;
 }
 .sp-process-card .sp-card-title .sp-card-drag { cursor: grab; color: #000; font-size: var(--fs-13); flex: 0 0 auto; user-select: none; touch-action: none; }
 .sp-process-card .sp-card-title .sp-card-drag:active { cursor: grabbing; }
 .sp-process-card .sp-card-title textarea {
-  flex: 1; min-width: 0; max-width: 20em; border: none; background: transparent;
+  flex: 1; min-width: 0; max-width: 40em; border: none; background: transparent;
   font-size: var(--fs-13); font-weight: 600; color: #000; padding: 2px 4px;
 }
 .sp-process-card .sp-card-title textarea:focus { background: #fff; border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark, #2f5597); }
 .sp-process-card .sp-cell { flex: 1; min-width: 90px; }
+/* 人员安排/检测&必检：淡灰底，聚焦白底 */
+.sp-process-card .sp-assign, .sp-process-card .sp-check { background: var(--n1); }
+.sp-process-card .sp-assign:focus, .sp-process-card .sp-check:focus { background: #fff; }
+/* 检测&必检：限宽约 8 个中文字符 */
+.sp-process-card .sp-check { max-width: 8em; }
+/* 删除 ×（紧凑红底圆角小按钮） */
+.sp-del-x {
+  flex: 0 0 auto; width: 26px; height: 26px; padding: 0;
+  border: 1px solid #f2cdcd; border-radius: var(--r-sm);
+  background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1;
+  cursor: pointer;
+}
+.sp-del-x:hover { background: #f9dcdc; }
 /* 拖拽占位虚线框（参照换发 drag-ghost：蓝色虚线 + 淡蓝底） */
 .drag-ghost {
   position: fixed; z-index: 998; pointer-events: none;
