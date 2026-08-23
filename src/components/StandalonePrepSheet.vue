@@ -395,7 +395,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-process-card .sp-card-title .sp-card-drag { cursor: grab; color: #000; font-size: var(--fs-13); flex: 0 0 auto; user-select: none; touch-action: none; }
 .sp-process-card .sp-card-title .sp-card-drag:active { cursor: grabbing; }
 .sp-process-card .sp-card-title textarea {
-  flex: 1; min-width: 40em; max-width: 80em; border: none; background: transparent;
+  flex: 1; min-width: 27em; max-width: 54em; border: none; background: transparent;
   font-size: var(--fs-13); font-weight: 600; color: #000; padding: 2px 4px;
 }
 .sp-process-card .sp-card-title textarea:focus { background: #fff; border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark, #2f5597); }
