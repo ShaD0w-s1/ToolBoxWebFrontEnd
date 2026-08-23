@@ -114,6 +114,60 @@ function onRowInput(event: Event): void {
   el.style.height = `${el.scrollHeight}px`;
   props.store.persist();
 }
+
+// ===== 工序行拖拽排序（参照换发二级页表单工序卡：⠿ 柄拖动，目标位置虚线占位框） =====
+const dragGhost = ref<{ left: number; top: number; width: number; height: number } | null>(null);
+function clearDragGhost(): void { dragGhost.value = null; }
+interface SpRowDrag { groupIdx: number; rowId: number; el: HTMLElement; startY: number; rowH: number; origOrder: number; curOrder: number }
+let spRowDrag: SpRowDrag | null = null;
+function onSpRowDragMove(e: PointerEvent): void {
+  if (!spRowDrag) return;
+  const d = spRowDrag;
+  const dr = Math.round((e.clientY - d.startY) / d.rowH);
+  d.curOrder = Math.max(0, d.origOrder + dr);
+  d.el.style.transform = `translateY(${dr * d.rowH}px)`;
+  // 占位虚线框：排除自身后，第 curOrder 个卡片的位置（超末尾取最后卡片底边）
+  const container = d.el.parentElement;
+  if (container) {
+    const rows = Array.from(container.querySelectorAll<HTMLElement>(".sp-process-card")).filter((r) => r !== d.el);
+    const r0 = d.el.getBoundingClientRect();
+    let top: number;
+    if (d.curOrder >= rows.length) {
+      top = rows.length ? rows[rows.length - 1].getBoundingClientRect().bottom + 3 : r0.top;
+    } else {
+      top = rows[Math.max(0, d.curOrder)].getBoundingClientRect().top;
+    }
+    dragGhost.value = { left: r0.left, top, width: r0.width, height: r0.height };
+  }
+}
+function onSpRowDragEnd(): void {
+  if (spRowDrag) {
+    const d = spRowDrag;
+    props.store.spMoveProcessRow(d.groupIdx, d.rowId, d.curOrder);
+    d.el.style.opacity = "";
+    d.el.style.transform = "";
+    d.el.style.zIndex = "";
+  }
+  document.body.style.userSelect = "";
+  window.removeEventListener("pointermove", onSpRowDragMove);
+  window.removeEventListener("pointerup", onSpRowDragEnd);
+  spRowDrag = null;
+  clearDragGhost();
+}
+function startSpRowDrag(e: PointerEvent, groupIdx: number, rowId: number): void {
+  e.preventDefault();
+  const g = sheet.value?.processGroups[groupIdx];
+  if (!g) return;
+  const idx = g.rows.findIndex((r) => r.id === rowId);
+  if (idx < 0) return;
+  const el = (e.currentTarget as HTMLElement).closest(".sp-process-card") as HTMLElement;
+  spRowDrag = { groupIdx, rowId, el, startY: e.clientY, rowH: el.offsetHeight || 40, origOrder: idx, curOrder: idx };
+  document.body.style.userSelect = "none";
+  el.style.opacity = "0.85";
+  el.style.zIndex = "999";
+  window.addEventListener("pointermove", onSpRowDragMove);
+  window.addEventListener("pointerup", onSpRowDragEnd);
+}
 /** 撑高所有表格单元格 textarea：加载已有数据时（无 input 事件）也要正确换行显示。 */
 function autoSizeAll(): void {
   const root = captureRef.value;
@@ -131,6 +185,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 
 <template>
   <div v-if="sheet" ref="captureRef" class="sp-sheet">
+    <div v-if="dragGhost" class="drag-ghost" :style="{ left: dragGhost.left + 'px', top: dragGhost.top + 'px', width: dragGhost.width + 'px', height: dragGhost.height + 'px' }"></div>
     <div class="subpage-head">
       <h3 v-if="!titleEditing" class="sp-title" @click="startRenameTitle" title="点击修改名称">{{ sheet.title }}</h3>
       <input v-else class="sp-title-input" v-model="titleDraft" @blur="commitRenameTitle" @keydown.enter.prevent="commitRenameTitle" @keydown.esc.prevent="cancelRenameTitle" autofocus />
@@ -233,17 +288,18 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
           <input class="sp-group-name" v-model="g.name" @input="store.persist" :placeholder="`工序组 ${gi + 1}`" />
           <button class="ghost danger-cell" @click="store.spRemoveProcessGroup(g.id)">删除</button>
         </header>
-        <div class="table-wrap"><table class="sp-table">
-          <thead><tr><th>工作步骤</th><th>人员安排</th><th>检测&必检</th><th>功能</th></tr></thead>
-          <tbody>
-            <tr v-for="r in g.rows" :key="r.id">
-              <td><textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell"></textarea></td>
-              <td><textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell"></textarea></td>
-              <td><textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell"></textarea></td>
-              <td><button class="ghost danger-cell" @click="store.spRemoveProcessRow(gi, r.id)">删除</button></td>
-            </tr>
-          </tbody>
-        </table></div>
+        <!-- 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） -->
+        <div class="sp-process-list">
+          <div v-for="r in g.rows" :key="r.id" class="sp-process-card">
+            <div class="sp-card-title">
+              <div class="sp-card-drag" title="拖动调整行序" @pointerdown="startSpRowDrag($event, gi, r.id)">⠿</div>
+              <textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell" placeholder="工作步骤"></textarea>
+            </div>
+            <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell" placeholder="人员安排"></textarea>
+            <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell" placeholder="检测&必检"></textarea>
+            <button class="ghost danger-cell" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">删除</button>
+          </div>
+        </div>
         <div class="prep-block-actions"><button class="ghost" @click="store.spAddProcessRow(gi)">+ 新增行</button></div>
       </div>
       <h4 class="sp-sub-h4">工卡签署安排</h4>
@@ -325,6 +381,30 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-subcard { display: flex; flex-direction: column; gap: 6px; }
 .sp-sub-title { font-size: var(--fs-13); font-weight: 600; color: #185FA5; }
 .sp-group-card { border: 1px solid var(--n3); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 12px; background: var(--n1); }
+/* 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） */
+.sp-process-list { display: flex; flex-direction: column; gap: 6px; }
+.sp-process-card { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); padding: 3px 6px; background: #fff; }
+.sp-process-card .sp-card-title {
+  display: flex; align-items: center; gap: 2px;
+  background: #FDCA17; border-radius: var(--r-sm);
+  border-right: 2px solid #C9A227;
+  flex: none; max-width: 50%; min-width: 0;
+  padding: 2px 4px 2px 2px;
+}
+.sp-process-card .sp-card-title .sp-card-drag { cursor: grab; color: #000; font-size: var(--fs-13); flex: 0 0 auto; user-select: none; touch-action: none; }
+.sp-process-card .sp-card-title .sp-card-drag:active { cursor: grabbing; }
+.sp-process-card .sp-card-title textarea {
+  flex: 1; min-width: 0; max-width: 20em; border: none; background: transparent;
+  font-size: var(--fs-13); font-weight: 600; color: #000; padding: 2px 4px;
+}
+.sp-process-card .sp-card-title textarea:focus { background: #fff; border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark, #2f5597); }
+.sp-process-card .sp-cell { flex: 1; min-width: 90px; }
+/* 拖拽占位虚线框（参照换发 drag-ghost：蓝色虚线 + 淡蓝底） */
+.drag-ghost {
+  position: fixed; z-index: 998; pointer-events: none;
+  border: 1.5px dashed var(--blue, #4472c4); background: rgba(68, 114, 196, .08);
+  border-radius: var(--r-sm);
+}
 .table-wrap { overflow-x: auto; }
 .sp-table { width: 100%; border-collapse: collapse; min-width: 520px; }
 .sp-table th, .sp-table td { border: 1px solid var(--n3); padding: 4px; text-align: left; font-size: var(--fs-13); vertical-align: top; }

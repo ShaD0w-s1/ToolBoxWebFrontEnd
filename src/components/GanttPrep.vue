@@ -1978,14 +1978,14 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <label class="gpf"><span class="gpf-label">FSN</span><input v-model="a.fsn" @change="onAircraftFieldEdited(a)" @input="save" /></label>
                 <label class="gpf"><span class="gpf-label">MSN</span><input v-model="a.msn" @change="onAircraftFieldEdited(a)" @input="save" /></label>
                 <label class="gpf"><span class="gpf-label">发动机</span><input v-model="a.engine" @change="onAircraftFieldEdited(a)" @input="save" /></label>
-                <label class="gpf"><span class="gpf-label">机型</span>
+                <label class="gpf"><span class="gpf-label">机型</span><input v-model="a.type" @change="onAircraftFieldEdited(a)" @input="save" /></label>
+                <label class="gpf"><span class="gpf-label">ETOPS</span><input v-model="a.etops" @change="onAircraftFieldEdited(a)" @input="save" /></label>
+                <label class="gpf"><span class="gpf-label">ELT-DT</span>
                   <div class="meta-type-row">
-                    <input v-model="a.type" @change="onAircraftFieldEdited(a)" @input="save" />
+                    <input v-model="a.eltDt" @change="onAircraftFieldEdited(a)" @input="save" />
                     <button class="icon-btn meta-x" title="删除该飞机" @click="removeAircraft(a.id)">×</button>
                   </div>
                 </label>
-                <label class="gpf"><span class="gpf-label">ETOPS</span><input v-model="a.etops" @change="onAircraftFieldEdited(a)" @input="save" /></label>
-                <label class="gpf"><span class="gpf-label">ELT-DT</span><input v-model="a.eltDt" @change="onAircraftFieldEdited(a)" @input="save" /></label>
               </div>
               <hr v-if="i < aircrafts.length - 1" class="meta-divider" />
             </div>

@@ -1215,6 +1215,19 @@ export function useToolbox() {
   function spRemoveProcessGroup(id: number): void { const p = currentProject.value; if (!p) return; p.standalonePrepSheet.processGroups = p.standalonePrepSheet.processGroups.filter((g) => g.id !== id); markCurrentDirty(); persist(); }
   function spAddProcessRow(groupIdx: number): void { const p = currentProject.value; if (!p) return; const g = p.standalonePrepSheet.processGroups[groupIdx]; if (!g) return; g.rows.push(emptyProcessRow()); markCurrentDirty(); persist(); }
   function spRemoveProcessRow(groupIdx: number, rowId: number): void { const p = currentProject.value; if (!p) return; const g = p.standalonePrepSheet.processGroups[groupIdx]; if (!g) return; g.rows = g.rows.filter((r) => r.id !== rowId); markCurrentDirty(); persist(); }
+  /** 工序组内行拖拽排序：把 rowId 行移动到 targetIndex 位置（拖拽落点，越界自动收敛）。 */
+  function spMoveProcessRow(groupIdx: number, rowId: number, targetIndex: number): void {
+    const p = currentProject.value; if (!p) return;
+    const g = p.standalonePrepSheet.processGroups[groupIdx]; if (!g) return;
+    const from = g.rows.findIndex((r) => r.id === rowId);
+    if (from < 0) return;
+    const rows = g.rows.slice();
+    const [row] = rows.splice(from, 1);
+    const to = Math.min(Math.max(targetIndex, 0), rows.length);
+    rows.splice(to, 0, row);
+    g.rows = rows;
+    markCurrentDirty(); persist();
+  }
   function spAddSigningRow(): void { const p = currentProject.value; if (!p) return; p.standalonePrepSheet.signingRows.push(emptySigningRow()); markCurrentDirty(); persist(); }
   function spRemoveSigningRow(id: number): void { const p = currentProject.value; if (!p) return; p.standalonePrepSheet.signingRows = p.standalonePrepSheet.signingRows.filter((r) => r.id !== id); markCurrentDirty(); persist(); }
   /** 单项准备单机号变更 → 从飞机信息标准库回填 FSN/MSN/发动机/机型/ETOPS/ELT-DT（本地查不到时走公开接口兜底，无需 AIRNAV 授权）。 */
@@ -1940,7 +1953,7 @@ export function useToolbox() {
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,
     mImportStandardSub, mSyncSubToMaterialLib, saveMaterialLibraryNow, replaceMaterialActive, mergeMaterialSections, mergeMaterialImport, markNoteDirty,
     spRenameTitle, spOnAircraftChange, spAddWork, spRemoveWork, spAddPart, spRemovePart, spAddArrange, spRemoveArrange,
-    spAddProcessGroup, spRemoveProcessGroup, spAddProcessRow, spRemoveProcessRow, spAddSigningRow, spRemoveSigningRow,
+    spAddProcessGroup, spRemoveProcessGroup, spAddProcessRow, spRemoveProcessRow, spMoveProcessRow, spAddSigningRow, spRemoveSigningRow,
     moveCard, moveUnassignedToSection, deleteUnassigned, upsertWorkcardStdLib,
     sortAvCbCards,
     lookupAircraftRow, fetchAircraftInfo,
