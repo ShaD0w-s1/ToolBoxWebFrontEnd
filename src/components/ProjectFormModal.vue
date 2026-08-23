@@ -95,7 +95,7 @@ async function submit(): Promise<void> {
   gap: 12px;
   width: min(380px, calc(100% - 48px));
   padding: 22px 26px;
-  background: #fff;
+  background: var(--n0);
   border-radius: var(--r-lg);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
@@ -107,13 +107,13 @@ async function submit(): Promise<void> {
   border: 1px solid var(--focus);
   border-radius: var(--r-md);
   font-size: var(--fs-14);
-  color: #2f5597;
+  color: var(--blue-dark);
   background: var(--n1);
   transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
 }
 .pfm-field input:hover, .pfm-field select:hover { border-color: var(--n5); }
 .pfm-field input:focus, .pfm-field select:focus {
-  outline: none; background: #fff; border-color: var(--blue);
+  outline: none; background: var(--n0); border-color: var(--blue);
   box-shadow: 0 0 0 3px rgba(68, 114, 196, .16);
 }
 .pfm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }

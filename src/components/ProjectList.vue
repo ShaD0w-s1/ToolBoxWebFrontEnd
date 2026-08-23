@@ -483,7 +483,7 @@ async function batchDeleteNoDate(): Promise<void> {
           <h3>网站管理 · 登录账号目录</h3>
           <button @click="showSiteAdmin = false">关闭</button>
         </div>
-        <p v-if="accountsLoading" class="site-admin-empty">加载中…</p>
+        <p v-if="accountsLoading" class="loading-state">加载中…</p>
         <table v-else-if="accounts.length" class="site-admin-table">
           <thead>
             <tr><th>姓名</th><th>登录次数</th><th>首次登录</th><th>最近登录</th></tr>
@@ -511,7 +511,7 @@ async function batchDeleteNoDate(): Promise<void> {
           <input v-model="newEngTplName" placeholder="新模板名称" @keydown.enter="addEngTemplate" />
           <button class="primary" @click="addEngTemplate">新增模板</button>
         </div>
-        <p v-if="engTemplatesLoading" class="site-admin-empty">加载中…</p>
+        <p v-if="engTemplatesLoading" class="loading-state">加载中…</p>
         <template v-else-if="engTemplates.length">
           <div v-for="t in engTemplates" :key="t._id" class="eng-tpl-row">
             <div class="eng-tpl-info">
@@ -540,7 +540,7 @@ async function batchDeleteNoDate(): Promise<void> {
           <input v-model="newStandaloneTplName" placeholder="新模板名称" @keydown.enter="addStandaloneTemplate" />
           <button class="primary" @click="addStandaloneTemplate">新增模板</button>
         </div>
-        <p v-if="standaloneTemplatesLoading" class="site-admin-empty">加载中…</p>
+        <p v-if="standaloneTemplatesLoading" class="loading-state">加载中…</p>
         <template v-else-if="standaloneTemplates.length">
           <div v-for="t in standaloneTemplates" :key="t._id" class="eng-tpl-row">
             <div class="eng-tpl-info">
@@ -605,7 +605,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .db-group-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .compare-card { border-color: #378add; }
 .site-admin-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; background: rgba(17, 24, 39, 0.45); }
-.site-admin-card { width: min(560px, calc(100% - 48px)); max-height: none; margin: 24px auto; padding: 20px 24px; background: #fff; border-radius: var(--r-lg); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
+.site-admin-card { width: min(560px, calc(100% - 48px)); max-height: none; margin: 24px auto; padding: 20px 24px; background: var(--n0); border-radius: var(--r-lg); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
 .site-admin-newtpl { display: flex; gap: 8px; margin-bottom: 12px; }
 .site-admin-newtpl input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); }
 .site-admin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -626,7 +626,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .list-side {
   flex: 0 0 33.3333%; min-width: 0;
   display: flex; flex-direction: column; gap: 12px;
-  background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--n0); border: 1px solid var(--line); border-radius: var(--r-lg);
   padding: 14px; position: sticky; top: 8px;
 }
 .list-main { flex: 1 1 66.6667%; min-width: 0; }
@@ -659,19 +659,19 @@ async function batchDeleteNoDate(): Promise<void> {
 .cs-main {
   min-height: 30px; padding: 4px 14px;
   border: 1px solid var(--blue); border-right: none; border-radius: var(--r-sm) 0 0 var(--r-sm);
-  background: var(--blue); color: #fff; font-size: var(--fs-12); font-weight: 600;
+  background: var(--blue); color: var(--n0); font-size: var(--fs-12); font-weight: 600;
 }
 .cs-main:hover { background: var(--blue-dark); }
 .cs-arrow {
   min-height: 30px; width: 26px; padding: 0;
   border: 1px solid var(--blue); border-radius: 0 var(--r-sm) var(--r-sm) 0;
-  background: #fff; color: var(--blue-dark); font-size: var(--fs-10);
+  background: var(--n0); color: var(--blue-dark); font-size: var(--fs-10);
 }
 .cs-arrow:hover { background: var(--blue-bg); }
 .cs-menu {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
   min-width: 110px; padding: 4px;
-  background: #fff; border: 1px solid var(--n3); border-radius: var(--r-md);
+  background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-md);
   box-shadow: var(--sh-2);
 }
 .cs-menu button {

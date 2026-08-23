@@ -133,16 +133,16 @@ function addSub(side: "mat" | "tool", cat: string): void {
 .nc-tabs { display: flex; gap: 6px; }
 .nc-hint { margin: 0 0 12px; font-size: var(--fs-12); color: var(--n7); }
 .nc-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--n3); border: 1px solid var(--n3); border-radius: var(--r-md); overflow: hidden; margin-bottom: 12px; }
-.nc-col { background: #fff; padding: 8px 10px; min-height: 36px; display: flex; align-items: center; }
+.nc-col { background: var(--n0); padding: 8px 10px; min-height: 36px; display: flex; align-items: center; }
 .nc-col-head { background: var(--n1); font-weight: 700; font-size: var(--fs-13); color: var(--n8); }
 .nc-cat { margin-bottom: 12px; border: 1px solid var(--n3); border-radius: var(--r-md); overflow: hidden; }
 .nc-cat-head { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #eef2f9; }
-.nc-cat-input { border: none; background: #fff; padding: 8px 10px; font-size: var(--fs-13); font-weight: 700; color: #185fa5; }
+.nc-cat-input { border: none; background: var(--n0); padding: 8px 10px; font-size: var(--fs-13); font-weight: 700; color: #185fa5; }
 .nc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--n3); }
 .nc-row-same .nc-col { background: #eaf3de; }
 .nc-sub-input { width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 6px 8px; font-size: var(--fs-13); }
 .nc-empty { display: block; width: 100%; min-height: 30px; background: #fafafa; }
 .nc-add-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #eef2f9; border-top: 1px solid var(--n3); }
-.nc-add-row button { border: none; background: #fff; padding: 6px 8px; font-size: var(--fs-12); color: #185fa5; }
+.nc-add-row button { border: none; background: var(--n0); padding: 6px 8px; font-size: var(--fs-12); color: #185fa5; }
 .nc-add-row button:hover { background: #e6f1fb; }
 </style>

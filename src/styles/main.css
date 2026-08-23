@@ -190,6 +190,10 @@ button.ghost:hover, .ghost:hover { background: var(--blue-light); }
 .library-card.cart-card { border-color: #f0b27a; background: #fce4d6; }
 .library-card > div { display: flex; flex: 1; flex-direction: column; }
 .empty-state { padding: 34px; border: 1px dashed var(--n5); border-radius: var(--r-lg); color: var(--muted); background: #fff; text-align: center; }
+/* 加载态统一组件（规范 §3 P1）：spinner + 文案，替代各弹窗/列表的纯文字"加载中…" */
+.loading-state { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 18px 0; color: var(--n7); font-size: var(--fs-13); }
+.loading-state::before { content: ""; width: 15px; height: 15px; border: 2px solid var(--n4); border-top-color: var(--blue); border-radius: 50%; animation: loading-spin .8s linear infinite; flex: 0 0 auto; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
 
 .detail-head { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; padding: 13px 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: #fff; box-shadow: var(--sh-1); }
 .detail-head > div:not(.summary) { display: flex; flex-direction: column; }

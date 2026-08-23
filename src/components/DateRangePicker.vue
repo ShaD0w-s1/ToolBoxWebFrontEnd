@@ -123,7 +123,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .drp { position: relative; display: block; width: 100%; }
 .drp-trigger {
   width: 100%; min-height: 38px; padding: 4px 10px;
-  border: 1px solid var(--n4); border-radius: var(--r-md); background: #fff;
+  border: 1px solid var(--n4); border-radius: var(--r-md); background: var(--n0);
   font-size: var(--fs-13); color: var(--n9); text-align: left;
   display: flex; align-items: center; gap: 6px;
 }
@@ -135,7 +135,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .drp-menu {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 60;
   width: 288px; padding: 10px;
-  background: #fff; border: 1px solid var(--n3); border-radius: var(--r-lg);
+  background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg);
   box-shadow: var(--sh-2);
 }
 .drp-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -154,7 +154,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 }
 .drp-day:hover { background: var(--blue-bg); }
 .drp-day.dim { color: var(--n5); }
-.drp-day.start, .drp-day.end { background: var(--blue); color: #fff; font-weight: 600; }
+.drp-day.start, .drp-day.end { background: var(--blue); color: var(--n0); font-weight: 600; }
 .drp-day.in { background: var(--blue-bg); color: var(--blue-dark); }
 .drp-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--n3); text-align: center; }
 .drp-reset {

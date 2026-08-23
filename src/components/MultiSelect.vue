@@ -54,14 +54,14 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .ms { position: relative; display: inline-flex; align-items: center; width: 100%; }
 .ms-trigger {
   flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px;
-  border: 1px solid var(--n4); border-radius: var(--r-sm); background: #fff;
+  border: 1px solid var(--n4); border-radius: var(--r-sm); background: var(--n0);
   font-size: var(--fs-13); color: var(--n9); text-align: left;
   display: flex; align-items: center; gap: 6px;
 }
 .ms-trigger:hover { border-color: var(--n5); }
 .ms-trigger.on { border-color: var(--blue); }
 .ms-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ms-count { font-size: var(--fs-11); background: var(--blue); color: #fff; border-radius: var(--r-pill); padding: 0 7px; line-height: 16px; }
+.ms-count { font-size: var(--fs-11); background: var(--blue); color: var(--n0); border-radius: var(--r-pill); padding: 0 7px; line-height: 16px; }
 .ms-arrow { font-size: var(--fs-10); color: var(--n6); transition: transform var(--t-fast); }
 .ms-arrow.up { transform: rotate(180deg); }
 .ms-clear {
@@ -73,7 +73,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .ms-menu {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60;
   max-height: 220px; overflow-y: auto; padding: 4px;
-  background: #fff; border: 1px solid var(--n3); border-radius: var(--r-md);
+  background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-md);
   box-shadow: var(--sh-2);
 }
 .ms-opt {

@@ -12,6 +12,7 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import { exportWorkcardAssignment } from "../services/spreadsheet";
 import { sectionHex, sectionRgba } from "../utils/sectionColor";
 import { exportFileName } from "../utils/format";
+import { growTextarea, growAllTextareas } from "../utils/dom";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
@@ -130,19 +131,12 @@ function onLevelChange(section: WorkcardSection, card: WorkCardRow): void {
 
 /** 需求 3：宽列（工卡号/工卡名称/参与人员）用 textarea，自动撑高以完整显示并换行。 */
 function onCardInput(event: Event): void {
-  const el = event.target as HTMLTextAreaElement;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
+  growTextarea(event.target as HTMLTextAreaElement);
   props.store.persist();
 }
 
-function growTextarea(el: HTMLTextAreaElement): void {
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
-}
-
 function growAll(): void {
-  rootEl.value?.querySelectorAll("textarea").forEach((t) => growTextarea(t as HTMLTextAreaElement));
+  growAllTextareas(rootEl.value);
 }
 
 /** 需求 4：导出图片，委托 App.vue 处理（与工具清单同名按钮一致）。 */
@@ -340,7 +334,7 @@ onMounted(() => {
 
 <style scoped>
 .workcard-assignment { --wa-col: 220px; padding: 4px 2px 40px; }
-.wa-section { margin-bottom: 22px; background: #fff; border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
+.wa-section { margin-bottom: 22px; background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
 .wa-unassigned { border-color: #f0c8a0; background: #fffaf3; }
 /* 工卡分配清单部位配色：参考工具清单（用同一套部位色，底色 50% 透明 + 左实色边条） */
 .wa-section:not(.wa-unassigned) { border-left: 6px solid var(--sec-color, var(--n3)); }
@@ -351,15 +345,15 @@ onMounted(() => {
 .wa-card-head h4 { margin: 0; background: var(--sec-bg, var(--n1)); color: var(--n8); padding: 5px 10px; border-radius: var(--r-sm); display: inline-flex; align-items: center; }
 .wa-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
 /* 工卡安排标题前的缩进/放出箭头 */
-.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); background: #fff; color: var(--n7); font-size: var(--fs-12); line-height: 1; cursor: pointer; flex-shrink: 0; }
-.wa-indent-arrow:hover { border-color: #4472c4; color: #2f5597; }
+.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); background: var(--n0); color: var(--n7); font-size: var(--fs-12); line-height: 1; cursor: pointer; flex-shrink: 0; }
+.wa-indent-arrow:hover { border-color: var(--blue); color: var(--blue-dark); }
 .wa-indent-arrow.off { color: #a8b2c4; }
 
 /* Segmented 分段视图选择器（全部/人员安排/FC/LG/AV CB/ENG） */
 .wa-segment { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: #eef1f6; border-radius: var(--r-pill); margin: 0 0 16px; }
 .wa-seg-btn { border: none; background: transparent; border-radius: var(--r-pill); padding: 6px 16px; font-size: var(--fs-13); color: var(--n7); cursor: pointer; font-family: inherit; }
-.wa-seg-btn:hover { color: #2f5597; }
-.wa-seg-btn.on { background: #fff; color: #2f5597; font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
+.wa-seg-btn:hover { color: var(--blue-dark); }
+.wa-seg-btn.on { background: var(--n0); color: var(--blue-dark); font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
 
 /* 人员安排布局 */
 .wa-personnel { margin-bottom: 10px; }
@@ -394,7 +388,7 @@ onMounted(() => {
   grid-template-columns: 0.5fr 2fr 2fr 1.6fr 56px;
   min-width: 520px;
 }
-.wa-cell { background: #fff; padding: 4px 6px; display: flex; align-items: stretch; }
+.wa-cell { background: var(--n0); padding: 4px 6px; display: flex; align-items: stretch; }
 .wa-head { background: var(--n1); font-weight: 600; font-size: var(--fs-13); color: #000; align-items: center; }
 .wa-ops { justify-content: center; }
 .wa-cell input,
@@ -430,7 +424,7 @@ onMounted(() => {
 }
 .wa-level-select option {
   color: #000;
-  background: #fff;
+  background: var(--n0);
 }
 /* 未分配部位表格的"部位"select 字体放大到与工卡名称一致（13px） */
 .wa-grid-unassigned .wa-cell select {
@@ -445,7 +439,7 @@ onMounted(() => {
 }
 /* 需求 1：操作列 × 按钮缩小到可见即可 */
 .wa-x { width: 18px; height: 18px; line-height: 1; padding: 0; font-size: var(--fs-11); }
-.wa-empty { grid-column: 1 / -1; background: #fff; padding: 12px; color: #98a2b3; font-size: var(--fs-13); text-align: center; }
+.wa-empty { grid-column: 1 / -1; background: var(--n0); padding: 12px; color: #98a2b3; font-size: var(--fs-13); text-align: center; }
 .add-card { margin-top: 8px; }
 
 /* 移动端：第二行 4 格 → 2 列；新增安排行满宽；工卡安排字体减小、工卡分级可见 */

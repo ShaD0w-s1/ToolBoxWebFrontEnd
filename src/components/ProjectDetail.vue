@@ -488,18 +488,18 @@ async function runToolFilterByWorkcard(): Promise<void> {
   </section>
   <section v-else class="detail-loading">
     <div class="sync-spinner" aria-hidden="true"></div>
-    <p>数据加载中…</p>
+    <p class="loading-state">数据加载中…</p>
     <button class="ghost" @click="store.backToList">← 返回列表</button>
   </section>
 </template>
 
 <style scoped>
 /* 项目类型选择框：白底蓝字（全局 .type-select 已定义，此处仅保留 option 兜底） */
-.type-select option { background: #fff; color: #333; }
+.type-select option { background: var(--n0); color: #333; }
 /* 深链直开/数据未就绪时的加载空态 */
 .detail-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 14px; min-height: 60vh; color: #697386;
+  gap: 14px; min-height: 60vh; color: var(--n7);
 }
 .detail-loading p { margin: 0; font-size: var(--fs-16); }
 .detail-loading .sync-spinner {
@@ -532,5 +532,5 @@ async function runToolFilterByWorkcard(): Promise<void> {
 .tool-dedupe-qty { width: 100%; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); box-sizing: border-box; }
 .tool-dedupe-del { width: 26px; height: 26px; padding: 0; border: 1px solid #f2cdcd; border-radius: var(--r-sm); background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1; cursor: pointer; }
 .tool-dedupe-del:hover { background: #f9dcdc; }
-.tool-dedupe-note { min-height: 30px; padding: 4px 7px; border: 1px dashed var(--line); border-radius: var(--r-sm); font-size: var(--fs-12); resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; background: #fff; }
+.tool-dedupe-note { min-height: 30px; padding: 4px 7px; border: 1px dashed var(--line); border-radius: var(--r-sm); font-size: var(--fs-12); resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; background: var(--n0); }
 </style>

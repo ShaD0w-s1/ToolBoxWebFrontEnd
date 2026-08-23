@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, nextTick, ref, watch, defineAsyncComponent } from "vue";
-import html2canvas from "html2canvas";
 import { useRouter, useRoute } from "vue-router";
 import AppHeader from "./components/AppHeader.vue";
 import AircraftUpdateModal from "./components/AircraftUpdateModal.vue";
@@ -18,7 +17,6 @@ import {
 } from "./domain/toolbox";
 import { useToolbox } from "./composables/useToolbox";
 import { setForceDesktop } from "./composables/useResponsiveGrid";
-import { exportJson, exportState, importCart, importState } from "./services/spreadsheet";
 import { copyText, createShareUrl, readSharePayload, type SharePayload } from "./services/sharing";
 import { download, exportFileName, formatDay } from "./utils/format";
 
@@ -72,6 +70,8 @@ function downloadPreview(): void {
 
 async function exportImage(element: HTMLElement | null, subPageName = ""): Promise<void> {
   if (!element) return;
+  // html2canvas 按需加载：仅点击导出时才下载（首屏不再预取该 196KB chunk）
+  const html2canvas = (await import("html2canvas")).default;
   lastImageName = `${exportFileName(store.currentProject.value?.name || store.detailTitle.value, subPageName)}.jpg`;
   // 移动端按网页宽屏（1100px、3 列）重排后再截，得到“网页宽屏长截图”
   const isMobile = window.innerWidth < 768;
@@ -163,6 +163,7 @@ async function exportImage(element: HTMLElement | null, subPageName = ""): Promi
 
 async function importActive(file: File): Promise<void> {
   try {
+    const { importState } = await import("./services/spreadsheet");
     store.replaceActive(await importState(file));
     store.notify("标准库导入完成");
   } catch (error) { store.notify(`导入失败：${errorMessage(error)}`); }
@@ -171,6 +172,7 @@ async function importActive(file: File): Promise<void> {
 /** “导入新部位.xlsx”：解析后合并进当前标准库（只补不覆盖），由 store 实现合并逻辑。 */
 async function importNewSections(file: File): Promise<void> {
   try {
+    const { importState } = await import("./services/spreadsheet");
     const imported = await importState(file);
     const { addedCats, addedItems } = store.mergeImportedSections(imported);
     store.notify(`导入新部位完成：新增部位 ${addedCats} 个，补充物品 ${addedItems} 项`);
@@ -179,6 +181,7 @@ async function importNewSections(file: File): Promise<void> {
 
 async function importToolCart(file: File): Promise<void> {
   try {
+    const { importCart } = await import("./services/spreadsheet");
     const items = await importCart(file);
     if (window.confirm(`确认用导入的 ${items.length} 项覆盖工具车数据库？`)) {
       store.setToolCart(items);
@@ -361,7 +364,7 @@ onUnmounted(() => {
   store.stopWatch();
 });
 
-function exportCurrentState(displayCats?: string[]): void {
+async function exportCurrentState(displayCats?: string[]): Promise<void> {
   if (!store.active.value) return;
   const active = store.active.value;
   // 仅导出集中显示页面上(displayCats)的工具，删除非显示部位数据
@@ -371,7 +374,14 @@ function exportCurrentState(displayCats?: string[]): void {
     categories: cats.filter((c) => active.categories.includes(c)),
     items: active.items.filter((it) => cats.includes(it.cat)),
   };
+  const { exportState } = await import("./services/spreadsheet");
   exportState(filtered, exportFileName(store.currentProject.value?.name || store.detailTitle.value, "工具清单"));
+}
+
+/** “导出全部”按钮：xlsx 按需加载（首屏不再预取 419KB chunk）。 */
+async function exportAll(): Promise<void> {
+  const { exportJson } = await import("./services/spreadsheet");
+  exportJson(store.app.value, exportFileName(store.currentProject.value?.name || store.detailTitle.value, "全部数据"));
 }
 </script>
 
@@ -381,7 +391,7 @@ function exportCurrentState(displayCats?: string[]): void {
     <ProjectList
       v-if="store.screen.value === 'list'"
       :store="store"
-      @export-all="exportJson(store.app.value)"
+      @export-all="exportAll()"
       @share="share('app')"
     />
     <ProjectDetail
@@ -457,7 +467,7 @@ function exportCurrentState(displayCats?: string[]): void {
   align-items: center;
   gap: 14px;
   padding: 28px 36px;
-  background: #fff;
+  background: var(--n0);
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
@@ -492,7 +502,7 @@ function exportCurrentState(displayCats?: string[]): void {
   flex-direction: column;
   gap: 12px;
   padding: 28px 32px;
-  background: #fff;
+  background: var(--n0);
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
   width: min(360px, calc(100% - 48px));

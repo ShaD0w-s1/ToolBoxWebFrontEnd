@@ -35,9 +35,9 @@ function subLabel(it: ToolItem): string {
 </template>
 
 <style scoped>
-.pnc-card { border: 1px solid #dde2ec; border-radius: var(--r-lg); background: #fff; margin-bottom: 10px; overflow: hidden; }
+.pnc-card { border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); margin-bottom: 10px; overflow: hidden; }
 .pnc-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #edf2fc; }
-.pnc-partno { font-size: var(--fs-14); color: #2f5597; font-weight: 700; }
+.pnc-partno { font-size: var(--fs-14); color: var(--blue-dark); font-weight: 700; }
 .pnc-name { font-size: var(--fs-13); color: #4a5160; }
 .pnc-count { margin-left: auto; font-size: var(--fs-12); color: #98a2b3; }
 .pnc-body { padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }

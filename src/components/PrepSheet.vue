@@ -241,8 +241,8 @@ function exportTableXlsx(): void {
 .prep-title:hover { background: #eef2fa; }
 .prep-title-input { font-size: var(--fs-18); padding: 4px 8px; border: 1px solid #6f8ad6; border-radius: var(--r-sm); min-width: 240px; }
 
-.prep-block { margin-bottom: 18px; background: #fff; border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
-.prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: #fff; padding: 8px 12px; border-radius: var(--r-md); }
+.prep-block { margin-bottom: 18px; background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
+.prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: var(--n0); padding: 8px 12px; border-radius: var(--r-md); }
 
 /* 需求 1：固定命名字体颜色为黑色 */
 .field-label { font-size: var(--fs-13); color: #000; font-weight: 500; }
@@ -252,10 +252,10 @@ function exportTableXlsx(): void {
 .prep-field { display: flex; flex-direction: column; gap: 4px; }
 .prep-field input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
 /* Divider 分隔线：基础信息各组之间；人员安排网格内跨 4 列（起落架行后、工卡负责人行后） */
-.prep-divider { height: 1px; background: #dde2ec; grid-column: 1 / -1; margin: 4px 0 10px; }
+.prep-divider { height: 1px; background: var(--n4); grid-column: 1 / -1; margin: 4px 0 10px; }
 
 /* 需求 4：ETOPS/ELT-DT 有非 N/A 数据时红色加粗 */
-.special-config { color: #c0392b !important; font-weight: 700 !important; }
+.special-config { color: var(--danger) !important; font-weight: 700 !important; }
 
 /* 后三天过夜航班 — 缩小输入格宽度避免 6 列行超宽（修复 1） */
 .prep-grid-6 .prep-field input { padding: 4px 6px; font-size: var(--fs-13); }

@@ -5,6 +5,7 @@ import { backend } from "../api";
 import type { StandalonePrepSheet } from "../domain/toolbox";
 import { exportStandalonePrep } from "../services/spreadsheet";
 import { exportFileName } from "../utils/format";
+import { growTextarea, growAllTextareas } from "../utils/dom";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
@@ -109,9 +110,7 @@ async function renameTemplate(t: { _id: string; name: string; state: StandaloneP
 
 /** 表格单元格 textarea 自动撑高并持久化（需求：表单内容自动换行）。 */
 function onRowInput(event: Event): void {
-  const el = event.target as HTMLTextAreaElement;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
+  growTextarea(event.target as HTMLTextAreaElement);
   props.store.persist();
 }
 
@@ -170,12 +169,7 @@ function startSpRowDrag(e: PointerEvent, groupIdx: number, rowId: number): void 
 }
 /** 撑高所有表格单元格 textarea：加载已有数据时（无 input 事件）也要正确换行显示。 */
 function autoSizeAll(): void {
-  const root = captureRef.value;
-  if (!root) return;
-  for (const el of root.querySelectorAll<HTMLTextAreaElement>(".sp-cell")) {
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }
+  growAllTextareas(captureRef.value, ".sp-cell");
 }
 onMounted(() => { nextTick(autoSizeAll); });
 watch(() => props.store.currentProject.value?.id, () => { nextTick(autoSizeAll); });
@@ -326,7 +320,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
           <input ref="saveTplInputRef" v-model="saveTplName" placeholder="新模板名称" @keydown.enter="saveAsTemplate" />
           <button class="primary" @click="saveAsTemplate">保存为新模板</button>
         </div>
-        <p v-if="templatesLoading" class="tpl-empty">加载中…</p>
+        <p v-if="templatesLoading" class="loading-state">加载中…</p>
         <template v-else-if="templates.length">
           <div v-for="t in templates" :key="t._id" class="tpl-row">
             <div class="tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>工序 {{ (t.state.processGroups || []).length }} 组 · 签署 {{ (t.state.signingRows || []).length }} 行</span></div>
@@ -351,14 +345,14 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-title { margin: 0; font-size: var(--fs-18); cursor: pointer; padding: 4px 6px; border-radius: var(--r-sm); }
 .sp-title:hover { background: #eef2fa; }
 .sp-title-input { font-size: var(--fs-18); padding: 4px 8px; border: 1px solid #6f8ad6; border-radius: var(--r-sm); min-width: 240px; }
-.prep-block { margin-bottom: 18px; background: #fff; border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
-.prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: #fff; padding: 8px 12px; border-radius: var(--r-md); }
+.prep-block { margin-bottom: 18px; background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
+.prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: var(--n0); padding: 8px 12px; border-radius: var(--r-md); }
 .sp-sub-h4 { margin: 18px 0 10px; }
 .field-label { font-size: var(--fs-13); color: #000; font-weight: 500; }
 .prep-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 14px; margin-bottom: 8px; }
 .prep-field { display: flex; flex-direction: column; gap: 4px; }
 .prep-field input, .prep-field textarea { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
-.special-config { color: #c0392b !important; font-weight: 700 !important; }
+.special-config { color: var(--danger) !important; font-weight: 700 !important; }
 .prep-personnel-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
 .prep-personnel-cell { display: flex; flex-direction: column; gap: 4px; }
 .prep-personnel-cell input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
@@ -384,7 +378,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-group-card { border: 1px solid var(--n3); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 12px; background: var(--n1); }
 /* 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） */
 .sp-process-list { display: flex; flex-direction: column; gap: 6px; }
-.sp-process-card { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, #dde2ec); border-radius: var(--r-sm); padding: 3px 6px; background: #fff; }
+.sp-process-card { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); padding: 3px 6px; background: var(--n0); }
 .sp-process-card .sp-card-title {
   display: flex; align-items: center; gap: 2px;
   background: #FDCA17; border-radius: var(--r-sm);
@@ -398,11 +392,11 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   flex: 1; min-width: 27em; max-width: 54em; border: none; background: transparent;
   font-size: var(--fs-13); font-weight: 600; color: #000; padding: 2px 4px;
 }
-.sp-process-card .sp-card-title textarea:focus { background: #fff; border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark, #2f5597); }
+.sp-process-card .sp-card-title textarea:focus { background: var(--n0); border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark, var(--blue-dark)); }
 .sp-process-card .sp-cell { flex: 1; min-width: 90px; }
 /* 人员安排/检测&必检/备注：淡灰底，聚焦白底 */
 .sp-process-card .sp-assign, .sp-process-card .sp-check, .sp-process-card .sp-note { background: var(--n1); }
-.sp-process-card .sp-assign:focus, .sp-process-card .sp-check:focus, .sp-process-card .sp-note:focus { background: #fff; }
+.sp-process-card .sp-assign:focus, .sp-process-card .sp-check:focus, .sp-process-card .sp-note:focus { background: var(--n0); }
 /* 人员安排：flex:1 自适应，填满工序行剩余长度（检测&必检 8em / 备注 15em / × 固定宽除外） */
 .sp-process-card .sp-assign { flex: 1 1 0%; min-width: 90px; }
 /* 检测&必检：限宽约 8 个中文字符 */
@@ -420,7 +414,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 /* 拖拽占位虚线框（参照换发 drag-ghost：蓝色虚线 + 淡蓝底） */
 .drag-ghost {
   position: fixed; z-index: 998; pointer-events: none;
-  border: 1.5px dashed var(--blue, #4472c4); background: rgba(68, 114, 196, .08);
+  border: 1.5px dashed var(--blue, var(--blue)); background: rgba(68, 114, 196, .08);
   border-radius: var(--r-sm);
 }
 .table-wrap { overflow-x: auto; }
@@ -428,25 +422,25 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-table th, .sp-table td { border: 1px solid var(--n3); padding: 4px; text-align: left; font-size: var(--fs-13); vertical-align: top; }
 .sp-table th { background: var(--n1); font-weight: 600; color: #000; }
 .sp-cell { width: 100%; box-sizing: border-box; padding: 5px 6px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; line-height: 1.5; font-family: inherit; }
-.sp-cell:focus { border-color: var(--focus); background: #fff; }
+.sp-cell:focus { border-color: var(--focus); background: var(--n0); }
 .sp-group-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: #4a5160; }
-.sp-group-name:hover, .sp-group-name:focus { border-color: var(--focus); background: #fff; }
+.sp-group-name:hover, .sp-group-name:focus { border-color: var(--focus); background: var(--n0); }
 .sp-part-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: #4a5160; }
-.sp-part-name:hover, .sp-part-name:focus { border-color: var(--focus); background: #fff; }
+.sp-part-name:hover, .sp-part-name:focus { border-color: var(--focus); background: var(--n0); }
 /* 单项工作模板弹窗 */
 .tpl-modal { position: fixed; inset: 0; z-index: 300; background: rgba(15, 23, 42, .45); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px 20px; }
-.tpl-modal-card { background: #fff; border-radius: var(--r-lg); padding: 18px 20px; width: 520px; max-width: 100%; margin: 0 auto; box-shadow: 0 8px 30px rgba(0, 0, 0, .18); }
+.tpl-modal-card { background: var(--n0); border-radius: var(--r-lg); padding: 18px 20px; width: 520px; max-width: 100%; margin: 0 auto; box-shadow: 0 8px 30px rgba(0, 0, 0, .18); }
 .tpl-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .tpl-modal-head h3 { font-size: var(--fs-16); margin: 0; color: #222; }
 .tpl-save-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .tpl-save-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); }
-.tpl-empty { color: #697386; font-size: var(--fs-13); text-align: center; padding: 14px 0; }
+.tpl-empty { color: var(--n7); font-size: var(--fs-13); text-align: center; padding: 14px 0; }
 .tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--n3); border-radius: var(--r-md); margin-bottom: 8px; }
 .tpl-info { flex: 1; min-width: 0; }
 .tpl-info.clickable { cursor: pointer; }
-.tpl-info.clickable:hover strong { color: #4472c4; }
+.tpl-info.clickable:hover strong { color: var(--blue); }
 .tpl-info strong { display: block; font-size: var(--fs-14); color: #222; }
-.tpl-info span { font-size: var(--fs-12); color: #697386; }
+.tpl-info span { font-size: var(--fs-12); color: var(--n7); }
 .tpl-actions { display: flex; gap: 6px; flex-shrink: 0; }
 @media (max-width: 768px) {
   .prep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }

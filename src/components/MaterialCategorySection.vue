@@ -190,36 +190,36 @@ async function supplementPart(): Promise<void> {
 </template>
 
 <style scoped>
-.category-card { background: #fff; border: 1px solid var(--n3); border-radius: var(--r-lg); margin-bottom: 14px; overflow: hidden; }
+.category-card { background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg); margin-bottom: 14px; overflow: hidden; }
 .category-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: var(--fs-14); }
 .collapse { background: transparent; border: none; cursor: pointer; font-size: var(--fs-14); color: #4a5160; }
 .category-head strong { font-size: var(--fs-16); }
 .cat-name { flex: 0 1 auto; min-width: 90px; max-width: 220px; padding: 4px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-16); color: inherit; }
-.cat-name:hover, .cat-name:focus { border-color: var(--focus); background: #fff; }
+.cat-name:hover, .cat-name:focus { border-color: var(--focus); background: var(--n0); }
 .category-body { padding: 10px 12px; }
 .notes { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); margin-bottom: 10px; resize: vertical; }
 .sub-grid { display: grid; gap: 10px; }
-.sub-card { border: 1.5px solid var(--focus); border-radius: var(--r-md); padding: 8px 10px; background: #fff; }
+.sub-card { border: 1.5px solid var(--focus); border-radius: var(--r-md); padding: 8px 10px; background: var(--n0); }
 .sub-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .sub-collapse { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: var(--fs-16); line-height: 1; color: #4a5160; flex: 0 0 auto; }
 .type-name { flex: 1 1 0; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-14); }
-.type-name:hover, .type-name:focus { border-color: var(--focus); background: #fff; }
+.type-name:hover, .type-name:focus { border-color: var(--focus); background: var(--n0); }
 /* 合并后：StandardPicker 在 sub-head 内作为类型名输入框，占满可用宽度、外观与 .type-name 一致 */
 .sub-head :deep(.standard-combo) { flex: 1 1 0; min-width: 0; margin: 0; }
 .sub-head :deep(.standard-input) {
   width: 100%; margin: 0; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-14); color: inherit;
 }
 .sub-head :deep(.standard-input:hover),
-.sub-head :deep(.standard-input:focus) { border-color: var(--focus); background: #fff; }
+.sub-head :deep(.standard-input:focus) { border-color: var(--focus); background: var(--n0); }
 .item-grid { display: grid; gap: 8px; }
-.m-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: stretch; border: 1px solid var(--n3); border-radius: var(--r-md); padding: 6px 8px; background: #fff; word-break: break-word; }
+.m-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: stretch; border: 1px solid var(--n3); border-radius: var(--r-md); padding: 6px 8px; background: var(--n0); word-break: break-word; }
 .m-field { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-12); color: var(--n7); min-width: 0; }
 .m-field input, .m-name { padding: 5px 7px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0; width: 100%; box-sizing: border-box; }
 /* 件号/名称/备注 textarea：与数量栏等高（默认单行），字体保持 12px，自动换行并随内容撑高 */
 .m-name { padding: 5px 7px; font-size: var(--fs-12); line-height: 1.4; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; font-family: inherit; min-height: 30px; }
 /* 操作按钮组：删除(x)+备注(+) 上下排列，占满卡片高度 */
 .m-ops { display: flex; flex-direction: column; gap: 4px; }
-.m-op { flex: 1; min-width: 26px; min-height: 22px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff; color: var(--n7); font-size: var(--fs-14); line-height: 1; cursor: pointer; }
+.m-op { flex: 1; min-width: 26px; min-height: 22px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--n0); color: var(--n7); font-size: var(--fs-14); line-height: 1; cursor: pointer; }
 .m-op:hover { background: var(--blue-light); }
 .m-op-del { border-color: #f2cdcd; background: #fdecec; color: #b53a3a; }
 .m-op-del:hover { background: #f9dcdc; }
