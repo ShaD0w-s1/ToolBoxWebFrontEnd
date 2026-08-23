@@ -197,12 +197,13 @@ onMounted(() => {
           <div class="wa-cell wa-head">部位</div>
           <div class="wa-cell wa-head wa-ops">操作</div>
 
-          <template v-for="(card, index) in assignment.unassigned" :key="`u-${index}`">
+          <template v-for="(card, index) in assignment.unassigned" :key="`u-${card.工卡号}-${index}`">
             <div class="wa-cell"><input v-model="card.序号" @input="store.persist" /></div>
             <div class="wa-cell wa-wrap"><textarea v-model="card.工卡号" rows="1" @input="onCardInput" /></div>
             <div class="wa-cell wa-wrap"><textarea v-model="card.工卡名称" rows="1" @input="onCardInput" /></div>
             <div class="wa-cell">
-              <select aria-label="选择部位" @change="onUnassignedSectionChange(index, $event)">
+              <!-- :value="" 受控：选择即移动，行被 splice 后 DOM 复用不会残留上一行的选中态（index key 复用场景必加） -->
+              <select :value="''" aria-label="选择部位" @change="onUnassignedSectionChange(index, $event)">
                 <option value="">选择部位</option>
                 <option v-for="s in WORKCARD_SECTIONS" :key="s" :value="s">{{ s }}</option>
               </select>
