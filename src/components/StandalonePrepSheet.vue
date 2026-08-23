@@ -389,20 +389,22 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   display: flex; align-items: center; gap: 2px;
   background: #FDCA17; border-radius: var(--r-sm);
   border-right: 2px solid #C9A227;
-  flex: none; max-width: 85%; min-width: 0;
+  flex: none; max-width: 100%; min-width: 0;
   padding: 2px 4px 2px 2px;
 }
 .sp-process-card .sp-card-title .sp-card-drag { cursor: grab; color: #000; font-size: var(--fs-13); flex: 0 0 auto; user-select: none; touch-action: none; }
 .sp-process-card .sp-card-title .sp-card-drag:active { cursor: grabbing; }
 .sp-process-card .sp-card-title textarea {
-  flex: 1; min-width: 0; max-width: 40em; border: none; background: transparent;
+  flex: 1; min-width: 40em; max-width: 80em; border: none; background: transparent;
   font-size: var(--fs-13); font-weight: 600; color: #000; padding: 2px 4px;
 }
 .sp-process-card .sp-card-title textarea:focus { background: #fff; border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark, #2f5597); }
 .sp-process-card .sp-cell { flex: 1; min-width: 90px; }
-/* 人员安排/检测&必检：淡灰底，聚焦白底 */
-.sp-process-card .sp-assign, .sp-process-card .sp-check { background: var(--n1); }
-.sp-process-card .sp-assign:focus, .sp-process-card .sp-check:focus { background: #fff; }
+/* 人员安排/检测&必检/备注：淡灰底，聚焦白底 */
+.sp-process-card .sp-assign, .sp-process-card .sp-check, .sp-process-card .sp-note { background: var(--n1); }
+.sp-process-card .sp-assign:focus, .sp-process-card .sp-check:focus, .sp-process-card .sp-note:focus { background: #fff; }
+/* 人员安排：固定 12em 缩短（工作步骤加长后腾出空间） */
+.sp-process-card .sp-assign { flex: none; width: 12em; min-width: 12em; }
 /* 检测&必检：限宽约 8 个中文字符 */
 .sp-process-card .sp-check { max-width: 8em; }
 /* 备注：固定 15em 宽（参照换发二级页工序卡），红字由全局 textarea[placeholder*=备注] 生效 */
