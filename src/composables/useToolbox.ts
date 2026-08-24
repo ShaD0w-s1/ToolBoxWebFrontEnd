@@ -549,14 +549,14 @@ export function useToolbox() {
     return true;
   }
 
-  async function createProject(name: string, aircraftType: AircraftType = "A320", projectType: ProjectType | "" = "", executeDate = ""): Promise<void> {
+  async function createProject(name: string, aircraftType: AircraftType = "A320", projectType: ProjectType | "" = "", executeDate = "", team = ""): Promise<void> {
     const project: Project = {
       id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name,
       createdAt: Date.now(),
       executeDate,
       aircraftType,
-      team: "",
+      team,
       type: (PROJECT_TYPES as readonly string[]).includes(projectType) ? projectType : "",
       // 机型未确定（工作准备单「机型」字段为空）时不引用任何标准库内容，data 从空开始；
       // 填好机型后由 aircraftTypeFromPrep 推断 → setAircraftType 切换到对应机型标准库。

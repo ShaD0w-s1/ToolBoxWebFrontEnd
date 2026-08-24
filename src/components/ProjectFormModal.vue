@@ -36,7 +36,7 @@ async function submit(): Promise<void> {
   }
   const executeDate = form.executeDate.replace(/-/g, "");
   if (props.mode === "create") {
-    await props.store.createProject(name, "A320", form.type, executeDate);
+    await props.store.createProject(name, "A320", form.type, executeDate, form.team);
   } else if (props.project) {
     props.store.updateProject(props.project, { name, team: form.team, type: form.type, executeDate });
   }
