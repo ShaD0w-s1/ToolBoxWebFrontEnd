@@ -307,6 +307,45 @@ function closeCardMenu(): void { openCardMenu.value = null; }
 onMounted(() => document.addEventListener("click", closeCardMenu));
 onBeforeUnmount(() => document.removeEventListener("click", closeCardMenu));
 
+// —— 项目目录导出（系统设置卡）：按执行日期区间导出 名称/类型/执行班组/执行日期 ——
+// 默认区间：本月 1 日 ~ 今天
+function monthBounds(): { from: string; to: string } {
+  const now = new Date();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return { from: `${now.getFullYear()}-${m}-01`, to: `${now.getFullYear()}-${m}-${d}` };
+}
+const dirBounds = monthBounds();
+const dirFrom = ref(dirBounds.from);
+const dirTo = ref(dirBounds.to);
+/** 执行日期 YYYYMMDD → 显示 YYYY-MM-DD（历史数据可能带连字符，宽容处理）。 */
+function fmtExecDate(v: string): string {
+  const d = String(v || "").replace(/\D/g, "");
+  return d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : String(v || "");
+}
+async function exportProjectDir(): Promise<void> {
+  const from = (dirFrom.value || "").replace(/\D/g, "");
+  const to = (dirTo.value || "").replace(/\D/g, "");
+  if (!from || !to) { props.store.notify("请先选择开始/结束日期", "err"); return; }
+  if (to < from) { props.store.notify("结束日期不能早于开始日期", "err"); return; }
+  const list = props.store.app.value.projects
+    .filter((p) => { const k = String(p.executeDate || "").replace(/\D/g, ""); return k.length === 8 && k >= from && k <= to; })
+    .slice()
+    .sort((a, b) => String(a.executeDate).localeCompare(String(b.executeDate)) || a.name.localeCompare(b.name, "zh-CN"));
+  if (!list.length) { props.store.notify("该日期区间内没有项目", "info"); return; }
+  try {
+    const XLSX = await import("xlsx");
+    const aoa: unknown[][] = [["序号", "项目名称", "类型", "执行班组", "执行日期"]];
+    list.forEach((p, i) => aoa.push([i + 1, p.name, p.type || "未选择", p.team || "未分配", fmtExecDate(p.executeDate)]));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "项目目录");
+    XLSX.writeFile(wb, `项目目录_${dirFrom.value}_${dirTo.value}.xlsx`);
+    props.store.notify(`已导出 ${list.length} 个项目`, "ok");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "导出失败", "err");
+  }
+}
+
 // —— 批量删除未设置执行日期的云端项目 ——
 async function batchDeleteNoDate(): Promise<void> {
   const list = props.store.app.value.projects.filter((p) => !p.executeDate);
@@ -390,10 +429,6 @@ async function batchDeleteNoDate(): Promise<void> {
         <div class="list-main">
           <div class="list-main-head">
             <p class="list-status">共 {{ store.filteredProjects.value.length }} 个工作项目</p>
-            <div class="list-main-ops">
-              <button title="导出全部项目数据" @click="emit('export-all')">导出全部</button>
-              <button class="danger" title="批量删除云端储存的未设置执行日期的项目" @click="batchDeleteNoDate">清理无日期项目</button>
-            </div>
           </div>
           <div v-if="!store.filteredProjects.value.length" class="empty-state">尚无符合条件的工作项目。</div>
           <article v-for="project in store.filteredProjects.value" :key="project.id" class="project-card">
@@ -472,12 +507,6 @@ async function batchDeleteNoDate(): Promise<void> {
                 <button class="primary" @click="showControlDoc = true">打开维护</button>
               </div>
             </article>
-            <article class="library-card compare-card">
-              <div><strong>网站管理</strong><span>登录过的账号目录</span></div>
-              <div class="library-actions">
-                <button class="primary" @click="openSiteAdmin">打开管理</button>
-              </div>
-            </article>
           </div>
         </section>
 
@@ -533,6 +562,26 @@ async function batchDeleteNoDate(): Promise<void> {
                     <span>{{ store.syncSettings.autoSaveOnEnd ? "已开启" : "已关闭" }}</span>
                   </label>
                   <span>失焦 / 切换项目 / 关闭页面时，自动保存当前编辑内容并释放锁。</span>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-field">
+                  <label>导出项目目录</label>
+                  <div class="settings-dir-row">
+                    <input class="inp settings-date" type="date" v-model="dirFrom" aria-label="开始日期" />
+                    <span class="settings-dir-sep">至</span>
+                    <input class="inp settings-date" type="date" v-model="dirTo" aria-label="结束日期" />
+                    <button class="primary" @click="exportProjectDir" title="按执行日期区间导出 项目名称/类型/执行班组/执行日期（.xlsx）">导出</button>
+                  </div>
+                  <span>按执行日期区间导出 项目名称 / 类型 / 执行班组 / 执行日期（.xlsx 格式）。</span>
+                </div>
+                <div class="settings-field">
+                  <label>数据维护</label>
+                  <div class="settings-dir-row">
+                    <button class="danger" @click="batchDeleteNoDate" title="批量删除云端储存的未设置执行日期的项目">清理无日期项目</button>
+                    <button @click="openSiteAdmin" title="查看登录过的账号目录（需 AIRNAV 密码）">网站管理</button>
+                  </div>
+                  <span>清理无日期项目：批量删除未设置执行日期的云端项目；网站管理：登录账号目录（需 AIRNAV 密码）。</span>
                 </div>
               </div>
             </article>
@@ -768,4 +817,9 @@ async function batchDeleteNoDate(): Promise<void> {
 .settings-field span { font-size: var(--fs-12, 12px); color: var(--muted, var(--n7)); line-height: 1.5; }
 .settings-toggle { flex-direction: row; align-items: center; gap: 8px; font-weight: 400 !important; }
 .settings-toggle input { width: 16px; height: 16px; accent-color: var(--proc-yellow, #FDCA17); }
+/* 设置卡内行式操作（日期区间+导出 / 数据维护按钮） */
+.settings-dir-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.settings-dir-row .settings-date { flex: 0 1 140px; min-width: 0; }
+.settings-dir-row .settings-dir-sep { font-size: var(--fs-13, 13px); color: var(--n7, #888); flex: 0 0 auto; }
+.settings-dir-row button { min-height: 34px; padding: 5px 12px; }
 </style>
