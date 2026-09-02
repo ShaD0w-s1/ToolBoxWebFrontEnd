@@ -190,13 +190,14 @@ function onAddCategory(event: Event): void {
   select.value = "";
 }
 
-/** 单独项目工具清单「添加类型」：不弹窗，直接新增一张默认名「新类型」的卡片（重名自动加序号，如 新类型2），并自动置顶。 */
+/** 单独项目工具清单「添加类型」：不弹窗，直接新增一张默认名「新类型」的卡片（重名自动加序号，如 新类型2）；
+ *  空行插入 items 首项 → 新类型卡按首次出现顺序显示在清单顶端，其余卡片位置不变。 */
 function addFlatToolType(): void {
   const active = props.store.active.value;
   const used = new Set((active?.items || []).map((it) => (it.sub || "").trim()).filter(Boolean));
   let name = "新类型";
   for (let k = 2; used.has(name); k++) name = `新类型${k}`;
-  props.store.addItem(FLAT_TOOL_CAT, name);
+  props.store.addItem(FLAT_TOOL_CAT, name, true);
 }
 
 /** 单独项目工具清单「导入表格」：扁平格式整体替换（兼容带/不带部位列，均不保留部位信息）。 */

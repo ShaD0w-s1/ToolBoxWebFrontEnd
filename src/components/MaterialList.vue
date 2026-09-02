@@ -119,13 +119,14 @@ function onAddCategory(event: Event): void {
 }
 
 function exportImage(): void { emit("export-image", captureRef.value); }
-/** 单独项目航材清单「添加类型」：不弹窗，直接新增一张默认名「新类型」的卡片（重名自动加序号），并自动置顶。 */
+/** 单独项目航材清单「添加类型」：不弹窗，直接新增一张默认名「新类型」的卡片（重名自动加序号）；
+ *  空行插入 items 首项 → 新类型卡显示在清单顶端，其余卡片位置不变。 */
 function addMaterialFlatType(): void {
   const active = props.store.materialActive.value;
   const used = new Set((active?.items || []).map((it) => (it.sub || "").trim()).filter(Boolean));
   let name = "新类型";
   for (let k = 2; used.has(name); k++) name = `新类型${k}`;
-  props.store.mAddItem(FLAT_MATERIAL_CAT, name);
+  props.store.mAddItem(FLAT_MATERIAL_CAT, name, true);
 }
 function exportTableXlsx(): void {
   if (!state.value) return;

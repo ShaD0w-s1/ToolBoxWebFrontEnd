@@ -1261,10 +1261,13 @@ export function useToolbox() {
     state.items = state.items.filter((it) => !(it.cat === cat && it.sub === sub));
     persist();
   }
-  function mAddItem(cat: string, sub: string): void {
+  function mAddItem(cat: string, sub: string, prepend = false): void {
     const state = requireMaterial();
     if (!state) return;
-    state.items.push({ id: nextId++, cat, sub, name: "", qty: 1, partNo: "" });
+    const item = { id: nextId++, cat, sub, name: "", qty: 1, partNo: "" };
+    // prepend=true 插入首项：新增类型卡按“首次出现顺序”自然显示在清单顶端
+    if (prepend) state.items.unshift(item);
+    else state.items.push(item);
     persist();
   }
   function mDeleteItem(id: number): void {
