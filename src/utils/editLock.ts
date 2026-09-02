@@ -23,17 +23,20 @@ export function createEditLockDirective(store: ToolboxStore): {
   function applyLockState(el: HTMLElement, key: string): void {
     const locked = store.isLockedByOther(key);
     const owner = store.lockOwnerOf(key);
+    // 本端正在编辑该输入框（focus 未 blur）→ 优先保持输入，不应用他人锁（防“编辑 <2s 被秒锁强踢并保存”）。
+    const editingHere = store.isEditingHere(key);
+    const effective = locked && !editingHere;
     const inner = el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement || el instanceof HTMLSelectElement
       ? el
       : el.querySelector<HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement>("textarea, input, select");
     if (inner) {
-      inner.disabled = locked;
-      if (locked) inner.setAttribute("data-locked-owner", owner || "");
+      inner.disabled = effective;
+      if (effective) inner.setAttribute("data-locked-owner", owner || "");
       else inner.removeAttribute("data-locked-owner");
     }
-    el.classList.toggle("remote-locked", locked);
-    if (locked && owner) el.title = `${owner} 正在编辑`;
-    else if (!locked) el.title = "";
+    el.classList.toggle("remote-locked", effective);
+    if (effective && owner) el.title = `${owner} 正在编辑`;
+    else if (!effective) el.title = "";
   }
   return {
     mounted(el: HTMLElement, binding: { value: string }) {

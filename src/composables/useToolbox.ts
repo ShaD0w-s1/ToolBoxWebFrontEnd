@@ -276,6 +276,8 @@ export function useToolbox() {
   /** 他人是否正在编辑该 key（UI 用于 disabled + 亮黄）。 */
   function isLockedByOther(key: string): boolean { return editingByOthers.has(key); }
   function lockOwnerOf(key: string): string { return editingByOthers.get(key) || ""; }
+  /** 本端是否正在编辑该 key（含正在输入/刚聚焦未 blur）。用于防“他人锁把正在输入的框强踢”。 */
+  function isEditingHere(key: string): boolean { return editingLocal.has(key); }
   function startEditingSync(): void {
     if (editingTimer) return;
     editingTimer = setInterval(() => {
@@ -2252,7 +2254,7 @@ export function useToolbox() {
     saveLibraryNow, saveCartNow, saveStdLibNow,
     identityName, identityReady, setIdentity, unlockSiteAdmin, onlineCount, startOnlinePing,
     syncSettings, persistSettings, sessionId, beginEdit, touchEdit, endEdit, endAllEditing, startEditingSync,
-    isLockedByOther, lockOwnerOf, editingLocal, editingByOthers, lockVersion,
+    isLockedByOther, lockOwnerOf, isEditingHere, editingLocal, editingByOthers, lockVersion,
     saveGantt, applyGanttTemplate, openEngTemplateForEdit,
     saveStandaloneTemplate, applyStandaloneTemplate, openStandaloneTemplateForEdit,
   };
