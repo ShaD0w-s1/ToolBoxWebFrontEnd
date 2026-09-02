@@ -13,9 +13,18 @@ import { exportWorkcardAssignment } from "../services/spreadsheet";
 import { sectionHex, sectionRgba } from "../utils/sectionColor";
 import { exportFileName } from "../utils/format";
 import { growTextarea, growAllTextareas } from "../utils/dom";
+import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
+
+// —— 单输入框级编辑软锁（共享指令）：A检工卡分配数据在 workcardAssignment 顶层字段 ——
+const lockKey = (kind: string, id: string, field: string): string => `workcardAssignment|${kind}|${id}|${field}`;
+const vLock = createEditLockDirective(props.store);
+/** 工卡行稳定 key：行级合并主键 = section + 工卡号（空号回退行序，避免同 section 空号互锁）。 */
+function rowKeyOf(section: WorkcardSection, card: WorkCardRow, index: number): string {
+  return `${section}:${(card.工卡号 || "").trim() || `r${index}`}`;
+}
 
 const rootEl = ref<HTMLElement | null>(null);
 const project = computed(() => props.store.currentProject.value);
@@ -229,19 +238,19 @@ onMounted(() => {
         <div class="wa-person-top">
           <label v-for="field in personnelLayout(section).top" :key="field" class="wa-person wa-full">
             <span>{{ field }}</span>
-            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" />
+            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" v-lock="lockKey('personnel', section, field)" />
           </label>
         </div>
         <div class="wa-person-second">
           <label v-for="field in personnelLayout(section).second" :key="field" class="wa-person">
             <span>{{ field }}</span>
-            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" />
+            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" v-lock="lockKey('personnel', section, field)" />
           </label>
         </div>
         <div v-if="personnelLayout(section).extra.length" class="wa-person-extra">
           <label v-for="field in personnelLayout(section).extra" :key="field" class="wa-person">
             <span>{{ field }}</span>
-            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" />
+            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" v-lock="lockKey('personnel', section, field)" />
           </label>
         </div>
       </div>
@@ -290,9 +299,9 @@ onMounted(() => {
 
           <!-- 数据行 -->
           <template v-for="(card, index) in assignment.sections[section].cards" :key="index">
-            <div class="wa-cell"><input v-model="card.序号" @input="store.persist" /></div>
-            <div class="wa-cell wa-wrap"><textarea v-model="card.工卡号" rows="1" @input="onCardInput" /></div>
-            <div class="wa-cell wa-wrap"><textarea v-model="card.工卡名称" rows="1" @input="onCardInput" /></div>
+            <div class="wa-cell"><input v-model="card.序号" @input="store.persist" v-lock="lockKey('card', rowKeyOf(section, card, index), '序号')" /></div>
+            <div class="wa-cell wa-wrap"><textarea v-model="card.工卡号" rows="1" @input="onCardInput" v-lock="lockKey('card', rowKeyOf(section, card, index), '工卡号')" /></div>
+            <div class="wa-cell wa-wrap"><textarea v-model="card.工卡名称" rows="1" @input="onCardInput" v-lock="lockKey('card', rowKeyOf(section, card, index), '工卡名称')" /></div>
             <!-- 需求 1：工卡分级改为下拉（一类/二类/三类）；空值显示「无」并红色高亮 -->
             <div class="wa-cell">
               <div class="wa-level-wrap">
@@ -301,17 +310,18 @@ onMounted(() => {
                   :class="{ 'wa-level-empty': !card.工卡分级 }"
                   v-model="card.工卡分级"
                   @change="onLevelChange(section, card)"
+                  v-lock="lockKey('card', rowKeyOf(section, card, index), '工卡分级')"
                 >
                   <option value="">无</option>
                   <option v-for="lv in WORKCARD_LEVELS" :key="lv" :value="lv">{{ lv }}</option>
                 </select>
               </div>
             </div>
-            <div class="wa-cell wa-wrap"><textarea v-model="card.参与人员" rows="1" @input="onCardInput" /></div>
-            <div class="wa-cell wa-wrap"><textarea v-model="card.工作签卡者" rows="1" @input="onCardInput" /></div>
+            <div class="wa-cell wa-wrap"><textarea v-model="card.参与人员" rows="1" @input="onCardInput" v-lock="lockKey('card', rowKeyOf(section, card, index), '参与人员')" /></div>
+            <div class="wa-cell wa-wrap"><textarea v-model="card.工作签卡者" rows="1" @input="onCardInput" v-lock="lockKey('card', rowKeyOf(section, card, index), '工作签卡者')" /></div>
             <!-- 需求 3：非“三类”行必检默认 N/A 且不可编辑 -->
             <div class="wa-cell">
-              <input v-model="card.必检" :disabled="card.工卡分级 !== '三类'" :placeholder="card.工卡分级 !== '三类' ? 'N/A' : ''" @input="store.persist" />
+              <input v-model="card.必检" :disabled="card.工卡分级 !== '三类'" :placeholder="card.工卡分级 !== '三类' ? 'N/A' : ''" @input="store.persist" v-lock="lockKey('card', rowKeyOf(section, card, index), '必检')" />
             </div>
             <template v-if="showMove[section]">
               <div class="wa-cell">

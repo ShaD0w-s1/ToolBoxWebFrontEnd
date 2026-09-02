@@ -214,7 +214,7 @@ export function useToolbox() {
     } catch { /* 拉取失败忽略 */ }
   }
   function fieldOfEditKey(key: string): ProjectField | null {
-    const f = key.split("|")[1] as ProjectField;
+    const f = key.split("|")[0] as ProjectField;
     return ["data", "materialList", "prepSheet", "workcardAssignment", "standalonePrepSheet", "ganttPrep", "meta"].includes(f) ? f : null;
   }
   /** 按项目保存指定顶层字段（不带项目切换的轻量 persist，纯标记 dirty + 450ms 防抖推送）。 */

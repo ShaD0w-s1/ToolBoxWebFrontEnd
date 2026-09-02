@@ -6,9 +6,15 @@ import type { StandalonePrepSheet } from "../domain/toolbox";
 import { exportStandalonePrep } from "../services/spreadsheet";
 import { exportFileName } from "../utils/format";
 import { growTextarea, growAllTextareas } from "../utils/dom";
+import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
+
+// —— 单输入框级编辑软锁（共享指令）：单独项目数据在 standalonePrepSheet 顶层字段 ——
+const lockKey = (kind: string, id: string, field: string): string => `standalonePrepSheet|${kind}|${id}|${field}`;
+const vLock = createEditLockDirective(props.store);
+
 
 const project = computed(() => props.store.currentProject.value);
 const sheet = computed(() => project.value?.standalonePrepSheet || null);
@@ -196,25 +202,25 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
     <section class="prep-block">
       <h4>基础信息</h4>
       <div class="prep-grid">
-        <label class="prep-field"><span class="field-label">机号</span><input v-model="sheet.base.机号" list="sp-aircraft" @change="onAircraftChange" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">FSN</span><input v-model="sheet.base.FSN" @change="onAircraftFieldEdited" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">MSN</span><input v-model="sheet.base.MSN" @change="onAircraftFieldEdited" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">发动机</span><input v-model="sheet.base.发动机" @change="onAircraftFieldEdited" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">机型</span><input v-model="sheet.base.机型" @change="onAircraftFieldEdited" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">ETOPS</span><input v-model="sheet.base.ETOPS" :class="{ 'special-config': hasSpecialConfig(sheet.base.ETOPS) }" @change="onAircraftFieldEdited" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">ELT-DT</span><input v-model="sheet.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(sheet.base['ELT-DT']) }" @change="onAircraftFieldEdited" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">地点</span><input v-model="sheet.base.地点" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">落地航班</span><input v-model="sheet.base.落地航班" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">落地时间</span><input v-model="sheet.base.落地时间" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">起飞时间</span><input v-model="sheet.base.起飞时间" @input="store.persist" /></label>
+        <label class="prep-field"><span class="field-label">机号</span><input v-model="sheet.base.机号" list="sp-aircraft" @change="onAircraftChange" @input="store.persist" v-lock="lockKey('base', 'single', '机号')" /></label>
+        <label class="prep-field"><span class="field-label">FSN</span><input v-model="sheet.base.FSN" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', 'FSN')" /></label>
+        <label class="prep-field"><span class="field-label">MSN</span><input v-model="sheet.base.MSN" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', 'MSN')" /></label>
+        <label class="prep-field"><span class="field-label">发动机</span><input v-model="sheet.base.发动机" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', '发动机')" /></label>
+        <label class="prep-field"><span class="field-label">机型</span><input v-model="sheet.base.机型" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', '机型')" /></label>
+        <label class="prep-field"><span class="field-label">ETOPS</span><input v-model="sheet.base.ETOPS" :class="{ 'special-config': hasSpecialConfig(sheet.base.ETOPS) }" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', 'ETOPS')" /></label>
+        <label class="prep-field"><span class="field-label">ELT-DT</span><input v-model="sheet.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(sheet.base['ELT-DT']) }" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', 'ELT-DT')" /></label>
+        <label class="prep-field"><span class="field-label">地点</span><input v-model="sheet.base.地点" @input="store.persist" v-lock="lockKey('base', 'single', '地点')" /></label>
+        <label class="prep-field"><span class="field-label">落地航班</span><input v-model="sheet.base.落地航班" @input="store.persist" v-lock="lockKey('base', 'single', '落地航班')" /></label>
+        <label class="prep-field"><span class="field-label">落地时间</span><input v-model="sheet.base.落地时间" @input="store.persist" v-lock="lockKey('base', 'single', '落地时间')" /></label>
+        <label class="prep-field"><span class="field-label">起飞时间</span><input v-model="sheet.base.起飞时间" @input="store.persist" v-lock="lockKey('base', 'single', '起飞时间')" /></label>
       </div>
       <datalist id="sp-aircraft"><option v-for="num in store.aircraftNumbers.value" :key="num" :value="num" /></datalist>
       <!-- 工作列表：指令号 + 工作内容 -->
       <div class="sp-works">
         <div v-for="(w, idx) in sheet.works" :key="w.id" class="sp-work-row">
           <span class="sp-idx">{{ idx + 1 }}</span>
-          <input v-model="w.指令号" class="sp-w-no" placeholder="指令号" @input="store.persist" />
-          <input v-model="w.工作内容" class="sp-w-content" placeholder="工作内容" @input="store.persist" />
+          <input v-model="w.指令号" class="sp-w-no" placeholder="指令号" @input="store.persist" v-lock="lockKey('work', String(w.id), '指令号')" />
+          <input v-model="w.工作内容" class="sp-w-content" placeholder="工作内容" @input="store.persist" v-lock="lockKey('work', String(w.id), '工作内容')" />
           <button class="ghost danger-cell" @click="store.spRemoveWork(w.id)">删除</button>
         </div>
       </div>
@@ -227,19 +233,19 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       <div class="sp-parts">
         <div v-for="(p, idx) in sheet.parts" :key="p.id" class="sp-part-card">
           <header class="sp-part-head">
-            <input class="sp-part-name" v-model="p.name" @input="store.persist" :placeholder="`部件 ${idx + 1}`" />
+            <input class="sp-part-name" v-model="p.name" @input="store.persist" :placeholder="`部件 ${idx + 1}`" v-lock="lockKey('part', String(p.id), 'name')" />
             <button class="ghost danger-cell" @click="store.spRemovePart(p.id)">删除</button>
           </header>
           <div class="sp-part-body">
             <div class="sp-subcard">
               <div class="sp-sub-title">拆下件</div>
-              <label class="prep-field"><span class="field-label">件号</span><input v-model="p.拆下件号" @input="store.persist" /></label>
-              <label class="prep-field"><span class="field-label">序号</span><input v-model="p.拆下序号" @input="store.persist" /></label>
+              <label class="prep-field"><span class="field-label">件号</span><input v-model="p.拆下件号" @input="store.persist" v-lock="lockKey('part', String(p.id), '拆下件号')" /></label>
+              <label class="prep-field"><span class="field-label">序号</span><input v-model="p.拆下序号" @input="store.persist" v-lock="lockKey('part', String(p.id), '拆下序号')" /></label>
             </div>
             <div class="sp-subcard">
               <div class="sp-sub-title">装上件</div>
-              <label class="prep-field"><span class="field-label">件号</span><input v-model="p.装上件号" @input="store.persist" /></label>
-              <label class="prep-field"><span class="field-label">序号</span><input v-model="p.装上序号" @input="store.persist" /></label>
+              <label class="prep-field"><span class="field-label">件号</span><input v-model="p.装上件号" @input="store.persist" v-lock="lockKey('part', String(p.id), '装上件号')" /></label>
+              <label class="prep-field"><span class="field-label">序号</span><input v-model="p.装上序号" @input="store.persist" v-lock="lockKey('part', String(p.id), '装上序号')" /></label>
             </div>
           </div>
         </div>
@@ -252,21 +258,21 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       <h4>人员安排</h4>
       <div class="prep-personnel-grid">
         <label v-for="cell in personnelLayout[0]" :key="cell.key" class="prep-personnel-cell" :style="{ gridColumn: `span ${cell.cols}` }">
-          <span class="field-label">{{ cell.key }}</span><input v-model="(sheet.personnel as unknown as Record<string, string>)[cell.key]" @input="store.persist" />
+          <span class="field-label">{{ cell.key }}</span><input v-model="(sheet.personnel as unknown as Record<string, string>)[cell.key]" @input="store.persist" v-lock="lockKey('personnel', 'single', cell.key)" />
         </label>
       </div>
-      <label class="prep-personnel-fullrow"><span class="field-label">参与人员</span><textarea v-model="sheet.personnel.参与人员" rows="2" @input="store.persist" /></label>
+      <label class="prep-personnel-fullrow"><span class="field-label">参与人员</span><textarea v-model="sheet.personnel.参与人员" rows="2" @input="store.persist" v-lock="lockKey('personnel', 'single', '参与人员')" /></label>
       <div class="prep-personnel-grid">
         <template v-for="(row, ri) in personnelLayout.slice(1)" :key="`pr-${ri}`">
           <label v-for="cell in row" :key="cell.key" class="prep-personnel-cell" :style="{ gridColumn: `span ${cell.cols}` }">
-            <span class="field-label">{{ cell.key }}</span><input v-model="(sheet.personnel as unknown as Record<string, string>)[cell.key]" @input="store.persist" />
+            <span class="field-label">{{ cell.key }}</span><input v-model="(sheet.personnel as unknown as Record<string, string>)[cell.key]" @input="store.persist" v-lock="lockKey('personnel', 'single', cell.key)" />
           </label>
         </template>
       </div>
       <div class="prep-extra-grid">
         <div v-for="item in sheet.personnel.extra" :key="item.id" class="prep-extra-item">
-          <input v-model="item.内容" @input="store.persist" placeholder="内容" class="extra-title" />
-          <input v-model="item.人员" @input="store.persist" placeholder="人员" class="extra-value" />
+          <input v-model="item.内容" @input="store.persist" placeholder="内容" class="extra-title" v-lock="lockKey('arrange', String(item.id), '内容')" />
+          <input v-model="item.人员" @input="store.persist" placeholder="人员" class="extra-value" v-lock="lockKey('arrange', String(item.id), '人员')" />
           <button class="ghost danger-cell" @click="store.spRemoveArrange(item.id)">删除</button>
         </div>
       </div>
@@ -279,7 +285,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       <div class="prep-block-actions"><button class="ghost" @click="store.spAddProcessGroup">+ 新增工序组</button></div>
       <div v-for="(g, gi) in sheet.processGroups" :key="g.id" class="sp-group-card">
         <header class="sp-part-head">
-          <input class="sp-group-name" v-model="g.name" @input="store.persist" :placeholder="`工序组 ${gi + 1}`" />
+          <input class="sp-group-name" v-model="g.name" @input="store.persist" :placeholder="`工序组 ${gi + 1}`" v-lock="lockKey('group', String(g.id), 'name')" />
           <button class="ghost danger-cell" @click="store.spRemoveProcessGroup(g.id)">删除</button>
         </header>
         <!-- 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） -->
@@ -287,11 +293,11 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
           <div v-for="r in g.rows" :key="r.id" class="sp-process-card">
             <div class="sp-card-title">
               <div class="sp-card-drag" title="拖动调整行序" @pointerdown="startSpRowDrag($event, gi, r.id)">⠿</div>
-              <textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell" placeholder="工作步骤"></textarea>
+              <textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell" placeholder="工作步骤" v-lock="lockKey('row', String(r.id), '工作步骤')"></textarea>
             </div>
-            <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell sp-assign" placeholder="人员安排"></textarea>
-            <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell sp-check" placeholder="检测&必检"></textarea>
-            <textarea rows="1" v-model="r.备注" @input="onRowInput" class="sp-cell sp-note" placeholder="备注"></textarea>
+            <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell sp-assign" placeholder="人员安排" v-lock="lockKey('row', String(r.id), '人员安排')"></textarea>
+            <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell sp-check" placeholder="检测&必检" v-lock="lockKey('row', String(r.id), '检测&必检')"></textarea>
+            <textarea rows="1" v-model="r.备注" @input="onRowInput" class="sp-cell sp-note" placeholder="备注" v-lock="lockKey('row', String(r.id), '备注')"></textarea>
             <button class="sp-del-x" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">×</button>
           </div>
         </div>
@@ -302,9 +308,9 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
         <thead><tr><th>手册号</th><th>工卡名</th><th>签署人</th><th>功能</th></tr></thead>
         <tbody>
           <tr v-for="r in sheet.signingRows" :key="r.id">
-            <td><textarea rows="1" v-model="r.手册号" @input="onRowInput" class="sp-cell"></textarea></td>
-            <td><textarea rows="1" v-model="r.工卡名" @input="onRowInput" class="sp-cell"></textarea></td>
-            <td><textarea rows="1" v-model="r.签署人" @input="onRowInput" class="sp-cell"></textarea></td>
+            <td><textarea rows="1" v-model="r.手册号" @input="onRowInput" class="sp-cell" v-lock="lockKey('sign', String(r.id), '手册号')"></textarea></td>
+            <td><textarea rows="1" v-model="r.工卡名" @input="onRowInput" class="sp-cell" v-lock="lockKey('sign', String(r.id), '工卡名')"></textarea></td>
+            <td><textarea rows="1" v-model="r.签署人" @input="onRowInput" class="sp-cell" v-lock="lockKey('sign', String(r.id), '签署人')"></textarea></td>
             <td><button class="ghost danger-cell" @click="store.spRemoveSigningRow(r.id)">删除</button></td>
           </tr>
         </tbody>

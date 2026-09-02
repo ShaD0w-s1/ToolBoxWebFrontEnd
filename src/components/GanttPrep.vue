@@ -4,45 +4,14 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
 import { backend } from "../api";
 import NameSuggest from "./NameSuggest.vue";
+import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ (e: "share"): void }>();
 
-// —— 单输入框级编辑软锁：每个可编辑输入框带稳定 key，他人编辑同一输入框时本地黄底+禁用 ——
-// key 约定 "ganttPrep|容器类型|容器id|字段名"，两端各自拼出相同 key 才能互锁。
-function lockKey(kind: string, id: string, field: string): string {
-  return `ganttPrep|${kind}|${id}|${field}`;
-}
-// v-lock 指令：focus 上报 / input 续期 / blur 结束并保存；他人锁定时 disabled + 黄底 + 悬浮提示。
-const vLock = {
-  mounted(el: HTMLElement, binding: { value: string }) {
-    applyLockState(el, binding.value);
-    el.addEventListener("focusin", () => props.store.beginEdit(binding.value));
-    el.addEventListener("input", () => props.store.touchEdit(binding.value));
-    el.addEventListener("focusout", () => props.store.endEdit(binding.value));
-  },
-  updated(el: HTMLElement, binding: { value: string }) {
-    applyLockState(el, binding.value);
-  },
-  unmounted(_el: HTMLElement, binding: { value: string }) {
-    props.store.endEdit(binding.value);
-  },
-};
-function applyLockState(el: HTMLElement, key: string): void {
-  const locked = props.store.isLockedByOther(key);
-  const owner = props.store.lockOwnerOf(key);
-  const inner = el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement || el instanceof HTMLSelectElement
-    ? el
-    : el.querySelector<HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement>("textarea, input, select");
-  if (inner) {
-    inner.disabled = locked;
-    if (locked) inner.setAttribute("data-locked-owner", owner || "");
-    else inner.removeAttribute("data-locked-owner");
-  }
-  el.classList.toggle("remote-locked", locked);
-  if (locked && owner) el.title = `${owner} 正在编辑`;
-  else if (!locked) el.title = "";
-}
+// —— 单输入框级编辑软锁（共享指令）：换发/APU 数据在 ganttPrep 顶层字段 ——
+const lockKey = (kind: string, id: string, field: string): string => `ganttPrep|${kind}|${id}|${field}`;
+const vLock = createEditLockDirective(props.store);
 
 
 const DEFAULT_RESP = ["现场负责人", "工具负责", "持卡", "必检", "拆装记录人"];

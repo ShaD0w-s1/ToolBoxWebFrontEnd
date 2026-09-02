@@ -8,9 +8,14 @@ import {
 import type { ToolboxStore } from "../composables/useToolbox";
 import { exportPrepSheetSingle } from "../services/spreadsheet";
 import { exportFileName } from "../utils/format";
+import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
+
+// —— 单输入框级编辑软锁（共享指令）：A检工作准备单数据在 prepSheet 顶层字段 ——
+const lockKey = (kind: string, id: string, field: string): string => `prepSheet|${kind}|${id}|${field}`;
+const vLock = createEditLockDirective(props.store);
 
 const project = computed(() => props.store.currentProject.value);
 const prep = computed<PrepSheetType | null>(() => project.value?.prepSheet || null);
@@ -120,17 +125,17 @@ function exportTableXlsx(): void {
       <div class="prep-grid">
         <label v-for="field in baseFields1" :key="field.key" class="prep-field">
           <span class="field-label">{{ field.label }}</span>
-          <input v-if="field.key === '机号'" v-model="prep.base.机号" list="aircraft-numbers" :placeholder="`输入或选择（共 ${store.aircraftNumbers.value.length} 架）`" @change="onAircraftChange" @input="store.persist" />
-          <input v-else v-model="prep.base[field.key]" @change="onAircraftFieldEdited" @input="store.persist" />
+          <input v-if="field.key === '机号'" v-model="prep.base.机号" list="aircraft-numbers" :placeholder="`输入或选择（共 ${store.aircraftNumbers.value.length} 架）`" @change="onAircraftChange" @input="store.persist" v-lock="lockKey('base', 'single', '机号')" />
+          <input v-else v-model="prep.base[field.key]" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', String(field.key))" />
         </label>
         <!-- ETOPS / ELT-DT：有非 N/A 数据时红色加粗 -->
         <label class="prep-field">
           <span class="field-label">ETOPS</span>
-          <input v-model="prep.base.ETOPS" :class="{ 'special-config': hasSpecialConfig(prep.base.ETOPS) }" @change="onAircraftFieldEdited" @input="store.persist" />
+          <input v-model="prep.base.ETOPS" :class="{ 'special-config': hasSpecialConfig(prep.base.ETOPS) }" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', 'ETOPS')" />
         </label>
         <label class="prep-field">
           <span class="field-label">ELT-DT</span>
-          <input v-model="prep.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(prep.base['ELT-DT']) }" @change="onAircraftFieldEdited" @input="store.persist" />
+          <input v-model="prep.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(prep.base['ELT-DT']) }" @change="onAircraftFieldEdited" @input="store.persist" v-lock="lockKey('base', 'single', 'ELT-DT')" />
         </label>
       </div>
       <datalist id="aircraft-numbers">
@@ -141,23 +146,23 @@ function exportTableXlsx(): void {
       <div class="prep-grid">
         <label v-for="field in baseFields2" :key="field.key" class="prep-field">
           <span class="field-label">{{ field.label }}</span>
-          <input v-model="prep.base[field.key]" @input="store.persist" />
+          <input v-model="prep.base[field.key]" @input="store.persist" v-lock="lockKey('base', 'single', String(field.key))" />
         </label>
       </div>
       <div class="prep-divider" aria-hidden="true"></div>
       <!-- 落地航班 + 落地时间 + 次日起飞时间 + 后三天过夜航班3格（6列行，修复 4） -->
       <div class="prep-grid prep-grid-6">
-        <label class="prep-field"><span class="field-label">落地航班</span><input v-model="prep.base.落地航班" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">落地时间</span><input v-model="prep.base.落地时间" @input="store.persist" /></label>
-        <label class="prep-field"><span class="field-label">次日起飞时间</span><input v-model="prep.base.次日起飞时间" @input="store.persist" /></label>
+        <label class="prep-field"><span class="field-label">落地航班</span><input v-model="prep.base.落地航班" @input="store.persist" v-lock="lockKey('base', 'single', '落地航班')" /></label>
+        <label class="prep-field"><span class="field-label">落地时间</span><input v-model="prep.base.落地时间" @input="store.persist" v-lock="lockKey('base', 'single', '落地时间')" /></label>
+        <label class="prep-field"><span class="field-label">次日起飞时间</span><input v-model="prep.base.次日起飞时间" @input="store.persist" v-lock="lockKey('base', 'single', '次日起飞时间')" /></label>
         <div class="prep-field prep-overnight" style="grid-column: span 3">
           <span class="field-label">后三天过夜航班</span>
           <div class="prep-overnight-inputs">
-            <input v-model="prep.base.后三天过夜航班1" @input="store.persist" />
+            <input v-model="prep.base.后三天过夜航班1" @input="store.persist" v-lock="lockKey('base', 'single', '后三天过夜航班1')" />
             <span class="connector">—</span>
-            <input v-model="prep.base.后三天过夜航班2" @input="store.persist" />
+            <input v-model="prep.base.后三天过夜航班2" @input="store.persist" v-lock="lockKey('base', 'single', '后三天过夜航班2')" />
             <span class="connector">—</span>
-            <input v-model="prep.base.后三天过夜航班3" @input="store.persist" />
+            <input v-model="prep.base.后三天过夜航班3" @input="store.persist" v-lock="lockKey('base', 'single', '后三天过夜航班3')" />
           </div>
         </div>
       </div>
@@ -179,7 +184,7 @@ function exportTableXlsx(): void {
         <template v-for="(row, rowIndex) in PREP_PERSONNEL_LAYOUT" :key="`pp-${rowIndex}`">
           <label v-for="cell in row" :key="cell.key" class="prep-personnel-cell" :style="{ gridColumn: `span ${cell.cols}` }">
             <span class="field-label">{{ cell.key }}</span>
-            <input v-model="prep.roles[cell.key]" @input="store.persist" />
+            <input v-model="prep.roles[cell.key]" @input="store.persist" v-lock="lockKey('role', 'single', String(cell.key))" />
           </label>
           <!-- Divider：起落架区域放行行后（航材负责人前）、工卡负责人行后（航后负责前） -->
           <div v-if="rowIndex === 1 || rowIndex === 4" class="prep-divider" aria-hidden="true"></div>
@@ -187,7 +192,7 @@ function exportTableXlsx(): void {
       </div>
       <label v-for="key in PREP_PERSONNEL_FULL_ROWS" :key="key" class="prep-personnel-fullrow">
         <span class="field-label">{{ key }}</span>
-        <input v-model="prep.roles[key]" @input="store.persist" />
+        <input v-model="prep.roles[key]" @input="store.persist" v-lock="lockKey('role', 'single', key)" />
       </label>
       <div class="prep-extra-grid">
         <div v-for="(item, index) in prep.roleExtras" :key="`xrole-${index}`" class="prep-extra-item">
@@ -206,7 +211,7 @@ function exportTableXlsx(): void {
         <template v-for="(row, rowIndex) in miscLayout" :key="`mr-${rowIndex}`">
           <label v-for="cell in row" :key="cell.key" class="prep-misc-cell" :style="{ gridColumn: `span ${cell.cols}` }">
             <span class="field-label">{{ cell.key }}</span>
-            <input v-model="prep.misc[cell.key]" @input="store.persist" />
+            <input v-model="prep.misc[cell.key]" @input="store.persist" v-lock="lockKey('misc', 'single', String(cell.key))" />
           </label>
         </template>
       </div>
