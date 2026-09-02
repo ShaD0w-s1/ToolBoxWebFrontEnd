@@ -382,12 +382,6 @@ async function exportCurrentState(displayCats?: string[]): Promise<void> {
   if (store.currentProject.value?.type === "单独项目") exportStateFlat(filtered, name);
   else exportState(filtered, name);
 }
-
-/** “导出全部”按钮：xlsx 按需加载（首屏不再预取 419KB chunk）。 */
-async function exportAll(): Promise<void> {
-  const { exportJson } = await import("./services/spreadsheet");
-  exportJson(store.app.value, exportFileName(store.currentProject.value?.name || store.detailTitle.value, "全部数据"));
-}
 </script>
 
 <template>
@@ -396,7 +390,6 @@ async function exportAll(): Promise<void> {
     <ProjectList
       v-if="store.screen.value === 'list'"
       :store="store"
-      @export-all="exportAll()"
       @share="share('app')"
     />
     <ProjectDetail

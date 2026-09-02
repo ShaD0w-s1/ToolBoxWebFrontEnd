@@ -24,7 +24,7 @@ import MultiSelect from "./MultiSelect.vue";
 import DateRangePicker from "./DateRangePicker.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
-const emit = defineEmits<{ "export-all": []; share: [] }>();
+const emit = defineEmits<{ share: [] }>();
 
 /** 系统设置（数据库子页卡片）：轮询频率 / 会话超时 / 终止编辑视为保存（持久化到 localStorage）。 */
 function setPollMs(ms: number): void {
@@ -769,7 +769,6 @@ async function batchDeleteNoDate(): Promise<void> {
 }
 .side-clear-x:hover { background: #f9dcdc; }
 /* 右侧列表头操作组 */
-.list-main-ops { display: flex; gap: 8px; }
 /* 项目卡片操作 split button：修订主按钮 + ▾ 下拉（复制/删除） */
 .card-split { position: relative; display: inline-flex; align-items: stretch; flex: 0 0 auto; }
 .cs-main {
