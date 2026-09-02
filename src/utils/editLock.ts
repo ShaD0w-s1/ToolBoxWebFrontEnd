@@ -38,15 +38,27 @@ export function createEditLockDirective(store: ToolboxStore): {
   return {
     mounted(el: HTMLElement, binding: { value: string }) {
       applyLockState(el, binding.value);
-      el.addEventListener("focusin", () => store.beginEdit(binding.value));
-      el.addEventListener("input", () => store.touchEdit(binding.value));
-      el.addEventListener("focusout", () => store.endEdit(binding.value));
+      el.addEventListener("focusin", () => {
+        // 会话 key 以 focus 瞬间快照为准：编辑中改名/改件号导致内容键漂移时，
+        // blur 仍按同一 key 结束会话并触发保存（否则快速编辑会丢/滞留会话）。
+        (el as HTMLElement & { __lockKey?: string }).__lockKey = binding.value;
+        store.beginEdit(binding.value);
+      });
+      el.addEventListener("input", () => {
+        const k = (el as HTMLElement & { __lockKey?: string }).__lockKey || binding.value;
+        store.touchEdit(k);
+      });
+      el.addEventListener("focusout", () => {
+        const k = (el as HTMLElement & { __lockKey?: string }).__lockKey || binding.value;
+        (el as HTMLElement & { __lockKey?: string }).__lockKey = undefined;
+        store.endEdit(k);
+      });
     },
     updated(el: HTMLElement, binding: { value: string }) {
       applyLockState(el, binding.value);
     },
-    unmounted(_el: HTMLElement, binding: { value: string }) {
-      store.endEdit(binding.value);
+    unmounted(el: HTMLElement, binding: { value: string }) {
+      store.endEdit((el as HTMLElement & { __lockKey?: string }).__lockKey || binding.value);
     },
   };
 }

@@ -1639,7 +1639,12 @@ export function useToolbox() {
   /** 合并两个 ToolState 的物品行（内容键对齐，本地优先）：本地正在编辑的行保留，
    *  远端新增的行并入（分配不冲突的新 id）。 */
   function mergeToolStateRows(local: ToolState, remote: ToolState): ToolState {
-    const localKeys = new Set(local.items.map((it) => itemKey(it)));
+    const merged = [...local.items];
+    /** 行指纹：排除名称/件号等“键字段”后的身份（部位+类型+件号+数量），改名/改件号不应变成新行。 */
+    const sameFingerprint = (l: ToolItem, r: ToolItem): boolean =>
+      (l.cat || "") === (r.cat || "") && (l.sub || "") === (r.sub || "")
+      && String(l.partNo || "") === String(r.partNo || "")
+      && (Number(l.qty) || 0) === (Number(r.qty) || 0);
     /** 远端草稿行（空行 / 新增占位“新物品”）：不并入，避免“编辑到一半的新增卡片”回传本地。 */
     const isDraftRow = (it: ToolItem): boolean => {
       const name = String(it.name || "").trim();
@@ -1648,8 +1653,24 @@ export function useToolbox() {
       if (name === "新物品" && !partNo && (Number(it.qty) || 0) === 1) return true;
       return false;
     };
-    const remoteOnly = remote.items.filter((it) => !localKeys.has(itemKey(it)) && !isDraftRow(it));
-    const merged = [...local.items];
+    const localKeys = new Set(local.items.map((it) => itemKey(it)));
+    let updatedCount = 0;
+    const remoteOnly: ToolItem[] = [];
+    for (const r of remote.items) {
+      if (localKeys.has(itemKey(r))) continue; // 同内容键已存在：本地优先（note 由下方字段级处理）
+      if (isDraftRow(r)) continue;
+      // 键字段（名称/件号）漂移但指纹相同、备注一致 → 同一行的“改名/更新”：同步远端值，不新增复制行
+      const twin = merged.find((l) => sameFingerprint(l, r) && (l.note || "") === (r.note || ""));
+      if (twin) {
+        twin.name = r.name;
+        twin.qty = r.qty;
+        if (r.partNo !== undefined) twin.partNo = r.partNo;
+        if (!noteDirtyKeys.has(itemKey(twin))) twin.note = r.note || "";
+        updatedCount += 1;
+        continue;
+      }
+      remoteOnly.push(r);
+    }
     // 字段级 note 合并：本地刚改过 note 的行保留本地 note；否则采纳远端 note（解决并发改 note 丢失）。
     let noteChanged = false;
     for (const localIt of merged) {
@@ -1672,7 +1693,7 @@ export function useToolbox() {
     const categories = [...local.categories];
     for (const c of remote.categories) if (!categories.includes(c)) categories.push(c);
     for (const it of merged) if (it.cat && !categories.includes(it.cat)) categories.push(it.cat);
-    if (remoteOnly.length === 0 && !noteChanged) return local;
+    if (remoteOnly.length === 0 && !noteChanged && updatedCount === 0) return local;
     return { ...local, categories, items: merged, notes: { ...remote.notes, ...local.notes } };
   }
 
