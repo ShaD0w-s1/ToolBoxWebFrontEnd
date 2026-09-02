@@ -545,7 +545,7 @@ function spId(): number { return standaloneId++; }
 /** 「单独项目」单项准备单默认值：基础信息一行空工作、无部件、一个空工序组（3 空行）、工卡签署 3 空行。 */
 export function defaultStandalonePrepSheet(): StandalonePrepSheet {
   return {
-    title: "单项准备单",
+    title: "单项工作准备单",
     base: {
       机号: "", FSN: "", MSN: "", 发动机: "", 机型: "", ETOPS: "", "ELT-DT": "",
       地点: "", 落地航班: "", 落地时间: "", 起飞时间: "",

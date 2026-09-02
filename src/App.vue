@@ -376,8 +376,11 @@ async function exportCurrentState(displayCats?: string[]): Promise<void> {
     categories: cats.filter((c) => active.categories.includes(c)),
     items: active.items.filter((it) => cats.includes(it.cat)),
   };
-  const { exportState } = await import("./services/spreadsheet");
-  exportState(filtered, exportFileName(store.currentProject.value?.name || store.detailTitle.value, "工具清单"));
+  const { exportState, exportStateFlat } = await import("./services/spreadsheet");
+  const name = exportFileName(store.currentProject.value?.name || store.detailTitle.value, "工具清单");
+  // 单独项目清单无部位概念：导出扁平表（类型 | 名称 | 数量），不体现部位信息
+  if (store.currentProject.value?.type === "单独项目") exportStateFlat(filtered, name);
+  else exportState(filtered, name);
 }
 
 /** “导出全部”按钮：xlsx 按需加载（首屏不再预取 419KB chunk）。 */

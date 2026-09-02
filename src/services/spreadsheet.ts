@@ -92,8 +92,67 @@ export async function importMaterialList(file: File): Promise<ToolState> {
   return normalizeState({ categories, items });
 }
 
-export async function importCart(file: File): Promise<ToolCartItem[]> {
+/** 柔性导入（兼容带/不带“部位”列；无部位列时统一归属 defaultCat，用于单独项目扁平清单）。
+ *  表头按名称识别：部位? / 类型|工作→sub / 件号? / 名称 / 数量（工具/航材通用）。 */
+export async function importStateFlat(file: File, defaultCat = ""): Promise<ToolState> {
   const workbook = XLSX.read(await readFile(file), { type: "array" });
+  const aoa = XLSX.utils.sheet_to_json<SheetCell[]>(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "" });
+  const headerIdx = aoa.findIndex((row) => row.some((c) => /类型|工作/.test(String(c))) && row.some((c) => /名称/.test(String(c))));
+  if (headerIdx < 0) throw new Error("未识别表头（需含 类型/工作 与 名称 列）");
+  const head = aoa[headerIdx].map((c) => String(c ?? "").trim());
+  const col = (re: RegExp): number => head.findIndex((h) => re.test(h));
+  const catIdx = col(/部位/);
+  const subIdx = col(/类型|工作/);
+  const pnIdx = col(/件号/);
+  const nameIdx = col(/名称/);
+  const qtyIdx = col(/数量/);
+  const items: ToolState["items"] = [];
+  const categories: string[] = [];
+  let id = 1;
+  for (const row of aoa.slice(headerIdx + 1)) {
+    const name = String(row[nameIdx] ?? "").trim();
+    if (!name) continue;
+    const cat = catIdx >= 0 ? String(row[catIdx] ?? "").trim() : defaultCat;
+    if (cat && !categories.includes(cat)) categories.push(cat);
+    items.push({
+      id: id++,
+      cat,
+      sub: subIdx >= 0 ? String(row[subIdx] ?? "").trim() : "固定",
+      name,
+      qty: qtyIdx >= 0 ? Math.max(0, Number.parseInt(String(row[qtyIdx]), 10) || 0) : 1,
+      ...(pnIdx >= 0 ? { partNo: String(row[pnIdx] ?? "").trim() } : {}),
+    });
+  }
+  return normalizeState({ categories, items });
+}
+
+/** 单独项目工具清单扁平导出：不体现部位（类型 | 名称 | 数量）。 */
+export function exportStateFlat(state: ToolState, name: string): void {
+  const rows: SheetCell[][] = [["类型", "名称", "数量"]];
+  for (const it of flatSortedItems(state)) rows.push([it.sub || "固定", it.name, it.qty]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "工具清单");
+  const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const file = new File([data], `${name || "工具清单"}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  void saveFile(file).catch(() => {});
+}
+
+/** 单独项目航材清单扁平导出：不体现部位（类型 | 件号 | 名称 | 数量 | 备注）。 */
+export function exportMaterialFlat(state: ToolState, name: string): void {
+  const rows: SheetCell[][] = [["类型", "件号", "名称", "数量", "备注"]];
+  for (const it of flatSortedItems(state)) rows.push([it.sub || "固定", it.partNo || "", it.name, it.qty, it.note || ""]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "航材清单");
+  const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const file = new File([data], `${name || "航材清单"}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  void saveFile(file).catch(() => {});
+}
+
+function flatSortedItems(state: ToolState): ToolState["items"] {
+  return state.items.slice().sort((a, b) => ((a.sub || "").localeCompare(b.sub || "", "zh-CN")) || a.name.localeCompare(b.name, "zh-CN"));
+}
+
+export async function importCart(file: File): Promise<ToolCartItem[]> {  const workbook = XLSX.read(await readFile(file), { type: "array" });
   const sheetName = workbook.SheetNames.find((name) => name.includes("工具车")) || workbook.SheetNames[0];
   const rows = XLSX.utils.sheet_to_json<SheetCell[]>(workbook.Sheets[sheetName], { header: 1, defval: "" });
   const header = rows.findIndex((row) => String(row[0]).match(/物品|名称/) && String(row[1]).includes("数量"));

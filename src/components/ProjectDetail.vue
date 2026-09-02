@@ -190,10 +190,12 @@ function onAddCategory(event: Event): void {
   select.value = "";
 }
 
-/** 单独项目工具清单「添加类型」：无部位层，类型作为隐藏部位(通用工具)下的分组，推入空行便于直接录入；新类型卡自动置顶。 */
+/** 单独项目工具清单「添加类型」：不弹窗，直接新增一张默认名「新类型」的卡片（重名自动加序号，如 新类型2），并自动置顶。 */
 function addFlatToolType(): void {
-  const name = window.prompt("输入新类型名称（如：力矩工具）")?.trim();
-  if (!name) return;
+  const active = props.store.active.value;
+  const used = new Set((active?.items || []).map((it) => (it.sub || "").trim()).filter(Boolean));
+  let name = "新类型";
+  for (let k = 2; used.has(name); k++) name = `新类型${k}`;
   props.store.addItem(FLAT_TOOL_CAT, name);
 }
 
@@ -368,7 +370,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
         <button title="强制推送后台" @click="store.saveNow()">保存</button>
         <button title="强制同步数据" @click="store.refresh()">刷新</button>
         <span v-if="!isEngApu" class="spacer" />
-        <span v-if="!isEngApu" class="hint">导入 AMES线控平台-打印其他 中的《例行工卡清单》</span>
+        <span v-if="!isEngApu && !isStandalone" class="hint">导入 AMES线控平台-打印其他 中的《例行工卡清单》</span>
         <button class="danger" @click="clearProjectAll">清空数据</button>
       </div>
 
@@ -428,7 +430,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
               <option v-for="opt in projectAddOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </template>
           </select>
-          <button v-else class="primary" @click="addFlatToolType" title="新增类型（新类型卡片将显示在清单顶端）">+ 添加类型</button>
+          <button v-else class="primary" @click="addFlatToolType" title="新增类型（默认名“新类型”，新类型卡片将显示在清单顶端）">+ 添加类型</button>
           <label v-if="store.currentProject.value && !isStandalone" class="field">机型
             <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
           </label>

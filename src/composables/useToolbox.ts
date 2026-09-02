@@ -1379,11 +1379,6 @@ export function useToolbox() {
   }
 
   // ----- 单项准备单 CRUD -----
-  function spRenameTitle(title: string): void {
-    const p = currentProject.value; if (!p) return;
-    p.standalonePrepSheet.title = title.trim() || "单项准备单";
-    markCurrentDirty(); persist();
-  }
   function spAddWork(): void { const p = currentProject.value; if (!p) return; p.standalonePrepSheet.works.push({ id: nextId++, 指令号: "", 工作内容: "" }); markCurrentDirty(); persist(); }
   function spRemoveWork(id: number): void { const p = currentProject.value; if (!p) return; p.standalonePrepSheet.works = p.standalonePrepSheet.works.filter((w) => w.id !== id); markCurrentDirty(); persist(); }
   function spAddPart(): void { const p = currentProject.value; if (!p) return; const idx = p.standalonePrepSheet.parts.length + 1; p.standalonePrepSheet.parts.push({ id: nextId++, name: `部件 ${idx}`, 拆下件号: "", 拆下序号: "", 装上件号: "", 装上序号: "" }); markCurrentDirty(); persist(); }
@@ -2075,7 +2070,9 @@ export function useToolbox() {
     if (!project) return;
     // mode="edit"：临时项目记录，关闭子页（backToList）自动删除、不保存
     editingTemplateProjectId.value = mode === "edit" ? project.id : null;
-    project.standalonePrepSheet = deepCopy(state.prep) as StandalonePrepSheet;
+    const prep = deepCopy(state.prep) as StandalonePrepSheet;
+    prep.title = name; // 模板编辑/引用：标题直接用模板名称
+    project.standalonePrepSheet = prep;
     markField("standalonePrepSheet");
     if (state.material) { project.materialList = deepCopy(state.material) as ToolState; markField("materialList"); }
     if (state.tools) { project.data = deepCopy(state.tools) as ToolState; markField("data"); }
@@ -2128,12 +2125,13 @@ export function useToolbox() {
     }
   }
 
-  /** 把「单项工作模板」灌入当前项目：准备单（保留当前 base）+ 航材/工具清单整体替换（若模板带清单）。
+  /** 把「单项工作模板」灌入当前项目：准备单（保留当前 base，标题=模板名称）+ 航材/工具清单整体替换（若模板带清单）。
    *  深拷贝、重算 nextId 防 id 冲突。 */
-  function applyStandaloneTemplate(state: StandaloneTemplateState): void {
+  function applyStandaloneTemplate(state: StandaloneTemplateState, tplName?: string): void {
     const p = currentProject.value; if (!p) return;
     const prep = deepCopy(state.prep) as StandalonePrepSheet;
     if (p.standalonePrepSheet?.base) prep.base = p.standalonePrepSheet.base;
+    if (tplName) prep.title = tplName; // 调取模板后名称用模板名
     p.standalonePrepSheet = prep;
     markField("standalonePrepSheet");
     if (state.material) { p.materialList = deepCopy(state.material) as ToolState; markField("materialList"); }
@@ -2158,7 +2156,7 @@ export function useToolbox() {
     mSubsOf, mItemsOf, mCatTotal, mAllTotal, mCategoryList,
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,
     mImportStandardSub, mSyncSubToMaterialLib, saveMaterialLibraryNow, replaceMaterialActive, mergeMaterialSections, mergeMaterialImport, markNoteDirty,
-    spRenameTitle, spOnAircraftChange, spAddWork, spRemoveWork, spAddPart, spRemovePart, spAddArrange, spRemoveArrange,
+    spOnAircraftChange, spAddWork, spRemoveWork, spAddPart, spRemovePart, spAddArrange, spRemoveArrange,
     spAddProcessGroup, spRemoveProcessGroup, spAddProcessRow, spRemoveProcessRow, spMoveProcessRow, spAddSigningRow, spRemoveSigningRow,
     moveCard, moveUnassignedToSection, deleteUnassigned, upsertWorkcardStdLib,
     sortAvCbCards,

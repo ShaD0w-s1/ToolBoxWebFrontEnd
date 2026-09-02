@@ -21,13 +21,6 @@ const project = computed(() => props.store.currentProject.value);
 const sheet = computed(() => project.value?.standalonePrepSheet || null);
 const captureRef = ref<HTMLElement | null>(null);
 
-// 标题改名
-const titleEditing = ref(false);
-const titleDraft = ref("");
-function startRenameTitle(): void { if (!sheet.value) return; titleDraft.value = sheet.value.title || ""; titleEditing.value = true; }
-async function commitRenameTitle(): Promise<void> { if (!sheet.value) return; props.store.spRenameTitle(titleDraft.value || "单项准备单"); titleEditing.value = false; await nextTick(); }
-function cancelRenameTitle(): void { titleEditing.value = false; }
-
 // 机号变更回填
 function onAircraftChange(): void { props.store.spOnAircraftChange(); }
 /** 机型字段（FSN/MSN/机型/发动机/ETOPS/ELT-DT）编辑后：检测与库中差异 → 弹「更新机型标准库」。 */
@@ -77,8 +70,8 @@ async function openTplModal(mode: "load" | "save" = tplMode.value): Promise<void
 function applyTemplate(t: { name: string; state: StandaloneTemplateState }): void {
   if (!sheet.value) return;
   const hasLists = Boolean(t.state.material || t.state.tools);
-  if (!window.confirm(`确认调取模板“${t.name}”？将整体替换当前单项准备单内容${hasLists ? "（含航材/工具清单）" : ""}（保留基础信息）。`)) return;
-  props.store.applyStandaloneTemplate(t.state);
+  if (!window.confirm(`确认调取模板“${t.name}”？将整体替换当前单项准备单内容${hasLists ? "（含航材/工具清单）" : ""}（保留基础信息），名称将使用模板名称。`)) return;
+  props.store.applyStandaloneTemplate(t.state, t.name);
   showTplModal.value = false;
 }
 async function saveAsTemplate(): Promise<void> {
@@ -189,10 +182,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   <div v-if="sheet" ref="captureRef" class="sp-sheet">
     <div v-if="dragGhost" class="drag-ghost" :style="{ left: dragGhost.left + 'px', top: dragGhost.top + 'px', width: dragGhost.width + 'px', height: dragGhost.height + 'px' }"></div>
     <div class="subpage-head">
-      <h3 v-if="!titleEditing" class="sp-title" @click="startRenameTitle" title="点击修改名称">{{ sheet.title }}</h3>
-      <input v-else class="sp-title-input" v-model="titleDraft" @blur="commitRenameTitle" @keydown.enter.prevent="commitRenameTitle" @keydown.esc.prevent="cancelRenameTitle" autofocus />
+      <h3 class="sp-title" title="单项工作准备单名称（调取模板后使用模板名称）">{{ sheet.title || '单项工作准备单' }}</h3>
       <div class="subpage-actions">
-        <label v-if="!titleEditing" class="ghost" @click="startRenameTitle">改名称</label>
         <button class="ghost" @click="openTplModal('load')">调取模板</button>
         <button class="ghost" @click="openTplModal('save')">保存模板</button>
         <button class="ghost" @click="exportImage">导出图片</button>

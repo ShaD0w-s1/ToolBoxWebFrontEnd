@@ -5,7 +5,7 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import MaterialCategorySection from "./MaterialCategorySection.vue";
 import FlatTypeList from "./FlatTypeList.vue";
 import PartNoGroupCard from "./PartNoGroupCard.vue";
-import { exportMaterialList, importMaterialList } from "../services/spreadsheet";
+import { exportMaterialList, exportMaterialFlat, importMaterialList, importStateFlat } from "../services/spreadsheet";
 import { backend } from "../api";
 import { exportFileName } from "../utils/format";
 
@@ -119,15 +119,20 @@ function onAddCategory(event: Event): void {
 }
 
 function exportImage(): void { emit("export-image", captureRef.value); }
-/** 单独项目航材清单「添加类型」：无部位层，类型作为隐藏部位(通用航材)下的分组，推入空行便于直接录入；新类型卡自动置顶。 */
+/** 单独项目航材清单「添加类型」：不弹窗，直接新增一张默认名「新类型」的卡片（重名自动加序号），并自动置顶。 */
 function addMaterialFlatType(): void {
-  const name = window.prompt("输入新类型名称（如：消耗件）")?.trim();
-  if (!name) return;
+  const active = props.store.materialActive.value;
+  const used = new Set((active?.items || []).map((it) => (it.sub || "").trim()).filter(Boolean));
+  let name = "新类型";
+  for (let k = 2; used.has(name); k++) name = `新类型${k}`;
   props.store.mAddItem(FLAT_MATERIAL_CAT, name);
 }
 function exportTableXlsx(): void {
   if (!state.value) return;
-  exportMaterialList(state.value, exportFileName(props.store.currentProject.value?.name || "", "航材清单"));
+  const name = exportFileName(props.store.currentProject.value?.name || "", "航材清单");
+  // 单独项目清单无部位概念：导出扁平表（类型 | 件号 | 名称 | 数量 | 备注），不体现部位信息
+  if (isStandalone.value) exportMaterialFlat(state.value, name);
+  else exportMaterialList(state.value, name);
   props.store.notify("表格已导出");
 }
 
@@ -168,14 +173,16 @@ async function onImportNewSections(event: Event): Promise<void> {
   } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
 }
 
-/** 导入补充表格.xlsx：相同信息保留、不同信息覆盖、新增信息新增。 */
+/** 导入补充表格.xlsx：相同信息保留、不同信息覆盖、新增信息新增。单独项目按扁平导入（无部位列兼容）。 */
 async function onImportSupplement(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
   if (!file) return;
   try {
-    const imported = await importMaterialList(file);
+    const imported = isStandalone.value
+      ? await importStateFlat(file, FLAT_MATERIAL_CAT)
+      : await importMaterialList(file);
     if (!imported.items.length) { props.store.notify("未解析到航材数据"); return; }
     const { updated, added } = props.store.mergeMaterialImport(imported);
     props.store.notify(`导入补充完成：覆盖 ${updated} 项，新增 ${added} 项`, "ok");
@@ -243,7 +250,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <option value="__NEW__">新部位</option>
         <option v-for="o in addOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
-      <button v-else class="primary" @click="addMaterialFlatType" title="新增类型（新类型卡片将显示在清单顶端）">+ 添加类型</button>
+      <button v-else class="primary" @click="addMaterialFlatType" title="新增类型（默认名“新类型”，新类型卡片将显示在清单顶端）">+ 添加类型</button>
       <label v-if="!isLibrary && !isStandalone" class="field">机型
         <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
       </label>
