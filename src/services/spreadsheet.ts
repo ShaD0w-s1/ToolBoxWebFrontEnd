@@ -30,9 +30,9 @@ function readFile(file: File): Promise<ArrayBuffer> {
 
 /** 导出两个工作表：工具清单和部位备注。移动端通过 saveFile（系统分享）可靠保存。 */
 export function exportState(state: ToolState, name: string): void {
-  const rows: SheetCell[][] = [["部位", "工作", "物品", "数量"]];
+  const rows: SheetCell[][] = [["部位", "工作", "物品", "数量", "备注"]];
   for (const cat of state.categories) {
-    for (const item of state.items.filter((entry) => entry.cat === cat)) rows.push([cat, item.sub, item.name, item.qty]);
+    for (const item of state.items.filter((entry) => entry.cat === cat)) rows.push([cat, item.sub, item.name, item.qty, item.note || ""]);
   }
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "工具清单");
@@ -58,7 +58,7 @@ export async function importState(file: File): Promise<ToolState> {
     const name = String(row[2] || "").trim();
     if (!cat || !name) continue;
     if (!categories.includes(cat)) categories.push(cat);
-    items.push({ id: id++, uid: genUid(), cat, sub: String(row[1] || "").trim(), name, qty: Math.max(0, Number.parseInt(String(row[3]), 10) || 0) });
+    items.push({ id: id++, uid: genUid(), cat, sub: String(row[1] || "").trim(), name, qty: Math.max(0, Number.parseInt(String(row[3]), 10) || 0), ...(row[4] ? { note: String(row[4]) } : {}) });
   }
   const notes: Record<string, string> = {};
   const notesName = workbook.SheetNames.find((name) => name.includes("部位备注"));
@@ -70,7 +70,7 @@ export async function importState(file: File): Promise<ToolState> {
   return normalizeState({ categories, items, notes });
 }
 
-/** 导入航材清单 xlsx：列 部位 / 类型 / 件号 / 名称 / 数量（与 exportMaterialList 格式一致）。 */
+/** 导入航材清单 xlsx：列 部位 / 类型 / 件号 / 名称 / 数量 / 备注（与 exportMaterialList 格式一致，备注列可缺省）。 */
 export async function importMaterialList(file: File): Promise<ToolState> {
   const workbook = XLSX.read(await readFile(file), { type: "array" });
   const sheetName = workbook.SheetNames[0];
@@ -90,6 +90,7 @@ export async function importMaterialList(file: File): Promise<ToolState> {
       name,
       qty: Math.max(0, Number.parseInt(String(row[4]), 10) || 0),
       partNo: String(row[2] || "").trim(),
+      ...(row[5] ? { note: String(row[5]) } : {}),
     });
   }
   return normalizeState({ categories, items });
@@ -109,6 +110,7 @@ export async function importStateFlat(file: File, defaultCat = ""): Promise<Tool
   const pnIdx = col(/件号/);
   const nameIdx = col(/名称/);
   const qtyIdx = col(/数量/);
+  const noteIdx = col(/备注/);
   const items: ToolState["items"] = [];
   const categories: string[] = [];
   let id = 1;
@@ -124,15 +126,16 @@ export async function importStateFlat(file: File, defaultCat = ""): Promise<Tool
       name,
       qty: qtyIdx >= 0 ? Math.max(0, Number.parseInt(String(row[qtyIdx]), 10) || 0) : 1,
       ...(pnIdx >= 0 ? { partNo: String(row[pnIdx] ?? "").trim() } : {}),
+      ...(noteIdx >= 0 && row[noteIdx] ? { note: String(row[noteIdx]) } : {}),
     });
   }
   return normalizeState({ categories, items });
 }
 
-/** 单独项目工具清单扁平导出：不体现部位（类型 | 名称 | 数量）。 */
+/** 单独项目工具清单扁平导出：不体现部位（类型 | 名称 | 数量 | 备注）。 */
 export function exportStateFlat(state: ToolState, name: string): void {
-  const rows: SheetCell[][] = [["类型", "名称", "数量"]];
-  for (const it of flatSortedItems(state)) rows.push([it.sub || "固定", it.name, it.qty]);
+  const rows: SheetCell[][] = [["类型", "名称", "数量", "备注"]];
+  for (const it of flatSortedItems(state)) rows.push([it.sub || "固定", it.name, it.qty, it.note || ""]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "工具清单");
   const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
@@ -425,13 +428,13 @@ export function exportStandalonePrep(sheet: StandalonePrepSheet, name: string): 
   void saveFile(file).catch(() => {});
 }
 
-/** 航材清单导出：单 Sheet，列 部位 / 类型 / 件号 / 名称 / 数量。 */
+/** 航材清单导出：单 Sheet，列 部位 / 类型 / 件号 / 名称 / 数量 / 备注。 */
 export function exportMaterialList(state: ToolState, name: string): void {
-  const aoa: SheetCell[][] = [["部位", "类型", "件号", "名称", "数量"]];
+  const aoa: SheetCell[][] = [["部位", "类型", "件号", "名称", "数量", "备注"]];
   for (const cat of state.categories) {
     const items = state.items.filter((it) => it.cat === cat);
-    if (!items.length) { aoa.push([cat, "", "", "", ""]); continue; }
-    for (const it of items) aoa.push([cat, it.sub, it.partNo || "", it.name, it.qty]);
+    if (!items.length) { aoa.push([cat, "", "", "", "", ""]); continue; }
+    for (const it of items) aoa.push([cat, it.sub, it.partNo || "", it.name, it.qty, it.note || ""]);
   }
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(aoa), "航材清单");
