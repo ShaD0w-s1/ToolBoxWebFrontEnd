@@ -199,6 +199,22 @@ function addFlatToolType(): void {
   props.store.addItem(FLAT_TOOL_CAT, name);
 }
 
+/** 单独项目工具清单「导入表格」：扁平格式整体替换（兼容带/不带部位列，均不保留部位信息）。 */
+async function importFlatToolFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const { importStateFlat } = await import("../services/spreadsheet");
+    const imported = await importStateFlat(file, FLAT_TOOL_CAT);
+    if (!imported.items.length) { props.store.notify("未解析到工具数据（表格需含 类型/名称 列）"); return; }
+    if (!window.confirm(`确认用导入的 ${imported.items.length} 项工具整体替换当前工具清单？`)) return;
+    props.store.replaceActive(imported);
+    props.store.notify("工具清单导入完成", "ok");
+  } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
+}
+
 function importFile(event: Event): void {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -414,6 +430,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
           <div class="subpage-actions">
             <button v-if="isLibrary" class="ghost" @click="finishLibrary">完成</button>
             <button v-if="!isLibrary" class="ghost" @click="downloadControlDoc">下载现场管控单</button>
+            <label v-if="isStandalone && !isLibrary" class="button ghost" title="导入表格整体替换（类型|名称|数量，可含部位列）">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importFlatToolFile" /></label>
             <button class="ghost" @click="emit('export-image', capture, isLibrary ? '工具标准库' : '工具清单')">导出图片</button>
             <button class="ghost" @click="emit('export-sheet', displayCats)">导出表格</button>
             <button v-if="!isLibrary" class="danger" @click="clearToolList">清空清单</button>

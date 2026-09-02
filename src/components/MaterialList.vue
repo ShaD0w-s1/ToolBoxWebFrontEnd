@@ -145,6 +145,21 @@ async function finishLibrary(): Promise<void> {
   props.store.backToList();
 }
 
+/** 单独项目航材清单「导入表格」：扁平格式整体替换（兼容带/不带部位列，均不保留部位信息）。 */
+async function onImportFlatFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const imported = await importStateFlat(file, FLAT_MATERIAL_CAT);
+    if (!imported.items.length) { props.store.notify("未解析到航材数据（表格需含 类型/名称 列）"); return; }
+    if (!window.confirm(`确认用导入的 ${imported.items.length} 项航材整体替换当前航材清单？`)) return;
+    props.store.replaceMaterialActive(imported);
+    props.store.notify("航材清单导入完成", "ok");
+  } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
+}
+
 /** 导入 xlsx：整体替换当前航材清单。 */
 async function onImportFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
@@ -239,6 +254,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
       <div class="subpage-actions">
         <button class="ghost" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTableXlsx">导出表格</button>
+        <label v-if="isStandalone" class="button ghost" title="导入表格整体替换（类型|件号|名称|数量，可含部位列）">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="onImportFlatFile" /></label>
         <button v-if="isLibrary" class="ghost" @click="finishLibrary">完成</button>
         <button v-if="!isLibrary" class="danger" @click="clearMaterialList">清空清单</button>
       </div>
