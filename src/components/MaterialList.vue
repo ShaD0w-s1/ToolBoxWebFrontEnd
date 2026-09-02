@@ -119,12 +119,8 @@ function onAddCategory(event: Event): void {
 }
 
 function exportImage(): void { emit("export-image", captureRef.value); }
-/** 单独项目航材清单「添加类型」：无部位层，类型作为隐藏部位(通用航材)下的分组，推入空行便于直接录入。 */
-function addMaterialFlatType(event: Event): void {
-  const select = event.target as HTMLSelectElement;
-  const value = select.value;
-  select.value = "";
-  if (value !== "__NEW__") return;
+/** 单独项目航材清单「添加类型」：无部位层，类型作为隐藏部位(通用航材)下的分组，推入空行便于直接录入；新类型卡自动置顶。 */
+function addMaterialFlatType(): void {
   const name = window.prompt("输入新类型名称（如：消耗件）")?.trim();
   if (!name) return;
   props.store.mAddItem(FLAT_MATERIAL_CAT, name);
@@ -247,10 +243,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <option value="__NEW__">新部位</option>
         <option v-for="o in addOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
-      <select v-else class="primary add-cat" @change="addMaterialFlatType" aria-label="添加类型">
-        <option value="" disabled>+ 添加类型</option>
-        <option value="__NEW__">新类型…</option>
-      </select>
+      <button v-else class="primary" @click="addMaterialFlatType" title="新增类型（新类型卡片将显示在清单顶端）">+ 添加类型</button>
       <label v-if="!isLibrary && !isStandalone" class="field">机型
         <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
       </label>

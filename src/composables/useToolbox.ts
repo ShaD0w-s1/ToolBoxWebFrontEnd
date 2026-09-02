@@ -214,6 +214,14 @@ export function useToolbox() {
     const f = key.split("|")[0] as ProjectField;
     return ["data", "materialList", "prepSheet", "workcardAssignment", "standalonePrepSheet", "ganttPrep", "meta"].includes(f) ? f : null;
   }
+  /** 物品行编辑门：工具/航材清单任一行仍在编辑会话中（含新增行未失焦/输入中）→ true。
+   *  此时整字段远端推送会携带“编辑到一半的不完整内容”，须等 blur/超时结束会话后再推送。 */
+  function isItemRowEditing(): boolean {
+    for (const key of editingLocal.keys()) {
+      if (key.startsWith("data|item|") || key.startsWith("materialList|item|")) return true;
+    }
+    return false;
+  }
   /** 按项目保存指定顶层字段（不带项目切换的轻量 persist，纯标记 dirty + 450ms 防抖推送）。 */
   function persistFieldOfProject(pid: string, field: ProjectField): void {
     let set = dirtyFields.get(pid);
@@ -536,6 +544,13 @@ export function useToolbox() {
   async function saveRemote(): Promise<void> {
     if (remoteSaving.value) {
       remotePending = true;
+      return;
+    }
+    // 物品行编辑门：清单行仍在编辑（输入中/未失焦）时，保留脏标记并延迟重试，
+    // 避免把“编辑到一半的不完整内容/新增空行”推送到远端回传给他人。
+    if (isItemRowEditing()) {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => { void saveRemote(); }, 600);
       return;
     }
     remoteSaving.value = true;
@@ -1627,7 +1642,15 @@ export function useToolbox() {
    *  远端新增的行并入（分配不冲突的新 id）。 */
   function mergeToolStateRows(local: ToolState, remote: ToolState): ToolState {
     const localKeys = new Set(local.items.map((it) => itemKey(it)));
-    const remoteOnly = remote.items.filter((it) => !localKeys.has(itemKey(it)));
+    /** 远端草稿行（空行 / 新增占位“新物品”）：不并入，避免“编辑到一半的新增卡片”回传本地。 */
+    const isDraftRow = (it: ToolItem): boolean => {
+      const name = String(it.name || "").trim();
+      const partNo = String(it.partNo || "").trim();
+      if (!name && !partNo && (Number(it.qty) || 0) <= 0) return true;
+      if (name === "新物品" && !partNo && (Number(it.qty) || 0) === 1) return true;
+      return false;
+    };
+    const remoteOnly = remote.items.filter((it) => !localKeys.has(itemKey(it)) && !isDraftRow(it));
     const merged = [...local.items];
     // 字段级 note 合并：本地刚改过 note 的行保留本地 note；否则采纳远端 note（解决并发改 note 丢失）。
     let noteChanged = false;

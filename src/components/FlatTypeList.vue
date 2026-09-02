@@ -36,6 +36,28 @@ const typeCards = computed<Array<{ sub: string; its: ToolItem[] }>>(() => {
   return [...m.entries()].map(([sub, its]) => ({ sub, its })).sort((a, b) => a.sub.localeCompare(b.sub, "zh-CN"));
 });
 
+// —— 新增类型置顶：捕捉“新出现的类型卡”置于列表顶端（会话内记忆，最近新增在前）——
+const pinned = ref<string[]>([]);
+let trackInit = false;
+watch(typeCards, (cards) => {
+  if (!trackInit) { trackInit = true; return; }
+  const exist = new Set(cards.map((c) => c.sub));
+  const keep = pinned.value.filter((s) => exist.has(s));
+  for (const c of cards) if (!keep.includes(c.sub)) keep.unshift(c.sub);
+  if (keep.length !== pinned.value.length || keep.some((s, i) => s !== pinned.value[i])) pinned.value = keep;
+});
+const orderedTypes = computed<Array<{ sub: string; its: ToolItem[] }>>(() => {
+  const all = typeCards.value;
+  const map = new Map(all.map((c) => [c.sub, c]));
+  const seen = new Set<string>();
+  const heads: Array<{ sub: string; its: ToolItem[] }> = [];
+  for (const s of pinned.value) {
+    if (!seen.has(s) && map.has(s)) { heads.push(map.get(s)!); seen.add(s); }
+  }
+  const rest = all.filter((c) => !seen.has(c.sub)).sort((a, b) => a.sub.localeCompare(b.sub, "zh-CN"));
+  return [...heads, ...rest];
+});
+
 /** 卡片取色（与换发串件清单一致：列表序号取 5 色调色板）。 */
 const CARD_PALETTE = ["#4472C4", "#ED7D31", "#548235", "#C9A227", "#7F7F7F"];
 const cardColorOf = (idx: number): string => CARD_PALETTE[idx % CARD_PALETTE.length];
@@ -74,6 +96,8 @@ function renameType(card: { sub: string }, event: Event): void {
   const s = new Set(collapsedSubs.value);
   if (s.has(card.sub)) { s.delete(card.sub); s.add(name); }
   collapsedSubs.value = s;
+  const pi = pinned.value.indexOf(card.sub);
+  if (pi >= 0) { const p = [...pinned.value]; p[pi] = name; pinned.value = p; }
   props.store.persist();
 }
 function deleteType(sub: string): void {
@@ -83,6 +107,7 @@ function deleteType(sub: string): void {
   const s = new Set(collapsedSubs.value);
   s.delete(sub);
   collapsedSubs.value = s;
+  pinned.value = pinned.value.filter((x) => x !== sub);
   props.store.persist();
 }
 function addItemOf(sub: string): void {
@@ -134,7 +159,7 @@ function autoGrow(event: Event): void {
   <div class="ft-list">
     <template v-if="typeCards.length">
       <section
-        v-for="(card, idx) in typeCards"
+        v-for="(card, idx) in orderedTypes"
         :key="card.sub"
         class="gp-card ft-card"
         :style="{ borderLeft: `6px solid ${cardColorOf(idx)}`, background: cardBgOf(idx) }"

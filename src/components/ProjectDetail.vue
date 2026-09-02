@@ -190,12 +190,8 @@ function onAddCategory(event: Event): void {
   select.value = "";
 }
 
-/** 单独项目工具清单「添加类型」：无部位层，类型作为隐藏部位(通用工具)下的分组，推入空行便于直接录入。 */
-function addFlatToolType(event: Event): void {
-  const select = event.target as HTMLSelectElement;
-  const value = select.value;
-  select.value = "";
-  if (value !== "__NEW__") return;
+/** 单独项目工具清单「添加类型」：无部位层，类型作为隐藏部位(通用工具)下的分组，推入空行便于直接录入；新类型卡自动置顶。 */
+function addFlatToolType(): void {
   const name = window.prompt("输入新类型名称（如：力矩工具）")?.trim();
   if (!name) return;
   props.store.addItem(FLAT_TOOL_CAT, name);
@@ -432,10 +428,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
               <option v-for="opt in projectAddOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </template>
           </select>
-          <select v-else class="primary add-cat" @change="addFlatToolType" aria-label="添加类型">
-            <option value="" disabled>+ 添加类型</option>
-            <option value="__NEW__">新类型…</option>
-          </select>
+          <button v-else class="primary" @click="addFlatToolType" title="新增类型（新类型卡片将显示在清单顶端）">+ 添加类型</button>
           <label v-if="store.currentProject.value && !isStandalone" class="field">机型
             <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
           </label>
