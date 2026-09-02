@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, type Project, type ToolItem } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, FLAT_TOOL_CAT, type Project, type ToolItem } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import CategorySection from "./CategorySection.vue";
+import FlatTypeList from "./FlatTypeList.vue";
 import PrepSheet from "./PrepSheet.vue";
 import WorkcardAssignment from "./WorkcardAssignment.vue";
 import StandalonePrepSheet from "./StandalonePrepSheet.vue";
@@ -187,6 +188,17 @@ function onAddCategory(event: Event): void {
   }
   addCatValue.value = "";
   select.value = "";
+}
+
+/** 单独项目工具清单「添加类型」：无部位层，类型作为隐藏部位(通用工具)下的分组，推入空行便于直接录入。 */
+function addFlatToolType(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  const value = select.value;
+  select.value = "";
+  if (value !== "__NEW__") return;
+  const name = window.prompt("输入新类型名称（如：力矩工具）")?.trim();
+  if (!name) return;
+  props.store.addItem(FLAT_TOOL_CAT, name);
 }
 
 function importFile(event: Event): void {
@@ -400,7 +412,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
       <template v-if="store.active.value && ((!isAcheck && !isStandalone && !isEngApu && !store.editingMaterialLibrary.value) || subPage === 'tools')">
         <div class="subpage-head">
           <h3>{{ isLibrary ? `${store.editingLibrary.value} 工具标准库` : '工具清单' }}</h3>
-          <span v-if="!isLibrary" class="auto-filter-warning">自动模糊筛选，需人工复核</span>
+          <span v-if="!isLibrary && !isStandalone" class="auto-filter-warning">自动模糊筛选，需人工复核</span>
           <div class="subpage-actions">
             <button v-if="isLibrary" class="ghost" @click="finishLibrary">完成</button>
             <button v-if="!isLibrary" class="ghost" @click="downloadControlDoc">下载现场管控单</button>
@@ -410,7 +422,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
           </div>
         </div>
         <div class="toolbar">
-          <select class="primary add-cat" :value="addCatValue" @change="onAddCategory" aria-label="添加部位">
+          <select v-if="!isStandalone" class="primary add-cat" :value="addCatValue" @change="onAddCategory" aria-label="添加部位">
             <option value="" disabled>+ 添加部位</option>
             <option value="__NEW__">新部位</option>
             <template v-if="isLibrary">
@@ -420,14 +432,18 @@ async function runToolFilterByWorkcard(): Promise<void> {
               <option v-for="opt in projectAddOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </template>
           </select>
-          <label v-if="store.currentProject.value" class="field">机型
+          <select v-else class="primary add-cat" @change="addFlatToolType" aria-label="添加类型">
+            <option value="" disabled>+ 添加类型</option>
+            <option value="__NEW__">新类型…</option>
+          </select>
+          <label v-if="store.currentProject.value && !isStandalone" class="field">机型
             <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
           </label>
           <label v-if="store.editingLibrary.value" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
           <label v-if="store.editingLibrary.value" class="button">导入新部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importNewSectionsFile" /></label>
           <button v-if="isAcheck && !isLibrary" class="button primary" @click="runToolFilterByWorkcard">按卡筛选</button>
-          <label v-if="!isLibrary" class="field">工作查询
-            <input list="tool-works" v-model="workQuery" placeholder="输入/选择工作" />
+          <label v-if="!isLibrary" class="field">{{ isStandalone ? '类型查询' : '工作查询' }}
+            <input list="tool-works" v-model="workQuery" :placeholder="isStandalone ? '输入/选择类型' : '输入/选择工作'" />
             <datalist id="tool-works"><option v-for="w in allWorks" :key="w" :value="w" /></datalist>
             <button v-if="workQuery" class="clear-btn" type="button" @click="workQuery = ''" aria-label="清空">×</button>
           </label>
@@ -478,8 +494,11 @@ async function runToolFilterByWorkcard(): Promise<void> {
         </div>
 
         <div class="category-list">
-          <CategorySection v-for="category in displayCats" :key="category" :category="category" :store="store" :highlighted="hasWorkQuery ? highlightedCats.has(category) : undefined" />
-          <div v-if="!displayCats.length" class="empty-state">当前没有部位，点击"添加部位"开始录入。</div>
+          <FlatTypeList v-if="isStandalone" :store="store" kind="tool" :query="workQuery" />
+          <template v-else>
+            <CategorySection v-for="category in displayCats" :key="category" :category="category" :store="store" :highlighted="hasWorkQuery ? highlightedCats.has(category) : undefined" />
+            <div v-if="!displayCats.length" class="empty-state">当前没有部位，点击"添加部位"开始录入。</div>
+          </template>
         </div>
       </template>
     </div>

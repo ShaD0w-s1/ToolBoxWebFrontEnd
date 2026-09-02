@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { AIRCRAFT_TYPES, type ToolItem } from "../domain/toolbox";
+import { AIRCRAFT_TYPES, FLAT_MATERIAL_CAT, type ToolItem } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import MaterialCategorySection from "./MaterialCategorySection.vue";
+import FlatTypeList from "./FlatTypeList.vue";
 import PartNoGroupCard from "./PartNoGroupCard.vue";
 import { exportMaterialList, importMaterialList } from "../services/spreadsheet";
 import { backend } from "../api";
@@ -118,6 +119,16 @@ function onAddCategory(event: Event): void {
 }
 
 function exportImage(): void { emit("export-image", captureRef.value); }
+/** 单独项目航材清单「添加类型」：无部位层，类型作为隐藏部位(通用航材)下的分组，推入空行便于直接录入。 */
+function addMaterialFlatType(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  const value = select.value;
+  select.value = "";
+  if (value !== "__NEW__") return;
+  const name = window.prompt("输入新类型名称（如：消耗件）")?.trim();
+  if (!name) return;
+  props.store.mAddItem(FLAT_MATERIAL_CAT, name);
+}
 function exportTableXlsx(): void {
   if (!state.value) return;
   exportMaterialList(state.value, exportFileName(props.store.currentProject.value?.name || "", "航材清单"));
@@ -221,7 +232,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
   <div ref="captureRef" class="material-list">
     <div class="subpage-head">
       <h3>{{ title }}</h3>
-      <span v-if="!isLibrary" class="auto-filter-warning">自动模糊筛选，需人工复核</span>
+      <span v-if="!isLibrary && !isStandalone" class="auto-filter-warning">自动模糊筛选，需人工复核</span>
       <div class="subpage-actions">
         <button class="ghost" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTableXlsx">导出表格</button>
@@ -231,12 +242,16 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
     </div>
 
     <div class="toolbar">
-      <select class="primary add-cat" :value="addCatValue" @change="onAddCategory" aria-label="添加部位">
+      <select v-if="!isStandalone" class="primary add-cat" :value="addCatValue" @change="onAddCategory" aria-label="添加部位">
         <option value="" disabled>+ 添加部位</option>
         <option value="__NEW__">新部位</option>
         <option v-for="o in addOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
-      <label v-if="!isLibrary" class="field">机型
+      <select v-else class="primary add-cat" @change="addMaterialFlatType" aria-label="添加类型">
+        <option value="" disabled>+ 添加类型</option>
+        <option value="__NEW__">新类型…</option>
+      </select>
+      <label v-if="!isLibrary && !isStandalone" class="field">机型
         <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
       </label>
       <label v-if="isLibrary" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportFile" /></label>
@@ -265,6 +280,10 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <PartNoGroupCard v-for="g in singleGroups" :key="g.partNo || String(g.items[0].id)" :store="store" :part-no="g.partNo" :name="g.name" :items="g.items" />
         <div v-if="!singleGroups.length" class="empty-state">暂无单件航材。</div>
       </section>
+    </div>
+
+    <div v-else-if="isStandalone" class="category-list">
+      <FlatTypeList :store="store" kind="material" :query="typeQuery" />
     </div>
 
     <div v-else class="category-list">

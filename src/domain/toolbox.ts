@@ -9,6 +9,11 @@ export const TEAMS = ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3", "外
  *  顺序即显示顺序（与 sectionColor 固定配色表一致）。标准库页不受此限制，显示全部。 */
 export const DEFAULT_CATEGORIES = ["ENG", "AV CB", "FC", "LG", "通用", "接机"] as const;
 
+/** 单独项目类清单（工具/航材）扁平化后的隐藏部位：界面不再展示部位层，物品统一归到该部位，
+ *  仅按「类型(sub)」分组展示/添加；导出等仍按该部位名分段。 */
+export const FLAT_TOOL_CAT = "通用工具";
+export const FLAT_MATERIAL_CAT = "通用航材";
+
 /** 新建工作项目时可选择的类型。空字符串表示历史遗留项目（仅有工具清单）。 */
 export const PROJECT_TYPES = ["A检", "零散", "单独项目", "换发/APU"] as const;
 export type ProjectType = (typeof PROJECT_TYPES)[number];
