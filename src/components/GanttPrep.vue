@@ -8,6 +8,43 @@ import NameSuggest from "./NameSuggest.vue";
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ (e: "share"): void }>();
 
+// —— 单输入框级编辑软锁：每个可编辑输入框带稳定 key，他人编辑同一输入框时本地黄底+禁用 ——
+// key 约定 "ganttPrep|容器类型|容器id|字段名"，两端各自拼出相同 key 才能互锁。
+function lockKey(kind: string, id: string, field: string): string {
+  return `ganttPrep|${kind}|${id}|${field}`;
+}
+// v-lock 指令：focus 上报 / input 续期 / blur 结束并保存；他人锁定时 disabled + 黄底 + 悬浮提示。
+const vLock = {
+  mounted(el: HTMLElement, binding: { value: string }) {
+    applyLockState(el, binding.value);
+    el.addEventListener("focusin", () => props.store.beginEdit(binding.value));
+    el.addEventListener("input", () => props.store.touchEdit(binding.value));
+    el.addEventListener("focusout", () => props.store.endEdit(binding.value));
+  },
+  updated(el: HTMLElement, binding: { value: string }) {
+    applyLockState(el, binding.value);
+  },
+  unmounted(_el: HTMLElement, binding: { value: string }) {
+    props.store.endEdit(binding.value);
+  },
+};
+function applyLockState(el: HTMLElement, key: string): void {
+  const locked = props.store.isLockedByOther(key);
+  const owner = props.store.lockOwnerOf(key);
+  const inner = el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement || el instanceof HTMLSelectElement
+    ? el
+    : el.querySelector<HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement>("textarea, input, select");
+  if (inner) {
+    inner.disabled = locked;
+    if (locked) inner.setAttribute("data-locked-owner", owner || "");
+    else inner.removeAttribute("data-locked-owner");
+  }
+  el.classList.toggle("remote-locked", locked);
+  if (locked && owner) el.title = `${owner} 正在编辑`;
+  else if (!locked) el.title = "";
+}
+
+
 const DEFAULT_RESP = ["现场负责人", "工具负责", "持卡", "必检", "拆装记录人"];
 const DEFAULT_PARTS_TYPES = ["无", "串件", "单拆", "单装", "领新件"];
 
@@ -1928,7 +1965,7 @@ async function importAllXlsx(event: Event): Promise<void> {
     <!-- 主区 -->
     <div class="main-area" id="gp-main-area" ref="mainAreaRef">
       <div class="subpage-head">
-        <input class="gp-title-input" v-model="templateName" placeholder="工作准备单（甘特）" @change="save" @input="save" />
+        <input class="gp-title-input" v-model="templateName" placeholder="工作准备单（甘特）" @change="save" @input="save" v-lock="lockKey('title', 'main', 'templateName')" />
         <button class="ghost" @click="openTplModal('load')">调取模板</button>
         <button class="ghost" @click="openTplModal('save')">保存模板</button>
         <span class="toolbar-sep" />
@@ -1975,15 +2012,15 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="gp-sec-title">飞机信息</div>
             <div v-for="(a, i) in aircrafts" :key="a.id" class="meta-group">
               <div class="meta-grid meta-grid-4">
-                <label class="gpf"><span class="gpf-label">机号</span><input v-model="a.reg" list="gp-aircraft-numbers" @change="onAircraftRegChange(a)" @input="save" /></label>
-                <label class="gpf"><span class="gpf-label">FSN</span><input v-model="a.fsn" @change="onAircraftFieldEdited(a)" @input="save" /></label>
-                <label class="gpf"><span class="gpf-label">MSN</span><input v-model="a.msn" @change="onAircraftFieldEdited(a)" @input="save" /></label>
-                <label class="gpf"><span class="gpf-label">发动机</span><input v-model="a.engine" @change="onAircraftFieldEdited(a)" @input="save" /></label>
-                <label class="gpf"><span class="gpf-label">机型</span><input v-model="a.type" @change="onAircraftFieldEdited(a)" @input="save" /></label>
-                <label class="gpf"><span class="gpf-label">ETOPS</span><input v-model="a.etops" @change="onAircraftFieldEdited(a)" @input="save" /></label>
+                <label class="gpf"><span class="gpf-label">机号</span><input v-model="a.reg" list="gp-aircraft-numbers" @change="onAircraftRegChange(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'reg')" /></label>
+                <label class="gpf"><span class="gpf-label">FSN</span><input v-model="a.fsn" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'fsn')" /></label>
+                <label class="gpf"><span class="gpf-label">MSN</span><input v-model="a.msn" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'msn')" /></label>
+                <label class="gpf"><span class="gpf-label">发动机</span><input v-model="a.engine" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'engine')" /></label>
+                <label class="gpf"><span class="gpf-label">机型</span><input v-model="a.type" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'type')" /></label>
+                <label class="gpf"><span class="gpf-label">ETOPS</span><input v-model="a.etops" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'etops')" /></label>
                 <label class="gpf"><span class="gpf-label">ELT-DT</span>
                   <div class="meta-type-row">
-                    <input v-model="a.eltDt" @change="onAircraftFieldEdited(a)" @input="save" />
+                    <input v-model="a.eltDt" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'eltDt')" />
                     <button class="icon-btn meta-x" title="删除该飞机" @click="removeAircraft(a.id)">×</button>
                   </div>
                 </label>
@@ -1996,23 +2033,23 @@ async function importAllXlsx(event: Event): Promise<void> {
           <section class="gp-section">
             <div class="gp-sec-title">项目安排</div>
             <div class="arrange-row arrange-row-3">
-              <label class="gpf"><span class="gpf-label">项目经理</span><textarea class="textwrap" rows="1" v-model="arrangement.manager" @input="save"></textarea></label>
-              <label class="gpf"><span class="gpf-label">值班组</span><textarea class="textwrap" rows="1" v-model="arrangement.dutyGroup" @input="save"></textarea></label>
-              <label class="gpf"><span class="gpf-label">执行地点</span><textarea class="textwrap" rows="1" v-model="arrangement.location" @input="save"></textarea></label>
+              <label class="gpf"><span class="gpf-label">项目经理</span><textarea class="textwrap" rows="1" v-model="arrangement.manager" @input="save" v-lock="lockKey('arrangement', 'single', 'manager')"></textarea></label>
+              <label class="gpf"><span class="gpf-label">值班组</span><textarea class="textwrap" rows="1" v-model="arrangement.dutyGroup" @input="save" v-lock="lockKey('arrangement', 'single', 'dutyGroup')"></textarea></label>
+              <label class="gpf"><span class="gpf-label">执行地点</span><textarea class="textwrap" rows="1" v-model="arrangement.location" @input="save" v-lock="lockKey('arrangement', 'single', 'location')"></textarea></label>
             </div>
             <div class="arrange-divider" />
             <div class="arrange-row arrange-participants-row">
-              <label class="gpf"><span class="gpf-label">参与人员</span><textarea class="participant-input textwrap" rows="1" v-model="participantInput" placeholder="例如：张三、李四（停止编辑即同步名单）" @keydown="onParticipantInputKeydown" @blur="onParticipantInputBlur"></textarea></label>
+              <label class="gpf"><span class="gpf-label">参与人员</span><textarea class="participant-input textwrap" rows="1" v-model="participantInput" placeholder="例如：张三、李四（停止编辑即同步名单）" @keydown="onParticipantInputKeydown" @blur="onParticipantInputBlur" v-lock="lockKey('arrangement', 'single', 'participants')"></textarea></label>
             </div>
             <div class="arrange-divider" />
             <div class="arrange-row arrange-row-2">
-              <label class="gpf"><span class="gpf-label">指令号</span><textarea class="textwrap" rows="1" v-model="arrangement.orderNo" @input="save"></textarea></label>
-              <label class="gpf"><span class="gpf-label">指令名称</span><textarea class="textwrap" rows="1" v-model="arrangement.orderName" @input="save"></textarea></label>
+              <label class="gpf"><span class="gpf-label">指令号</span><textarea class="textwrap" rows="1" v-model="arrangement.orderNo" @input="save" v-lock="lockKey('arrangement', 'single', 'orderNo')"></textarea></label>
+              <label class="gpf"><span class="gpf-label">指令名称</span><textarea class="textwrap" rows="1" v-model="arrangement.orderName" @input="save" v-lock="lockKey('arrangement', 'single', 'orderName')"></textarea></label>
             </div>
             <div class="arrange-items">
               <div v-for="it in arrangementItems" :key="it.id" class="arrange-item">
-                <label class="gpf"><span class="gpf-label">内容</span><textarea class="textwrap" rows="1" v-model="it.content" @input="save"></textarea></label>
-                <label class="gpf"><span class="gpf-label">安排</span><textarea class="textwrap" rows="1" v-model="it.assign" @input="save"></textarea></label>
+                <label class="gpf"><span class="gpf-label">内容</span><textarea class="textwrap" rows="1" v-model="it.content" @input="save" v-lock="lockKey('arrangeitem', it.id, 'content')"></textarea></label>
+                <label class="gpf"><span class="gpf-label">安排</span><textarea class="textwrap" rows="1" v-model="it.assign" @input="save" v-lock="lockKey('arrangeitem', it.id, 'assign')"></textarea></label>
                 <button class="icon-btn" @click="removeArrangementItem(it.id)">×</button>
               </div>
             </div>
@@ -2023,19 +2060,19 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="gp-sec-title">部件卡片</div>
             <div v-for="(c, i) in components" :key="c.id" class="component-card">
               <div class="meta-group-head">
-                <label class="gpf component-name-wrap"><input v-model="c.name" class="component-name-input" :placeholder="`部件卡片 ${i + 1} 名称`" @input="save" /></label>
+                <label class="gpf component-name-wrap"><input v-model="c.name" class="component-name-input" :placeholder="`部件卡片 ${i + 1} 名称`" @input="save" v-lock="lockKey('component', c.id, 'name')" /></label>
                 <button class="icon-btn" @click="removeComponent(c.id)">×</button>
               </div>
               <div class="component-cols">
                 <div class="component-col">
                   <div class="component-tag off">拆下件</div>
-                  <label class="gpf"><span class="gpf-label">件号</span><textarea class="textwrap" rows="1" v-model="c.offPn" @input="save"></textarea></label>
-                  <label class="gpf"><span class="gpf-label">序号</span><textarea class="textwrap" rows="1" v-model="c.offSn" @input="save"></textarea></label>
+                  <label class="gpf"><span class="gpf-label">件号</span><textarea class="textwrap" rows="1" v-model="c.offPn" @input="save" v-lock="lockKey('component', c.id, 'offPn')"></textarea></label>
+                  <label class="gpf"><span class="gpf-label">序号</span><textarea class="textwrap" rows="1" v-model="c.offSn" @input="save" v-lock="lockKey('component', c.id, 'offSn')"></textarea></label>
                 </div>
                 <div class="component-col">
                   <div class="component-tag on">装上件</div>
-                  <label class="gpf"><span class="gpf-label">件号</span><textarea class="textwrap" rows="1" v-model="c.onPn" @input="save"></textarea></label>
-                  <label class="gpf"><span class="gpf-label">序号</span><textarea class="textwrap" rows="1" v-model="c.onSn" @input="save"></textarea></label>
+                  <label class="gpf"><span class="gpf-label">件号</span><textarea class="textwrap" rows="1" v-model="c.onPn" @input="save" v-lock="lockKey('component', c.id, 'onPn')"></textarea></label>
+                  <label class="gpf"><span class="gpf-label">序号</span><textarea class="textwrap" rows="1" v-model="c.onSn" @input="save" v-lock="lockKey('component', c.id, 'onSn')"></textarea></label>
                 </div>
               </div>
             </div>
@@ -2056,10 +2093,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                         <option v-if="a.type && !DEFAULT_PARTS_TYPES.includes(a.type)" :value="a.type">{{ a.type }}</option>
                       </select>
                     </td>
-                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save" :class="{ 'sp-empty': !a.content.trim() }"></textarea></td>
-                    <td :class="{ 'sp-empty-cell': !r.owner.trim() }"><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><NameSuggest :model-value="r.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="r.owner = $event; save()" /></td>
-                    <td :class="{ 'sp-empty-cell': !r.participants.trim() }"><NameSuggest :model-value="r.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="r.participants = $event; save()" /></td>
-                    <td><textarea class="textwrap" rows="1" v-model="r.note" placeholder="备注" @input="save"></textarea></td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save" :class="{ 'sp-empty': !a.content.trim() }" v-lock="lockKey('spa', a.id, 'content')"></textarea></td>
+                    <td :class="{ 'sp-empty-cell': !r.owner.trim() }"><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><NameSuggest :model-value="r.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="r.owner = $event; save()" v-lock="lockKey('sprow', r.id, 'owner')" /></td>
+                    <td :class="{ 'sp-empty-cell': !r.participants.trim() }"><NameSuggest :model-value="r.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="r.participants = $event; save()" v-lock="lockKey('sprow', r.id, 'participants')" /></td>
+                    <td><textarea class="textwrap" rows="1" v-model="r.note" placeholder="备注" @input="save" v-lock="lockKey('sprow', r.id, 'note')"></textarea></td>
                     <td>
                       <select :value="r.executeStage ? r.executeStage.chartId + '::' + r.executeStage.stageIdx : ''" @change="setSpRowStage(r, ($event.target as HTMLSelectElement).value)">
                         <option value="">未选择</option>
@@ -2080,9 +2117,9 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="chart-header">
               <div class="chart-title-row">
                 <button class="collapse-btn" @click="toggleCollapse(chart.id)" :title="chart.collapsed ? '展开本天' : '收起本天'">{{ chart.collapsed ? '▶' : '▼' }}</button>
-                <input class="date-input" type="date" v-model="chart.date" @change="save" title="日期(日历选择)" />
-                <span class="day-label">DAY</span><input v-model.number="chart.day" class="day-input" @change="normalizeDay(chart)" title="DAY 计数" />
-                <input v-model="chart.title" class="chart-title-input" @change="save" title="标题" />
+                <input class="date-input" type="date" v-model="chart.date" @change="save" title="日期(日历选择)" v-lock="lockKey('chart', chart.id, 'date')" />
+                <span class="day-label">DAY</span><input v-model.number="chart.day" class="day-input" @change="normalizeDay(chart)" title="DAY 计数" v-lock="lockKey('chart', chart.id, 'day')" />
+                <input v-model="chart.title" class="chart-title-input" @change="save" title="标题" v-lock="lockKey('chart', chart.id, 'title')" />
               </div>
               <div class="chart-toolbar">
                 <button @click="addDayAfter(chart.id)">+ 增加一天</button>
@@ -2095,9 +2132,9 @@ async function importAllXlsx(event: Event): Promise<void> {
               <div class="gp-sec-title">顶部责任 (各项负责)</div>
               <div class="resp-banner">
                 <div v-for="r in chart.responsibilities" :key="r.id" class="resp-cell">
-                  <input v-model="r.label" class="resp-label-input" title="负责内容" @input="save" />
+                  <input v-model="r.label" class="resp-label-input" title="负责内容" @input="save" v-lock="lockKey('resp', r.id, 'label')" />
                   <span class="resp-colon">:</span>
-                  <NameSuggest :model-value="r.name" :suggestions="participantSuggestions" placeholder="姓名" @update:model-value="r.name = $event; save()" />
+                  <NameSuggest :model-value="r.name" :suggestions="participantSuggestions" placeholder="姓名" @update:model-value="r.name = $event; save()" v-lock="lockKey('resp', r.id, 'name')" />
                   <button class="icon-btn resp-del" @click="removeResp(chart.id, r.id)">×</button>
                 </div>
                 <div class="resp-cell resp-add"><button @click="addResp(chart.id)">+ 添加安排</button></div>
@@ -2108,7 +2145,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <div v-for="(st, si) in chart.stages" :key="st.id" class="form-stage-card">
                   <div class="form-stage-head">
                     <div class="form-stage-drag" title="拖动调整阶段顺序" @pointerdown="startFormStageDrag($event, chart.id, si)">⠿</div>
-                    <input v-model="st.name" @input="save" />
+                    <input v-model="st.name" @input="save" v-lock="lockKey('stage', st.id, 'name')" />
                     <select v-if="dayOptionsExcluding(chart.id).length" class="day-move-select form" :value="''" title="迁移整个阶段到其它 DAY" @change="moveStageToChart(chart.id, si, ($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''">
                       <option value="" disabled>⇄ 移 DAY</option>
                       <option v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" :value="c.id">{{ c.label }}</option>
@@ -2120,20 +2157,20 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <div v-for="card in cardsOfStage(chart, si)" :key="card.id" class="form-card-row">
                       <div class="form-card-title">
                         <div class="form-card-drag" title="拖动调行序" @pointerdown="startFormCardDrag($event, chart.id, card.id)">⠿</div>
-                        <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="save"></textarea>
+                        <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="save" v-lock="lockKey('card', card.id, 'content')"></textarea>
                       </div>
-                      <NameSuggest class="ns-owner" :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" />
-                      <NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" />
-                      <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="save"></textarea>
+                      <NameSuggest class="ns-owner" :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" v-lock="lockKey('card', card.id, 'owner')" />
+                      <NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" v-lock="lockKey('card', card.id, 'participants')" />
+                      <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="save" v-lock="lockKey('card', card.id, 'note')"></textarea>
                       <span v-if="card.endStage > card.startStage" class="fc-span">持续至「{{ chart.stages[card.endStage]?.name }}」</span>
                       <button class="icon-btn" @click="deleteCard(chart.id, card.id)">×</button>
                     </div>
                     <div v-for="x in spRowsOfStage(chart.id, si)" :key="'sp' + x.row.id" class="form-card-row part-form-row">
                       <span class="part-form-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
                       <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
-                      <NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" />
-                      <NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" />
-                      <textarea class="textwrap" rows="1" v-model="x.row.note" placeholder="备注" @input="save"></textarea>
+                      <NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" v-lock="lockKey('sprow', x.row.id, 'owner')" />
+                      <NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" v-lock="lockKey('sprow', x.row.id, 'participants')" />
+                      <textarea class="textwrap" rows="1" v-model="x.row.note" placeholder="备注" @input="save" v-lock="lockKey('sprow', x.row.id, 'note')"></textarea>
                       <button class="icon-btn" title="删除原分配的阶段（串件仍在串件安排中）" @click="clearSpStage(x.arr.id, x.row.id)">×</button>
                     </div>
                     <div v-if="!cardsOfStage(chart, si).length && !spRowsOfStage(chart.id, si).length" class="stage-empty">无工序</div>
@@ -2158,9 +2195,9 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="chart-header">
               <div class="chart-title-row">
                 <button class="collapse-btn" @click="toggleCollapse(chart.id)" :title="chart.collapsed ? '展开本天' : '收起本天'">{{ chart.collapsed ? '▶' : '▼' }}</button>
-                <input class="date-input" type="date" v-model="chart.date" @change="save" />
-                <span class="day-label">DAY</span><input v-model.number="chart.day" class="day-input" @change="normalizeDay(chart)" />
-                <input v-model="chart.title" class="chart-title-input" @change="save" />
+                <input class="date-input" type="date" v-model="chart.date" @change="save" v-lock="lockKey('chart', chart.id, 'date')" />
+                <span class="day-label">DAY</span><input v-model.number="chart.day" class="day-input" @change="normalizeDay(chart)" v-lock="lockKey('chart', chart.id, 'day')" />
+                <input v-model="chart.title" class="chart-title-input" @change="save" v-lock="lockKey('chart', chart.id, 'title')" />
               </div>
               <div class="chart-toolbar">
                 <button @click="addStage(chart.id)">+ 阶段</button>
@@ -2175,8 +2212,8 @@ async function importAllXlsx(event: Event): Promise<void> {
             <template v-if="!chart.collapsed">
               <div class="resp-banner">
                 <div v-for="r in chart.responsibilities" :key="r.id" class="resp-cell">
-                  <input v-model="r.label" class="resp-label-input" @input="save" /><span class="resp-colon">:</span>
-                  <NameSuggest :model-value="r.name" :suggestions="participantSuggestions" placeholder="姓名" @update:model-value="r.name = $event; save()" />
+                  <input v-model="r.label" class="resp-label-input" @input="save" v-lock="lockKey('resp', r.id, 'label')" /><span class="resp-colon">:</span>
+                  <NameSuggest :model-value="r.name" :suggestions="participantSuggestions" placeholder="姓名" @update:model-value="r.name = $event; save()" v-lock="lockKey('resp', r.id, 'name')" />
                   <button class="icon-btn resp-del" @click="removeResp(chart.id, r.id)">×</button>
                 </div>
                 <div class="resp-cell resp-add"><button @click="addResp(chart.id)">+ 添加安排</button></div>
@@ -2185,7 +2222,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <div class="gantt-grid" :style="{ gridTemplateColumns: `repeat(${chart.stages.length}, minmax(40px, min(calc(100% / ${chart.stages.length}), 20%)))`, gridTemplateRows: `44px repeat(${rowCountOf(chart)}, auto)` }">
                   <div v-for="(st, si) in chart.stages" :key="st.id" class="gantt-head" :style="{ gridColumn: si + 1, gridRow: 1 }">
                     <div class="stage-col-drag" title="拖动调整列位置" @pointerdown="startStageColDrag($event, chart.id, si)">⠿</div>
-                    <input v-model="st.name" class="stage-name-input" @input="save" />
+                    <input v-model="st.name" class="stage-name-input" @input="save" v-lock="lockKey('stage', st.id, 'name')" />
                     <span class="stage-split" @click.stop>
                       <button class="add-card-btn stage-split-main" title="本列添加工序" @click="addCard(chart.id, si)">+工序</button>
                       <button class="stage-split-arrow" title="更多操作" @click="toggleStageMenu(chart.id, si)">▾</button>
@@ -2206,10 +2243,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="resize-r" title="拖右边缘改结束阶段" @pointerdown="startCardDrag($event, 'resize-right', chart.id, card.id)"></div>
                       <button class="card-close" title="删除工序" @click="deleteCard(chart.id, card.id)">✕</button>
                       <div class="card-body">
-                        <textarea class="f-content" v-model="card.content" placeholder="工作内容" @input="save" rows="1"></textarea>
-                        <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" /></div>
-                        <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" /></div>
-                        <textarea class="f-note" v-model="card.note" placeholder="备注(红色提示)" @input="save" rows="1"></textarea>
+                        <textarea class="f-content" v-model="card.content" placeholder="工作内容" @input="save" rows="1" v-lock="lockKey('card', card.id, 'content')"></textarea>
+                        <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" v-lock="lockKey('card', card.id, 'owner')" /></div>
+                        <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" v-lock="lockKey('card', card.id, 'participants')" /></div>
+                        <textarea class="f-note" v-model="card.note" placeholder="备注(红色提示)" @input="save" rows="1" v-lock="lockKey('card', card.id, 'note')"></textarea>
                       </div>
                     </div>
                   </div>
@@ -2220,11 +2257,11 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="card-body">
                         <div class="sp-title-row">
                           <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
-                          <textarea class="f-content sp-view-content" rows="1" v-model="x.arr.content" placeholder="（空）" @input="save"></textarea>
+                          <textarea class="f-content sp-view-content" rows="1" v-model="x.arr.content" placeholder="（空）" @input="save" v-lock="lockKey('spa', x.arr.id, 'content')"></textarea>
                         </div>
-                        <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" /></div>
-                        <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" /></div>
-                        <textarea class="f-note" v-model="x.row.note" placeholder="备注" @input="save" rows="1"></textarea>
+                        <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" v-lock="lockKey('sprow', x.row.id, 'owner')" /></div>
+                        <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" v-lock="lockKey('sprow', x.row.id, 'participants')" /></div>
+                        <textarea class="f-note" v-model="x.row.note" placeholder="备注" @input="save" rows="1" v-lock="lockKey('sprow', x.row.id, 'note')"></textarea>
                       </div>
                     </div>
                   </div>
@@ -2273,8 +2310,8 @@ async function importAllXlsx(event: Event): Promise<void> {
               <thead><tr><th>工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
               <tbody>
                 <tr v-for="(x, i) in state.docs.wp" :key="'wp' + i">
-                  <td><input v-model="(x as any).jc" placeholder="工卡号" @input="save" /></td>
-                  <td><input v-model="(x as any).name" placeholder="工卡名称" @input="save" /></td>
+                  <td><input v-model="(x as any).jc" placeholder="工卡号" @input="save" v-lock="lockKey('docwp', 'row' + i, 'jc')" /></td>
+                  <td><input v-model="(x as any).name" placeholder="工卡名称" @input="save" v-lock="lockKey('docwp', 'row' + i, 'name')" /></td>
                   <td><button class="icon-btn" @click="removeDoc('wp', i)">×</button></td>
                 </tr>
               </tbody>
@@ -2296,8 +2333,8 @@ async function importAllXlsx(event: Event): Promise<void> {
               <thead><tr><th>工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
               <tbody>
                 <tr v-for="(x, i) in state.docs.eng" :key="'eng' + i">
-                  <td><input v-model="(x as any).jc" placeholder="工卡号" @input="save" /></td>
-                  <td><input v-model="(x as any).name" placeholder="工卡名称" @input="save" /></td>
+                  <td><input v-model="(x as any).jc" placeholder="工卡号" @input="save" v-lock="lockKey('doceng', 'row' + i, 'jc')" /></td>
+                  <td><input v-model="(x as any).name" placeholder="工卡名称" @input="save" v-lock="lockKey('doceng', 'row' + i, 'name')" /></td>
                   <td><button class="icon-btn" @click="removeDoc('eng', i)">×</button></td>
                 </tr>
               </tbody>
@@ -2328,8 +2365,8 @@ async function importAllXlsx(event: Event): Promise<void> {
                       </select>
                     </td>
                     <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save"></textarea></td>
-                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><input :value="r.jc" placeholder="工卡号" @input="r.jc = ($event.target as HTMLInputElement).value; save()" /></td>
-                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><textarea class="sp-name" rows="1" :value="r.name" placeholder="工卡名称" @input="r.name = ($event.target as HTMLTextAreaElement).value; save()"></textarea></td>
+                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><input :value="r.jc" placeholder="工卡号" @input="r.jc = ($event.target as HTMLInputElement).value; save()" v-lock="lockKey('sprow', r.id, 'jc')" /></td>
+                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><textarea class="sp-name" rows="1" :value="r.name" placeholder="工卡名称" @input="r.name = ($event.target as HTMLTextAreaElement).value; save()" v-lock="lockKey('sprow', r.id, 'name')"></textarea></td>
                     <td v-if="ri === 0" :rowspan="a.rows.length"><button class="icon-btn" title="删除整条串件安排" @click="removeSpArrangement(a.id)">×</button></td>
                   </tr>
                 </template>
@@ -2392,9 +2429,9 @@ async function importAllXlsx(event: Event): Promise<void> {
                   <div class="pnc-body">
                     <div v-for="row in g.rows" :key="row.item.id" class="pnc-item">
                       <span class="pnc-type" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
-                      <input v-model.number="row.item.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="save" />
+                      <input v-model.number="row.item.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
                       <button class="pnc-del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button>
-                      <textarea v-model="row.item.note" rows="1" class="pnc-note" placeholder="备注" @input="save"></textarea>
+                      <textarea v-model="row.item.note" rows="1" class="pnc-note" placeholder="备注" @input="save" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
                     </div>
                   </div>
                 </article>
@@ -2413,9 +2450,9 @@ async function importAllXlsx(event: Event): Promise<void> {
                   <div class="pnc-body">
                     <div v-for="row in g.rows" :key="row.item.id" class="pnc-item">
                       <span class="pnc-type" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
-                      <input v-model.number="row.item.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="save" />
+                      <input v-model.number="row.item.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
                       <button class="pnc-del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button>
-                      <textarea v-model="row.item.note" rows="1" class="pnc-note" placeholder="备注" @input="save"></textarea>
+                      <textarea v-model="row.item.note" rows="1" class="pnc-note" placeholder="备注" @input="save" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
                     </div>
                   </div>
                 </article>
@@ -2427,21 +2464,21 @@ async function importAllXlsx(event: Event): Promise<void> {
           <section v-for="card in visiblePartCards" :key="card.id" class="gp-card pt-card" :style="{ borderLeft: '6px solid ' + partCardColorOf(card), background: partCardBgOf(card) }">
             <div class="pt-card-head" :style="{ background: partCardHeadOf(card) }">
               <button class="pt-collapse" :title="collapsedCards.has(card.id) ? '展开卡片' : '折叠卡片'" @click="toggleCardCollapse(card.id)">{{ collapsedCards.has(card.id) ? '▸' : '▾' }}</button>
-              <input v-model="card.name" class="pt-card-name" placeholder="卡片名称(可输入或搜索串件内容)" list="gp-part-contents" @input="save" />
+              <input v-model="card.name" class="pt-card-name" placeholder="卡片名称(可输入或搜索串件内容)" list="gp-part-contents" @input="save" v-lock="lockKey('partcard', card.id, 'name')" />
               <span class="pt-count">{{ card.items.length }} 项</span>
               <button class="icon-btn" @click="removePartList(partKind, card.id)">×</button>
             </div>
             <template v-if="!collapsedCards.has(card.id)">
             <div class="pt-items">
               <div v-for="it in card.items" :key="it.id" class="pt-item" :class="{ 'pt-item-air': tab === 'airparts', 'pt-item-tool': tab === 'tools' }">
-                <label v-if="tab === 'airparts'" class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.pn" class="m-name" @input="onPartAutoSize"></textarea></label>
-                <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" class="m-name" @input="onPartAutoSize"></textarea></label>
-                <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" type="number" min="0" @input="save" /></label>
+                <label v-if="tab === 'airparts'" class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.pn" class="m-name" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'pn')"></textarea></label>
+                <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" class="m-name" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'name')"></textarea></label>
+                <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" type="number" min="0" @input="save" v-lock="lockKey('partitem', it.id, 'qty')" /></label>
                 <div class="m-ops">
                   <button class="m-op m-op-del" title="删除物品" @click="removePartItem(partKind, card.id, it.id)">×</button>
                   <button class="m-op" :title="expandedNotes.has(it.id) ? '收起备注' : '添加备注'" @click="toggleNote(it.id)">+</button>
                 </div>
-                <div v-if="expandedNotes.has(it.id)" class="pt-note-row"><textarea v-model="it.note" class="pt-note" placeholder="备注" @input="save"></textarea></div>
+                <div v-if="expandedNotes.has(it.id)" class="pt-note-row"><textarea v-model="it.note" class="pt-note" placeholder="备注" @input="save" v-lock="lockKey('partitem', it.id, 'note')"></textarea></div>
               </div>
               <div v-if="!card.items.length" class="pt-empty">暂无物品 — 点击「+ 增加物品」</div>
             </div>
@@ -2969,5 +3006,26 @@ textarea.textwrap {
   .form-card-row textarea { min-width: 100%; }
   .form-card-row .form-card-title textarea { min-width: 60px; max-width: 100%; }
   .gantt-grid { min-width: 640px; }
+}
+
+/* ===== 他人正在编辑：输入框亮黄底 + 锁定 ===== */
+.remote-locked,
+.remote-locked textarea,
+.remote-locked input,
+.remote-locked .ns-input,
+textarea.remote-locked,
+input.remote-locked {
+  background: #FFF176 !important;           /* 亮黄警示底 */
+  border-color: #F9A825 !important;
+  box-shadow: inset 0 0 0 1.5px #FBC02D !important;
+  cursor: not-allowed !important;
+  color: #6d4c00 !important;
+}
+.remote-locked[title]:not([title=""]) { position: relative; }
+.remote-locked textarea:disabled,
+.remote-locked input:disabled,
+textarea.remote-locked:disabled,
+input.remote-locked:disabled {
+  opacity: 0.85; color: #6d4c00 !important; -webkit-text-fill-color: #6d4c00;
 }
 </style>

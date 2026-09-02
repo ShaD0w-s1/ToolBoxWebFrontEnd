@@ -352,6 +352,8 @@ onMounted(async () => {
   if (!store.identityReady.value) showIdentityModal.value = true;
   // 启动每 2 秒自动同步（推送本地变更到云端，不覆盖本地编辑）
   store.startAutoSync(2000);
+  // 编辑会话（单输入框软锁）：3s 轮询会话超时与拉取他人编辑态
+  store.startEditingSync();
   // 在线人数心跳 + 徽标轮询（60s 身份保活 + online-count）
   store.startOnlinePing();
   // 根据远端配置启动 watch 实时推送或轮询（loadRemote 成功后内部已按配置启动，

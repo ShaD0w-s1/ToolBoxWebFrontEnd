@@ -5,6 +5,7 @@ const props = defineProps<{
   modelValue: string;
   suggestions: string[];
   placeholder?: string;
+  disabled?: boolean;
 }>();
 const emit = defineEmits<{ "update:modelValue": [string] }>();
 

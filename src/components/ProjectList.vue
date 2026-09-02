@@ -24,6 +24,24 @@ import DateRangePicker from "./DateRangePicker.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-all": []; share: [] }>();
+
+/** 系统设置（数据库子页卡片）：轮询频率 / 会话超时 / 终止编辑视为保存（持久化到 localStorage）。 */
+function setPollMs(ms: number): void {
+  props.store.syncSettings.pollMs = Math.max(500, Math.min(ms, 20000));
+  props.store.persistSettings();
+  props.store.startPolling(); // 重启轮询使新间隔立即生效
+  props.store.notify(`轮询频率已设为 ${ms / 1000}s`, "ok");
+}
+function setSessionTimeout(ms: number): void {
+  props.store.syncSettings.sessionTimeoutMs = Math.max(15000, Math.min(ms, 600000));
+  props.store.persistSettings();
+  props.store.notify(`会话超时已设为 ${ms / 1000}s`, "ok");
+}
+function setAutoSaveOnEnd(on: boolean): void {
+  props.store.syncSettings.autoSaveOnEnd = on;
+  props.store.persistSettings();
+  props.store.notify(on ? "已开启：终止编辑（失焦/切页）自动保存" : "已关闭：终止编辑不自动保存", on ? "ok" : "info");
+}
 // 新建项目弹窗：true=显示。
 const showCreateModal = ref(false);
 // 修订弹窗目标项目：null=隐藏，否则为该项目的修订弹窗。
@@ -474,6 +492,46 @@ async function batchDeleteNoDate(): Promise<void> {
             </article>
           </div>
         </section>
+
+        <!-- 系统设置（一级页数据库子页卡片）：轮询频率 / 会话超时 / 终止编辑视为保存 -->
+        <section class="db-group">
+          <h3 class="db-group-title">系统设置</h3>
+          <div class="db-group-cards">
+            <article class="library-card settings-card">
+              <div class="settings-row">
+                <div class="settings-field">
+                  <label>轮询频率（前台）</label>
+                  <select :value="String(store.syncSettings.pollMs)" @change="setPollMs(Number(($event.target as HTMLSelectElement).value))">
+                    <option value="500">0.5s（最快，请求最多）</option>
+                    <option value="1000">1s</option>
+                    <option value="2000">2s（推荐）</option>
+                    <option value="3000">3s</option>
+                    <option value="5000">5s（省流量）</option>
+                  </select>
+                  <span>同步他人改动到本机的间隔；后台标签页自动放宽到 10s。</span>
+                </div>
+                <div class="settings-field">
+                  <label>编辑会话超时</label>
+                  <select :value="String(store.syncSettings.sessionTimeoutMs)" @change="setSessionTimeout(Number(($event.target as HTMLSelectElement).value))">
+                    <option value="60000">60s</option>
+                    <option value="90000">90s</option>
+                    <option value="120000">120s（推荐）</option>
+                    <option value="180000">180s</option>
+                  </select>
+                  <span>输入框持续编辑超过该时长未失焦 → 自动保存并脱离编辑状态。</span>
+                </div>
+                <div class="settings-field">
+                  <label>终止编辑视为保存</label>
+                  <label class="settings-toggle">
+                    <input type="checkbox" :checked="store.syncSettings.autoSaveOnEnd" @change="setAutoSaveOnEnd(($event.target as HTMLInputElement).checked)" />
+                    <span>{{ store.syncSettings.autoSaveOnEnd ? "已开启" : "已关闭" }}</span>
+                  </label>
+                  <span>失焦 / 切换项目 / 关闭页面时，自动保存当前编辑内容并释放锁。</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
       </template>
     </div>
 
@@ -691,4 +749,17 @@ async function batchDeleteNoDate(): Promise<void> {
   .list-side { flex: none; width: 100%; position: static; }
   .list-main { flex: none; width: 100%; }
 }
+
+/* 系统设置卡片（数据库子页）：轮询频率 / 会话超时 / 终止编辑视为保存 */
+.settings-card { display: block; padding: 18px; }
+.settings-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+.settings-field { display: flex; flex-direction: column; gap: 6px; }
+.settings-field > label { font-weight: 600; font-size: var(--fs-13, 13px); color: var(--text, var(--n8)); }
+.settings-field select {
+  padding: 7px 10px; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-md, 8px);
+  font-size: var(--fs-13, 13px); background: var(--n0, #fff); font-family: inherit;
+}
+.settings-field span { font-size: var(--fs-12, 12px); color: var(--muted, var(--n7)); line-height: 1.5; }
+.settings-toggle { flex-direction: row; align-items: center; gap: 8px; font-weight: 400 !important; }
+.settings-toggle input { width: 16px; height: 16px; accent-color: var(--proc-yellow, #FDCA17); }
 </style>

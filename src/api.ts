@@ -119,6 +119,12 @@ export const backend = {
       { headers: { "X-Airnav-Token": token } },
     ),
   onlineCount: () => request<ApiEnvelope<{ count: number }>>("/api/online-count/"),
+  reportEditing: (payload: { session_id: string; name: string; project_id: string; key: string }) =>
+    request<ApiEnvelope>("/api/editing/", { method: "POST", body: payload }),
+  listEditing: (projectId: string, excludeSession: string) =>
+    request<ApiEnvelope<Array<{ session_id: string; name: string; key: string }>>>(
+      `/api/editing/?project_id=${encodeURIComponent(projectId)}&session_id=${encodeURIComponent(excludeSession)}`,
+    ),
   listEngTemplates: () =>
     request<ApiEnvelope<Array<{ _id: string; id: string; name: string; savedAt: string; state: GanttPrepState }>>>("/api/eng-templates/"),
   createEngTemplate: (payload: { name: string; state: GanttPrepState }) =>

@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { backend, ApiError, type ApiEnvelope } from "../api";
 import { startWatchRevision, stopWatchRevision } from "../services/realtime";
 import {
@@ -142,6 +142,166 @@ export function useToolbox() {
   const IDENTITY_KEY = "toolbox_identity_name";
   const identityName = ref<string>(localStorage.getItem(IDENTITY_KEY) || "");
   const identityReady = computed(() => !!identityName.value);
+  // —— 编辑会话（单输入框软锁）：本浏览器会话唯一 id + 用户设置（轮询频率/会话超时/终止保存）——
+  const SESSION_KEY = "toolbox_session_id";
+  const SETTINGS_KEY = "toolbox_sync_settings";
+  let sessionId = localStorage.getItem(SESSION_KEY) || "";
+  if (!sessionId) {
+    sessionId = (crypto?.randomUUID?.() ?? `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+    localStorage.setItem(SESSION_KEY, sessionId);
+  }
+  /** 同步设置（一级页数据库子页「系统设置」卡片读写，localStorage 持久化）。 */
+  const syncSettings = reactive({
+    pollMs: 2000,           // 前台轮询间隔（ms）：同步他人改动频率
+    sessionTimeoutMs: 120000, // 编辑会话超时（ms）：超时自动保存并脱离编辑
+    autoSaveOnEnd: true,    // 终止编辑（失焦/切项目/关页）视为保存
+  });
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") as Partial<typeof syncSettings>;
+    if (Number(saved.pollMs) >= 500 && Number(saved.pollMs) <= 20000) syncSettings.pollMs = Number(saved.pollMs);
+    if (Number(saved.sessionTimeoutMs) >= 15000 && Number(saved.sessionTimeoutMs) <= 600000) syncSettings.sessionTimeoutMs = Number(saved.sessionTimeoutMs);
+    if (typeof saved.autoSaveOnEnd === "boolean") syncSettings.autoSaveOnEnd = saved.autoSaveOnEnd;
+  } catch { /* 设置损坏则用默认 */ }
+  function persistSettings(): void {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(syncSettings));
+  }
+  // 本地正在编辑的输入框 key -> 最近一次活动时间戳（Date.now()）。
+  const editingLocal = reactive(new Map<string, number>());
+  // 远端其他用户正在编辑的 key -> 姓名（轮询拉取，用于渲染黄锁 + disabled）。
+  const editingByOthers = reactive(new Map<string, string>());
+  // 他人编辑快照刷新计数：UI 组件绑定时读取它触发重渲染（disabled/class 跟随黄锁）。
+  const lockVersion = ref(0);
+  let lastEditingReportAt = 0;
+  let lastEditingFetchAt = 0;
+  let editingTimer: ReturnType<typeof setInterval> | undefined;
+  let pidWatchStopper: (() => void) | undefined;
+  /** 上报编辑会话心跳（前端 ~12s 一次，后端 TTL 60s 兜底自动释放）。pid 为空默认当前项目。 */
+  async function reportEditingHeartbeat(pidOverride?: string): Promise<void> {
+    const pid = pidOverride ?? currentProjectId.value;
+    if (!pid || !identityName.value.trim()) return;
+    const now = Date.now();
+    if (now - lastEditingReportAt < 12000 && !pidOverride) return;
+    if (!pidOverride) lastEditingReportAt = now;
+    const key = editingLocal.size ? [...editingLocal.keys()].join("\u0001") : "";
+    try {
+      await backend.reportEditing({ session_id: sessionId, name: identityName.value.trim(), project_id: pid, key: key.slice(0, 1800) });
+    } catch { /* 上报失败忽略（下轮重试） */ }
+  }
+  /** 拉取他人编辑会话（前端 ~4s 一次，仅当前打开某项目时）。 */
+  async function fetchEditingOthers(): Promise<void> {
+    const pid = currentProjectId.value;
+    if (!pid) return;
+    const now = Date.now();
+    if (now - lastEditingFetchAt < 4000) return;
+    lastEditingFetchAt = now;
+    try {
+      const res = await backend.listEditing(pid, sessionId);
+      const data = (res as { data?: unknown }).data;
+      const list = Array.isArray(data) ? (data as Array<{ session_id: string; name: string; key: string }>) : [];
+      const next = new Map<string, string>();
+      for (const item of list) {
+        for (const key of String(item.key || "").split("\u0001")) {
+          if (key) next.set(key, String(item.name || ""));
+        }
+      }
+      let changed = false;
+      const stale: string[] = [];
+      for (const key of editingByOthers.keys()) if (!next.has(key)) stale.push(key);
+      for (const key of stale) { editingByOthers.delete(key); changed = true; }
+      for (const [key, name] of next) { if (editingByOthers.get(key) !== name) { editingByOthers.set(key, name); changed = true; } }
+      if (changed) lockVersion.value += 1;
+    } catch { /* 拉取失败忽略 */ }
+  }
+  function fieldOfEditKey(key: string): ProjectField | null {
+    const f = key.split("|")[1] as ProjectField;
+    return ["data", "materialList", "prepSheet", "workcardAssignment", "standalonePrepSheet", "ganttPrep", "meta"].includes(f) ? f : null;
+  }
+  /** 按项目保存指定顶层字段（不带项目切换的轻量 persist，纯标记 dirty + 450ms 防抖推送）。 */
+  function persistFieldOfProject(pid: string, field: ProjectField): void {
+    let set = dirtyFields.get(pid);
+    if (!set) { set = new Set(); dirtyFields.set(pid, set); }
+    set.add(field);
+    clearTimeout(saveTimer);
+    if (cloud.available) saveTimer = setTimeout(saveRemote, 450);
+  }
+  /** focus：登记正在编辑的输入框。key = "session|field|entity|subField…"（field 置于第 2 段便于保存映射）。 */
+  function beginEdit(key: string): void {
+    if (!key) return;
+    editingLocal.set(key, Date.now());
+    void reportEditingHeartbeat();
+  }
+  /** 输入中刷新活动时间（超时判定用）。 */
+  function touchEdit(key: string): void {
+    const ts = editingLocal.get(key);
+    if (ts !== undefined) editingLocal.set(key, Date.now());
+  }
+  /** 收集指定项目下全部编辑会话涉及字段并保存落盘（供项目切换/关页前调用）。 */
+  function flushEditingProject(pid: string): void {
+    if (!editingLocal.size) return;
+    const fields = new Set<ProjectField>();
+    for (const key of editingLocal.keys()) {
+      const f = fieldOfEditKey(key);
+      if (f) fields.add(f);
+    }
+    editingLocal.clear();
+    if (fields.size && syncSettings.autoSaveOnEnd) {
+      for (const f of fields) persistFieldOfProject(pid, f);
+    }
+  }
+  /** blur/终止：保存当前输入框所在字段并释放该输入框的编辑会话。 */
+  function endEdit(key: string): void {
+    if (!editingLocal.has(key)) return;
+    editingLocal.delete(key);
+    const pid = currentProjectId.value;
+    const f = fieldOfEditKey(key);
+    if (pid && f && syncSettings.autoSaveOnEnd) persistFieldOfProject(pid, f);
+    void reportEditingHeartbeat();
+  }
+  /** 切项目 / 关页：终止当前项目全部编辑会话（保存并释放）。 */
+  function endAllEditing(): void {
+    const pid = currentProjectId.value;
+    if (!pid || !editingLocal.size) return;
+    flushEditingProject(pid);
+    lastEditingReportAt = 0;
+    void reportEditingHeartbeat();
+  }
+  /** 他人是否正在编辑该 key（UI 用于 disabled + 亮黄）。 */
+  function isLockedByOther(key: string): boolean { return editingByOthers.has(key); }
+  function lockOwnerOf(key: string): string { return editingByOthers.get(key) || ""; }
+  function startEditingSync(): void {
+    if (editingTimer) return;
+    editingTimer = setInterval(() => {
+      // 1) 会话超时：超过 timeoutMs 未活动 → 自动保存该字段并脱离编辑（设置项②，未断网也生效）。
+      const timeoutMs = syncSettings.sessionTimeoutMs;
+      const now = Date.now();
+      const expired: string[] = [];
+      for (const [key, ts] of editingLocal) if (now - ts > timeoutMs) expired.push(key);
+      if (expired.length) {
+        const pid = currentProjectId.value;
+        const fields = new Set<ProjectField>();
+        for (const key of expired) { editingLocal.delete(key); const f = fieldOfEditKey(key); if (f) fields.add(f); }
+        if (pid && fields.size && syncSettings.autoSaveOnEnd) {
+          for (const f of fields) persistFieldOfProject(pid, f);
+          notify("编辑会话超时，已自动保存并脱离编辑状态");
+        }
+        void reportEditingHeartbeat();
+      }
+      // 2) 轮询他人编辑态（黄锁刷新）。
+      void fetchEditingOthers();
+    }, 3000);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) endAllEditing(); });
+    window.addEventListener("beforeunload", () => { endAllEditing(); });
+    if (!pidWatchStopper) {
+      pidWatchStopper = watch(currentProjectId, (next, prev) => {
+        if (prev && next !== prev && editingLocal.size) {
+          flushEditingProject(prev);
+          editingLocal.clear();
+          void reportEditingHeartbeat(prev); // 用旧项目 pid 释放
+        }
+        lockVersion.value += 1;
+      });
+    }
+  }
   // —— 网站同时在线人数（账号胶囊黄色徽标）：每 60s 身份心跳保活 last_seen + 拉取 online-count（后端按 5 分钟窗口统计）——
   const onlineCount = ref(0);
   let onlineTimer: ReturnType<typeof setInterval> | undefined;
@@ -1732,8 +1892,9 @@ export function useToolbox() {
 
   function scheduleNextPoll(): void {
     if (pollingTimer) clearTimeout(pollingTimer);
-    // 短轮询：前台 1s（聚焦场景多人协同实时性），后台 10s（省调用）。
-    const interval = document.hidden ? 10000 : 1000;
+    // 短轮询间隔可配（系统设置·轮询频率，默认 2s）；后台标签页自动放宽到 10s 省调用。
+    const base = document.hidden ? 10000 : syncSettings.pollMs;
+    const interval = Math.max(500, Math.min(base, 20000));
     pollingTimer = setTimeout(pollOnce, interval);
   }
 
@@ -1964,6 +2125,8 @@ export function useToolbox() {
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
     identityName, identityReady, setIdentity, unlockSiteAdmin, onlineCount, startOnlinePing,
+    syncSettings, persistSettings, sessionId, beginEdit, touchEdit, endEdit, endAllEditing, startEditingSync,
+    isLockedByOther, lockOwnerOf, editingLocal, editingByOthers, lockVersion,
     saveGantt, applyGanttTemplate, openEngTemplateForEdit,
     saveStandaloneTemplate, applyStandaloneTemplate, openStandaloneTemplateForEdit,
   };
