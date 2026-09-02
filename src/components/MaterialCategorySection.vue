@@ -10,8 +10,6 @@ import StandardPicker from "./StandardPicker.vue";
 const props = defineProps<{ store: ToolboxStore; category: string; highlighted?: boolean }>();
 const collapsed = ref(false);
 const cardEl = ref<HTMLElement | null>(null);
-// 记录「正在展开备注行」的物品 id（点 + 展开，输入后 note 非空则保持，清空则收起）
-const noteExpanded = ref<Set<number>>(new Set());
 const barColor = computed(() => sectionHex(props.category));
 const headBg = computed(() => sectionRgba(props.category, 0.5));
 const cardBg = computed(() => sectionRgba(props.category, 0.2));
@@ -52,47 +50,19 @@ function onAutoSize(event: Event): void {
   props.store.persist();
 }
 
-/** 撑高卡片内所有 textarea（初始渲染/数据加载后也要正确换行显示）。 */
+/** 撑高卡片内所有物品 textarea（初始渲染/数据加载后也要正确换行显示）。 */
 function autoSizeAll(): void {
-  for (const el of cardEl.value?.querySelectorAll<HTMLTextAreaElement>(".m-name") || []) {
+  for (const el of cardEl.value?.querySelectorAll<HTMLTextAreaElement>(".itg textarea") || []) {
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }
 }
 onMounted(() => { nextTick(autoSizeAll); });
 
-/** 展开/收起物品备注行。 */
-function toggleNote(it: ToolItem): void {
-  const s = new Set(noteExpanded.value);
-  if (s.has(it.id)) s.delete(it.id);
-  else s.add(it.id);
-  noteExpanded.value = s;
-}
-
-/** 备注输入后持久化；清空则收起备注行。 */
+/** 备注列失焦提交（标记字段级脏，参与合并）。 */
 function commitNote(it: ToolItem): void {
   props.store.markNoteDirty(it);
   props.store.persist();
-  if (!(it.note || "").trim()) {
-    const s = new Set(noteExpanded.value);
-    s.delete(it.id);
-    noteExpanded.value = s;
-  }
-}
-
-/** 删除备注（清空并收起）。 */
-function removeNote(it: ToolItem): void {
-  it.note = "";
-  props.store.markNoteDirty(it);
-  const s = new Set(noteExpanded.value);
-  s.delete(it.id);
-  noteExpanded.value = s;
-  props.store.persist();
-}
-
-/** 物品是否显示备注行（已有备注，或点 + 展开）。 */
-function noteVisible(it: ToolItem): boolean {
-  return Boolean(it.note) || noteExpanded.value.has(it.id);
 }
 
 const catNote = computed({
@@ -177,19 +147,14 @@ async function supplementPart(): Promise<void> {
             <button @click="store.mAddItem(category, sub)">+ 物品</button>
             <button class="danger" @click="deleteSub(sub)">删除</button>
           </header>
-          <div v-if="!collapsedSubs.has(sub)" class="item-grid" :style="{ gridTemplateColumns: 'repeat(2, 1fr)' }">
-            <div v-for="it in store.mItemsOf(category, sub)" :key="it.id" class="m-item" :class="{ 'flash-update': store.isFlashing(it) }">
-              <label class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.partNo" v-lock="lock(it, 'partNo')" @input="onAutoSize" class="m-name m-partno"></textarea></label>
-              <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" @input="onAutoSize" class="m-name"></textarea></label>
-              <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" @input="store.persist" /></label>
-              <div class="m-ops">
-                <button class="m-op m-op-del" title="删除" @click="store.mDeleteItem(it.id)">×</button>
-                <button class="m-op" :title="it.note ? '编辑备注' : '添加备注'" @click="toggleNote(it)">+</button>
-              </div>
-              <div v-if="noteVisible(it)" class="m-note-row">
-                <label class="m-field"><span>备注</span><textarea rows="1" v-model="it.note" v-lock="lock(it, 'note')" placeholder="输入备注" @input="onAutoSize" @blur="commitNote(it)" class="m-name"></textarea></label>
-                <button class="m-op m-op-del" title="删除备注" @click="removeNote(it)">×</button>
-              </div>
+          <div v-if="!collapsedSubs.has(sub)" class="itg" style="grid-template-columns: 1.1fr 2fr 0.6fr 2.2fr auto">
+            <div class="itg-head"><span>件号</span><span>名称</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
+            <div v-for="it in store.mItemsOf(category, sub)" :key="it.id" class="itg-row" :class="{ 'flash-update': store.isFlashing(it) }">
+              <textarea rows="1" v-model="it.partNo" v-lock="lock(it, 'partNo')" placeholder="件号" @input="onAutoSize"></textarea>
+              <textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" placeholder="名称" @input="onAutoSize"></textarea>
+              <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+              <textarea rows="1" class="itg-note-input" v-model="it.note" v-lock="lock(it, 'note')" placeholder="备注" @input="onAutoSize" @blur="commitNote(it)"></textarea>
+              <div class="itg-ops"><button class="del" title="删除物品" @click="store.mDeleteItem(it.id)">×</button></div>
             </div>
           </div>
         </section>

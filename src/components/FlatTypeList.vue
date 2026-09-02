@@ -95,32 +95,10 @@ function removeItem(it: ToolItem): void {
   else props.store.mDeleteItem(it.id);
 }
 
-// —— 备注展开 ——
-const noteExpanded = ref<Set<number>>(new Set());
-function toggleNote(it: ToolItem): void {
-  const s = new Set(noteExpanded.value);
-  if (s.has(it.id)) s.delete(it.id); else s.add(it.id);
-  noteExpanded.value = s;
-}
+// —— 备注列失焦提交（标记字段级脏，参与合并）——
 function commitNote(it: ToolItem): void {
   props.store.markNoteDirty(it);
   props.store.persist();
-  if (!(it.note || "").trim()) {
-    const s = new Set(noteExpanded.value);
-    s.delete(it.id);
-    noteExpanded.value = s;
-  }
-}
-function removeNote(it: ToolItem): void {
-  it.note = "";
-  props.store.markNoteDirty(it);
-  const s = new Set(noteExpanded.value);
-  s.delete(it.id);
-  noteExpanded.value = s;
-  props.store.persist();
-}
-function noteVisible(it: ToolItem): boolean {
-  return Boolean(it.note) || noteExpanded.value.has(it.id);
 }
 
 /** 文本区自动撑高（对齐换发 pt 卡 onPartAutoSize）。 */
@@ -155,33 +133,20 @@ function autoGrow(event: Event): void {
           <button class="icon-btn" :title="'删除类型：' + card.sub" @click="deleteType(card.sub)">×</button>
         </div>
         <template v-if="isOpen(card.sub)">
-          <div v-if="card.its.length" class="pt-items" :class="{ 'ft-items-tool': isTool, 'ft-items-air': !isTool }">
-            <!-- 航材行：件号/名称/数量/×/+备注（对齐换发串件航材 pt-item-air） -->
-            <div v-if="!isTool" v-for="it in card.its" :key="it.id" class="pt-item pt-item-air">
-              <label class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.partNo" v-lock="lock(it, 'partNo')" class="m-name" @input="autoGrow"></textarea></label>
-              <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" class="m-name" @input="autoGrow"></textarea></label>
-              <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" @input="store.persist" /></label>
-              <div class="m-ops">
-                <button class="m-op m-op-del" title="删除物品" @click="removeItem(it)">×</button>
-                <button class="m-op" :title="it.note ? '编辑备注' : '添加备注'" @click="toggleNote(it)">+</button>
-              </div>
-              <div v-if="noteVisible(it)" class="pt-note-row">
-                <textarea v-model="it.note" v-lock="lock(it, 'note')" class="pt-note" placeholder="备注" rows="1" @input="autoGrow" @blur="commitNote(it)"></textarea>
-                <button class="m-op m-op-del ft-note-del" title="删除备注" @click="removeNote(it)">×</button>
-              </div>
+          <!-- 物品表：行间水平实线、列间垂直虚线；字段名以 placeholder 呈现（维持卡片框架与配色） -->
+          <div v-if="card.its.length" class="itg" :style="{ gridTemplateColumns: isTool ? '2fr 0.6fr 2.2fr auto' : '1.1fr 2fr 0.6fr 2.2fr auto' }">
+            <div class="itg-head">
+              <template v-if="!isTool"><span>件号</span></template>
+              <span>名称</span><span>数量</span><span class="itg-note-cell">备注</span><span></span>
             </div>
-            <!-- 工具行：名称/数量/×/+备注（对齐换发串件工具 pt-item-tool） -->
-            <div v-else v-for="it in card.its" :key="it.id" class="pt-item pt-item-tool">
-              <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" class="m-name" @input="autoGrow"></textarea></label>
-              <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" @input="store.persist" /></label>
-              <div class="m-ops">
-                <button class="m-op m-op-del" title="删除物品" @click="removeItem(it)">×</button>
-                <button class="m-op" :title="it.note ? '编辑备注' : '添加备注'" @click="toggleNote(it)">+</button>
-              </div>
-              <div v-if="noteVisible(it)" class="pt-note-row">
-                <textarea v-model="it.note" v-lock="lock(it, 'note')" class="pt-note" placeholder="备注" rows="1" @input="autoGrow" @blur="commitNote(it)"></textarea>
-                <button class="m-op m-op-del ft-note-del" title="删除备注" @click="removeNote(it)">×</button>
-              </div>
+            <div v-for="it in card.its" :key="it.id" class="itg-row">
+              <template v-if="!isTool">
+                <textarea rows="1" v-model="it.partNo" v-lock="lock(it, 'partNo')" placeholder="件号" @input="autoGrow"></textarea>
+              </template>
+              <textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" placeholder="名称" @input="autoGrow"></textarea>
+              <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+              <textarea rows="1" class="itg-note-input" v-model="it.note" v-lock="lock(it, 'note')" placeholder="备注" @input="autoGrow" @blur="commitNote(it)"></textarea>
+              <div class="itg-ops"><button class="del" title="删除物品" @click="removeItem(it)">×</button></div>
             </div>
           </div>
           <div v-else class="pt-empty">暂无物品 — 点击「+ 增加物品」</div>

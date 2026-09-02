@@ -479,11 +479,14 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <strong>{{ g.key }}</strong>
                 <span class="tool-dedupe-count">× {{ g.items.length }}</span>
               </header>
-              <div v-for="it in g.items" :key="it.id" class="tool-dedupe-row">
-                <span class="tool-dedupe-type" :title="it.cat">{{ it.sub || "固定" }}</span>
-                <input v-model.number="it.qty" type="number" min="0" class="tool-dedupe-qty" aria-label="数量" @input="store.persist" />
-                <button class="tool-dedupe-del" title="删除该工具" @click="store.deleteItem(it.id)">×</button>
-                <textarea v-model="it.note" rows="1" class="tool-dedupe-note" placeholder="备注" @input="onToolDedupeNote(it)"></textarea>
+              <div class="itg" style="grid-template-columns: 1.4fr 0.6fr 2.2fr auto">
+                <div class="itg-head"><span>类型</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
+                <div v-for="it in g.items" :key="it.id" class="itg-row">
+                  <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
+                  <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
+                  <textarea v-model="it.note" rows="1" class="itg-note-input" placeholder="备注" @input="onToolDedupeNote(it)"></textarea>
+                  <div class="itg-ops"><button class="del" title="删除该工具" @click="store.deleteItem(it.id)">×</button></div>
+                </div>
               </div>
             </div>
             <div v-if="!toolDuplicates.length" class="empty-state">暂无重复工具。</div>
@@ -495,11 +498,14 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <strong>{{ g.key }}</strong>
                 <span class="tool-dedupe-count">× 1</span>
               </header>
-              <div v-for="it in g.items" :key="it.id" class="tool-dedupe-row">
-                <span class="tool-dedupe-type" :title="it.cat">{{ it.sub || "固定" }}</span>
-                <input v-model.number="it.qty" type="number" min="0" class="tool-dedupe-qty" aria-label="数量" @input="store.persist" />
-                <button class="tool-dedupe-del" title="删除该工具" @click="store.deleteItem(it.id)">×</button>
-                <textarea v-model="it.note" rows="1" class="tool-dedupe-note" placeholder="备注" @input="onToolDedupeNote(it)"></textarea>
+              <div class="itg" style="grid-template-columns: 1.4fr 0.6fr 2.2fr auto">
+                <div class="itg-head"><span>类型</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
+                <div v-for="it in g.items" :key="it.id" class="itg-row">
+                  <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
+                  <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
+                  <textarea v-model="it.note" rows="1" class="itg-note-input" placeholder="备注" @input="onToolDedupeNote(it)"></textarea>
+                  <div class="itg-ops"><button class="del" title="删除该工具" @click="store.deleteItem(it.id)">×</button></div>
+                </div>
               </div>
             </div>
             <div v-if="!toolSingles.length" class="empty-state">暂无单件工具。</div>

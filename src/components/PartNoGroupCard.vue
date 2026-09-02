@@ -32,11 +32,14 @@ function subLabel(it: ToolItem): string {
       <span class="pnc-count">×{{ items.length }}</span>
     </header>
     <div class="pnc-body">
-      <div v-for="it in items" :key="it.id" class="pnc-item">
-        <span class="pnc-type">{{ subLabel(it) }}</span>
-        <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" class="pnc-qty" aria-label="数量" @input="store.persist" />
-        <button class="pnc-del" title="删除" @click="remove(it)">×</button>
-        <textarea v-model="it.note" v-lock="lock(it, 'note')" class="pnc-note" rows="1" placeholder="备注" @input="commitNote(it)" />
+      <div class="itg" style="grid-template-columns: 1.4fr 0.6fr 2.2fr auto">
+        <div class="itg-head"><span>类型</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
+        <div v-for="it in items" :key="it.id" class="itg-row">
+          <span class="itg-tag">{{ subLabel(it) }}</span>
+          <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+          <textarea v-model="it.note" v-lock="lock(it, 'note')" rows="1" class="itg-note-input" placeholder="备注" @input="commitNote(it)" />
+          <div class="itg-ops"><button class="del" title="删除" @click="remove(it)">×</button></div>
+        </div>
       </div>
     </div>
   </article>

@@ -325,3 +325,49 @@ input.remote-locked {
   background-color: #FFF176 !important;
   color: #000 !important;
 }
+
+/* ===== 物品清单表格化（航材/工具清单物品行 + 重复梳理行通用）=====
+ * 用法：.itg 作为网格容器（内联/类设 grid-template-columns），
+ *  首行 .itg-head 表头，其后每个 .itg-row 为一行（display:contents 保持网格对齐）。
+ *  行间水平实线（border-bottom）、列间垂直虚线（border-left）；输入去边框，字段名用 placeholder。 */
+.itg { display: grid; width: 100%; margin-top: 4px; }
+.itg .itg-head, .itg .itg-row { display: contents; }
+.itg .itg-head > * {
+  padding: 6px 8px; font-size: var(--fs-12, 12px); color: var(--n6); font-weight: 600;
+  background: #f6f8fc; border-bottom: 2px solid var(--n4); border-left: 1px dashed var(--n3);
+}
+.itg .itg-head > *:first-child { border-left: none; }
+.itg .itg-row > * {
+  padding: 3px 8px; min-width: 0; border-bottom: 1px solid var(--n4);
+  border-left: 1px dashed var(--n3); display: flex; align-items: center;
+}
+.itg .itg-row > *:first-child { border-left: none; }
+.itg .itg-row:last-child > * { border-bottom: none; }
+.itg .itg-row:hover > * { background: var(--blue-light, #eaf1fa); }
+.itg input, .itg textarea {
+  width: 100%; border: 1px solid transparent; background: transparent;
+  font: inherit; font-size: var(--fs-13, 13px); line-height: 1.4; color: inherit;
+  padding: 5px 2px; border-radius: 0; outline: none; resize: none; font-family: inherit; min-height: 30px;
+}
+.itg textarea { overflow: hidden; }
+.itg input[type="number"] { text-align: center; }
+.itg input:focus, .itg textarea:focus {
+  background: var(--n0); border: 1px solid var(--focus); border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(91, 141, 217, .16);
+}
+.itg input::placeholder, .itg textarea::placeholder { color: var(--n6); }
+.itg .itg-tag {
+  font-size: var(--fs-12, 12px); color: var(--n7); background: #eef2f8; border-radius: 4px;
+  padding: 2px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.itg .itg-ops { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 3px 6px; }
+.itg .itg-ops button {
+  border: 1px solid var(--line); background: var(--n0); border-radius: 4px; cursor: pointer;
+  line-height: 1; padding: 4px 0; color: var(--n7); font-size: var(--fs-13, 13px);
+}
+.itg .itg-ops button:hover { background: var(--blue-light, #eaf1fa); }
+.itg .itg-ops button.del { border-color: #f2cdcd; background: #fdecec; color: var(--danger); }
+.itg .itg-ops button.del:hover { background: #f9dcdc; }
+@media (max-width: 768px) {
+  .itg .itg-head > *, .itg .itg-row > * { padding-left: 4px; padding-right: 4px; }
+}

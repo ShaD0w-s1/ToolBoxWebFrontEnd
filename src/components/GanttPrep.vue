@@ -647,14 +647,7 @@ function clearGanttAll(): void {
 function onPartTabEnter(): void {
   syncPartCardsFromCharts(partKind.value);
   partSearch.value = "";
-  // 备注有数据的物品自动展开备注行（保留用户手动展开的空备注状态）
-  const s = state.value;
-  const list = (s && (tab.value === "airparts" ? s.airParts : s.toolParts)) || [];
-  const auto = new Set<string>();
-  list.forEach((c) => (c.items || []).forEach((it) => { if (it.note && String(it.note).trim()) auto.add(it.id); }));
-  const prev = expandedNotes.value;
-  auto.forEach((id) => prev.add(id));
-  expandedNotes.value = new Set(prev);
+  // 备注已为常显列，无需自动展开逻辑
   autoSizeAllParts();
 }
 // ===== 清单卡片搜索（AutoComplete：卡片名/件号/名称候选）+ 卡片折叠 =====
@@ -715,7 +708,7 @@ function onPartAutoSize(event: Event): void {
 }
 function autoSizeAllParts(): void {
   nextTick(() => {
-    document.querySelectorAll<HTMLTextAreaElement>(".pt-item .m-name").forEach((el) => {
+    document.querySelectorAll<HTMLTextAreaElement>(".pt-card .itg textarea").forEach((el) => {
       el.style.height = "auto";
       el.style.height = `${el.scrollHeight}px`;
     });
@@ -1286,14 +1279,6 @@ async function renameTemplate(t: { _id: string; name: string; state: GanttPrepSt
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "模板改名失败", "err");
   }
-}
-
-// ===== 物品备注 toggle（收起/展开） =====
-const expandedNotes = ref<Set<string>>(new Set());
-function toggleNote(id: string): void {
-  const n = new Set(expandedNotes.value);
-  if (n.has(id)) n.delete(id); else n.add(id);
-  expandedNotes.value = n;
 }
 
 // ===== 填空框上传中动画：输入后（防抖+异步上传未完成）在框上叠加灰蒙 + "……" =====
@@ -2396,11 +2381,14 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <span class="pnc-count">×{{ g.rows.length }}</span>
                   </header>
                   <div class="pnc-body">
-                    <div v-for="row in g.rows" :key="row.item.id" class="pnc-item">
-                      <span class="pnc-type" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
-                      <input v-model.number="row.item.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
-                      <button class="pnc-del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button>
-                      <textarea v-model="row.item.note" rows="1" class="pnc-note" placeholder="备注" @input="save" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
+                    <div class="itg" style="grid-template-columns: 1.4fr 0.6fr 2.2fr auto">
+                      <div class="itg-head"><span>卡片</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
+                      <div v-for="row in g.rows" :key="row.item.id" class="itg-row">
+                        <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
+                        <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
+                        <textarea rows="1" class="itg-note-input" v-model="row.item.note" placeholder="备注" @input="save" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
+                        <div class="itg-ops"><button class="del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button></div>
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -2417,11 +2405,14 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <span class="pnc-count">×1</span>
                   </header>
                   <div class="pnc-body">
-                    <div v-for="row in g.rows" :key="row.item.id" class="pnc-item">
-                      <span class="pnc-type" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
-                      <input v-model.number="row.item.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
-                      <button class="pnc-del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button>
-                      <textarea v-model="row.item.note" rows="1" class="pnc-note" placeholder="备注" @input="save" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
+                    <div class="itg" style="grid-template-columns: 1.4fr 0.6fr 2.2fr auto">
+                      <div class="itg-head"><span>卡片</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
+                      <div v-for="row in g.rows" :key="row.item.id" class="itg-row">
+                        <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
+                        <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
+                        <textarea rows="1" class="itg-note-input" v-model="row.item.note" placeholder="备注" @input="save" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
+                        <div class="itg-ops"><button class="del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button></div>
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -2438,19 +2429,22 @@ async function importAllXlsx(event: Event): Promise<void> {
               <button class="icon-btn" @click="removePartList(partKind, card.id)">×</button>
             </div>
             <template v-if="!collapsedCards.has(card.id)">
-            <div class="pt-items">
-              <div v-for="it in card.items" :key="it.id" class="pt-item" :class="{ 'pt-item-air': tab === 'airparts', 'pt-item-tool': tab === 'tools' }">
-                <label v-if="tab === 'airparts'" class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.pn" class="m-name" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'pn')"></textarea></label>
-                <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" class="m-name" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'name')"></textarea></label>
-                <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" type="number" min="0" @input="save" v-lock="lockKey('partitem', it.id, 'qty')" /></label>
-                <div class="m-ops">
-                  <button class="m-op m-op-del" title="删除物品" @click="removePartItem(partKind, card.id, it.id)">×</button>
-                  <button class="m-op" :title="expandedNotes.has(it.id) ? '收起备注' : '添加备注'" @click="toggleNote(it.id)">+</button>
-                </div>
-                <div v-if="expandedNotes.has(it.id)" class="pt-note-row"><textarea v-model="it.note" class="pt-note" placeholder="备注" @input="save" v-lock="lockKey('partitem', it.id, 'note')"></textarea></div>
+            <div v-if="card.items.length" class="itg" :style="{ gridTemplateColumns: tab === 'airparts' ? '1.2fr 2fr 0.6fr 2.2fr auto' : '2fr 0.6fr 2.2fr auto' }">
+              <div class="itg-head">
+                <template v-if="tab === 'airparts'"><span>件号</span></template>
+                <span>名称</span><span>数量</span><span class="itg-note-cell">备注</span><span></span>
               </div>
-              <div v-if="!card.items.length" class="pt-empty">暂无物品 — 点击「+ 增加物品」</div>
+              <div v-for="it in card.items" :key="it.id" class="itg-row">
+                <template v-if="tab === 'airparts'">
+                  <textarea rows="1" v-model="it.pn" placeholder="件号" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'pn')"></textarea>
+                </template>
+                <textarea rows="1" v-model="it.name" placeholder="名称" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'name')"></textarea>
+                <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', it.id, 'qty')" />
+                <textarea rows="1" class="itg-note-input" v-model="it.note" placeholder="备注" @input="onPartAutoSize" @blur="save" v-lock="lockKey('partitem', it.id, 'note')"></textarea>
+                <div class="itg-ops"><button class="del" title="删除物品" @click="removePartItem(partKind, card.id, it.id)">×</button></div>
+              </div>
             </div>
+            <div v-else class="pt-empty">暂无物品 — 点击「+ 增加物品」</div>
             <button class="gp-add" @click="addPartItem(partKind, card.id)">+ 增加物品</button>
             </template>
           </section>
