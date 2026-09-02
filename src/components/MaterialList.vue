@@ -13,6 +13,8 @@ const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
 
 const captureRef = ref<HTMLElement | null>(null);
 const isLibrary = computed(() => Boolean(props.store.editingMaterialLibrary.value));
+// 单独项目类：航材清单与标准库脱钩 → 添加部位下拉不再提供「从航材标准库带入」选项。
+const isStandalone = computed(() => props.store.currentProject.value?.type === "单独项目");
 const title = computed(() => isLibrary.value ? `${props.store.editingMaterialLibrary.value} 航材标准库` : "航材清单");
 const state = computed(() => props.store.materialActive.value);
 const cats = computed(() => props.store.materialCategories.value);
@@ -88,9 +90,11 @@ const addOptions = computed<Array<{ value: string; label: string }>>(() => {
   for (const c of cats.value) {
     if (!shown.has(c)) opts.push({ value: `__SHOW__::${c}`, label: `显示：${c}` });
   }
-  // 标准库里尚未加入的部位 → 添加并带入数据
-  for (const c of props.store.standardMaterialCategories.value) {
-    if (!cats.value.includes(c)) opts.push({ value: c, label: c });
+  // 标准库里尚未加入的部位 → 添加并带入数据（单独项目已与标准库脱钩，不提供带入）
+  if (!isStandalone.value) {
+    for (const c of props.store.standardMaterialCategories.value) {
+      if (!cats.value.includes(c)) opts.push({ value: c, label: c });
+    }
   }
   return opts;
 });
@@ -105,8 +109,8 @@ function onAddCategory(event: Event): void {
     const name = value.slice("__SHOW__::".length);
     if (name && !revealed.value.includes(name)) revealed.value.push(name);
   } else if (value) {
-    // 从航材标准库添加该部位（带入其全部类型与物品）
-    props.store.mAddCategoryFromStandard(value);
+    // 从航材标准库添加该部位（带入其全部类型与物品）；单独项目已脱钩，忽略标准库名直选。
+    if (!isStandalone.value) props.store.mAddCategoryFromStandard(value);
     if (!revealed.value.includes(value)) revealed.value.push(value);
   }
   addCatValue.value = "";

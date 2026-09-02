@@ -1,4 +1,4 @@
-import type { GanttPrepState, ProjectPayload, SectionPayload, StandalonePrepSheet } from "./domain/toolbox";
+import type { GanttPrepState, ProjectPayload, SectionPayload, StandaloneTemplateState } from "./domain/toolbox";
 
 const configuredBase = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const apiBase = configuredBase.replace(/\/$/, "");
@@ -136,10 +136,10 @@ export const backend = {
   duplicateEngTemplate: (id: string) =>
     request<ApiEnvelope<Record<string, unknown>>>(`/api/eng-templates/${encodeURIComponent(id)}/duplicate/`, { method: "POST" }),
   listStandaloneTemplates: () =>
-    request<ApiEnvelope<Array<{ _id: string; id: string; name: string; savedAt: string; state: StandalonePrepSheet }>>>("/api/standalone-templates/"),
-  createStandaloneTemplate: (payload: { name: string; state: StandalonePrepSheet }) =>
+    request<ApiEnvelope<Array<{ _id: string; id: string; name: string; savedAt: string; state: StandaloneTemplateState }>>>("/api/standalone-templates/"),
+  createStandaloneTemplate: (payload: { name: string; state: StandaloneTemplateState }) =>
     request<ApiEnvelope<Record<string, unknown>>>("/api/standalone-templates/", { method: "POST", body: payload }),
-  updateStandaloneTemplate: (id: string, payload: { name: string; state: StandalonePrepSheet }) =>
+  updateStandaloneTemplate: (id: string, payload: { name: string; state: StandaloneTemplateState }) =>
     request<ApiEnvelope>(`/api/standalone-templates/${encodeURIComponent(id)}/`, { method: "PUT", body: payload }),
   deleteStandaloneTemplate: (id: string) =>
     request<ApiEnvelope>(`/api/standalone-templates/${encodeURIComponent(id)}/`, { method: "DELETE" }),

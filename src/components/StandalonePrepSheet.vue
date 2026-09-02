@@ -2,7 +2,8 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { backend } from "../api";
-import type { StandalonePrepSheet } from "../domain/toolbox";
+import type { StandaloneTemplateState } from "../domain/toolbox";
+import { normalizeStandaloneTemplateState } from "../domain/toolbox";
 import { exportStandalonePrep } from "../services/spreadsheet";
 import { exportFileName } from "../utils/format";
 import { growTextarea, growAllTextareas } from "../utils/dom";
@@ -55,7 +56,7 @@ function exportTableXlsx(): void {
 // ===== 单项工作模板（调取/保存双模式，与换发/APU 二级页一致：调取仅加载；保存=新模板+覆盖/改名/删除） =====
 const showTplModal = ref(false);
 const tplMode = ref<"load" | "save">("load");
-const templates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: StandalonePrepSheet }>>([]);
+const templates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: StandaloneTemplateState }>>([]);
 const templatesLoading = ref(false);
 const saveTplName = ref("");
 const saveTplInputRef = ref<HTMLInputElement | null>(null);
@@ -65,7 +66,7 @@ async function openTplModal(mode: "load" | "save" = tplMode.value): Promise<void
   templatesLoading.value = true;
   try {
     const res = await backend.listStandaloneTemplates();
-    templates.value = (Array.isArray(res.data) ? res.data : []).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+    templates.value = (Array.isArray(res.data) ? res.data : []).map((d) => ({ ...d, state: normalizeStandaloneTemplateState(d.state) })).slice().sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "模板加载失败", "err");
   } finally {
@@ -73,9 +74,10 @@ async function openTplModal(mode: "load" | "save" = tplMode.value): Promise<void
     if (mode === "save") nextTick(() => saveTplInputRef.value?.focus());
   }
 }
-function applyTemplate(t: { name: string; state: StandalonePrepSheet }): void {
+function applyTemplate(t: { name: string; state: StandaloneTemplateState }): void {
   if (!sheet.value) return;
-  if (!window.confirm(`确认加载模板“${t.name}”？将覆盖当前单项准备单内容（保留基础信息）。`)) return;
+  const hasLists = Boolean(t.state.material || t.state.tools);
+  if (!window.confirm(`确认调取模板“${t.name}”？将整体替换当前单项准备单内容${hasLists ? "（含航材/工具清单）" : ""}（保留基础信息）。`)) return;
   props.store.applyStandaloneTemplate(t.state);
   showTplModal.value = false;
 }
@@ -88,7 +90,7 @@ async function saveAsTemplate(): Promise<void> {
 }
 async function overwriteTemplate(t: { _id: string; name: string }): Promise<void> {
   if (!sheet.value) return;
-  if (!window.confirm(`确认覆盖模板“${t.name}”？当前单项准备单内容将写入该模板。`)) return;
+  if (!window.confirm(`确认覆盖模板“${t.name}”？当前准备单及航材/工具清单内容将写入该模板。`)) return;
   const id = await props.store.saveStandaloneTemplate(t.name, t._id);
   if (id) await openTplModal(tplMode.value);
 }
@@ -102,7 +104,7 @@ async function deleteTemplate(t: { _id: string; name: string }): Promise<void> {
     props.store.notify(e instanceof Error ? e.message : "模板删除失败", "err");
   }
 }
-async function renameTemplate(t: { _id: string; name: string; state: StandalonePrepSheet }): Promise<void> {
+async function renameTemplate(t: { _id: string; name: string; state: StandaloneTemplateState }): Promise<void> {
   const name = window.prompt("请输入新模板名称", t.name)?.trim();
   if (!name || name === t.name) return;
   try {
@@ -329,7 +331,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
         <p v-if="templatesLoading" class="loading-state">加载中…</p>
         <template v-else-if="templates.length">
           <div v-for="t in templates" :key="t._id" class="tpl-row">
-            <div class="tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>工序 {{ (t.state.processGroups || []).length }} 组 · 签署 {{ (t.state.signingRows || []).length }} 行</span></div>
+            <div class="tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>工序 {{ (t.state.prep.processGroups || []).length }} 组 · 签署 {{ (t.state.prep.signingRows || []).length }} 行{{ t.state.material || t.state.tools ? ' · 带清单' : '' }}</span></div>
             <div class="tpl-actions">
               <button v-if="tplMode === 'load'" class="ghost" @click="applyTemplate(t)">加载</button>
               <template v-else>

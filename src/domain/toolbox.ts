@@ -294,6 +294,27 @@ export interface ToolState {
   aircraftType: AircraftType;
 }
 
+/** 「单项工作模板」内容载荷：仿照换发/APU 模板保存整套甘特 state，
+ *  单独项目模板除准备单外同时快照 航材清单(materialList) 与 工具清单(project.data)。
+ *  旧版模板（仅存 StandalonePrepSheet）在读取时归一化为 { prep, material:null, tools:null }。 */
+export interface StandaloneTemplateState {
+  prep: StandalonePrepSheet;
+  /** 航材清单快照（project.materialList）；旧模板为 null（不替换当前清单）。 */
+  material: ToolState | null;
+  /** 工具清单快照（project.data）；旧模板为 null（不替换当前清单）。 */
+  tools: ToolState | null;
+}
+
+/** 兼容旧「单项工作模板」：旧模板 doc.state 直接是 StandalonePrepSheet（含 processGroups），
+ *  新模板 doc.state 是 { prep, material, tools }。 */
+export function normalizeStandaloneTemplateState(raw: unknown): StandaloneTemplateState {
+  const o = (raw || {}) as { prep?: StandalonePrepSheet; material?: ToolState | null; tools?: ToolState | null };
+  if (o.prep && Array.isArray((o.prep as { processGroups?: unknown }).processGroups)) {
+    return { prep: o.prep, material: o.material ?? null, tools: o.tools ?? null };
+  }
+  return { prep: raw as StandalonePrepSheet, material: null, tools: null };
+}
+
 export interface ToolCartItem {
   name: string;
   qty: number;

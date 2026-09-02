@@ -314,3 +314,14 @@ td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 协同编辑软锁：他人正在编辑 → 亮黄底 + 禁用（跨组件通用，供 v-lock 指令 toggle 的 .remote-locked 使用）。 */
+.remote-locked,
+.remote-locked textarea,
+.remote-locked input,
+.remote-locked select,
+textarea.remote-locked,
+input.remote-locked {
+  background-color: #FFF176 !important;
+  color: #000 !important;
+}

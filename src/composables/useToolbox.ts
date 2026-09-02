@@ -36,6 +36,7 @@ import {
   type ProjectType,
   type SectionPayload,
   type StandalonePrepSheet,
+  type StandaloneTemplateState,
   type StandardLib,
   type StandardLibKey,
   type StandardLibRow,
@@ -171,7 +172,6 @@ export function useToolbox() {
   const editingByOthers = reactive(new Map<string, string>());
   // 他人编辑快照刷新计数：UI 组件绑定时读取它触发重渲染（disabled/class 跟随黄锁）。
   const lockVersion = ref(0);
-  let lastEditingFetchAt = 0;
   let editingTimer: ReturnType<typeof setInterval> | undefined;
   let editingKeepalive: ReturnType<typeof setInterval> | undefined;
   let lastReportedSnapshot = ""; // 上次成功上报的 key 快照，仅变化时上报（事件驱动，无节流）
@@ -188,13 +188,10 @@ export function useToolbox() {
       if (!pidOverride) lastReportedSnapshot = key;
     } catch { /* 上报失败忽略（下次变化或保活重试） */ }
   }
-  /** 拉取他人编辑会话（前端 ~4s 一次，仅当前打开某项目时）。 */
+  /** 拉取他人编辑会话（前台每 1s 一次，仅当前打开某项目时；后台标签页由 startEditingSync 跳过）。 */
   async function fetchEditingOthers(): Promise<void> {
     const pid = currentProjectId.value;
-    if (!pid) return;
-    const now = Date.now();
-    if (now - lastEditingFetchAt < 4000) return;
-    lastEditingFetchAt = now;
+    if (!pid || document.hidden) return;
     try {
       const res = await backend.listEditing(pid, sessionId);
       const data = (res as { data?: unknown }).data;
@@ -297,9 +294,9 @@ export function useToolbox() {
         clearInterval(editingKeepalive);
         editingKeepalive = undefined;
       }
-      // 3) 轮询他人编辑态（黄锁刷新）。
-      void fetchEditingOthers();
     }, 3000);
+    // 3) 他人编辑态拉取：独立 1s 前台定时器（黄锁实时性；后台标签页已 endAllEditing，跳过省流量）。
+    setInterval(() => { void fetchEditingOthers(); }, 1000);
     document.addEventListener("visibilitychange", () => { if (document.hidden) endAllEditing(); });
     window.addEventListener("beforeunload", () => { endAllEditing(); });
     if (!pidWatchStopper) {
@@ -2047,15 +2044,18 @@ export function useToolbox() {
       : `已用模板「${name}」创建项目，请完善内容`);
   }
 
-  /** 模板库入口：新建单独项目预载模板内容。mode="edit" 打开模板编辑页（改完「保存模板 → 覆盖」写回）；mode="apply" 用模板创建实际项目。 */
-  async function openStandaloneTemplateForEdit(name: string, state: StandalonePrepSheet, mode: "edit" | "apply" = "edit"): Promise<void> {
+  /** 模板库入口：新建单独项目预载模板内容（准备单 + 航材清单 + 工具清单）。
+   *  mode="edit" 打开模板编辑页（改完「保存模板 → 覆盖」写回）；mode="apply" 用模板创建实际项目。 */
+  async function openStandaloneTemplateForEdit(name: string, state: StandaloneTemplateState, mode: "edit" | "apply" = "edit"): Promise<void> {
     await createProject(name, "A320", "单独项目");
     const project = currentProject.value;
     if (!project) return;
     // mode="edit"：临时项目记录，关闭子页（backToList）自动删除、不保存
     editingTemplateProjectId.value = mode === "edit" ? project.id : null;
-    project.standalonePrepSheet = deepCopy(state);
+    project.standalonePrepSheet = deepCopy(state.prep) as StandalonePrepSheet;
     markField("standalonePrepSheet");
+    if (state.material) { project.materialList = deepCopy(state.material) as ToolState; markField("materialList"); }
+    if (state.tools) { project.data = deepCopy(state.tools) as ToolState; markField("data"); }
     persist();
     notify(mode === "edit"
       ? `已打开模板编辑页「${name}」，修改后点「保存模板 → 覆盖」写回模板`
@@ -2077,12 +2077,18 @@ export function useToolbox() {
     return copy;
   }
 
-  /** 把当前项目的单项准备单保存为「单项工作模板」（不含 base 基础信息、不含人员姓名等。
+  /** 把当前项目的单项工作准备单 + 航材/工具清单保存为「单项工作模板」。
+   *  不含 base 基础信息、不含人员姓名；清单为空时置 null（旧模板仅含准备单）。
    *  传 templateId 时覆盖已有模板；返回模板 _id 供后续覆盖保存用。 */
   async function saveStandaloneTemplate(name: string, templateId?: string): Promise<string | null> {
     const p = currentProject.value; if (!p) return null;
-    const snapshot = stripNamesFromStandalone(p.standalonePrepSheet);
-    snapshot.base = defaultStandalonePrepSheet().base;
+    const emptyList = (s?: ToolState | null): boolean => !s || ((s.categories?.length ?? 0) === 0 && (s.items?.length ?? 0) === 0);
+    const snapshot: StandaloneTemplateState = {
+      prep: stripNamesFromStandalone(p.standalonePrepSheet),
+      material: emptyList(p.materialList) ? null : deepCopy(p.materialList),
+      tools: emptyList(p.data) ? null : deepCopy(p.data),
+    };
+    snapshot.prep.base = defaultStandalonePrepSheet().base;
     try {
       if (templateId) {
         await backend.updateStandaloneTemplate(templateId, { name, state: snapshot });
@@ -2099,16 +2105,20 @@ export function useToolbox() {
     }
   }
 
-  /** 把「单项工作模板」灌入当前项目的单项准备单：深拷贝、保留当前项目 base、重算 nextId 防 id 冲突。 */
-  function applyStandaloneTemplate(state: StandalonePrepSheet): void {
+  /** 把「单项工作模板」灌入当前项目：准备单（保留当前 base）+ 航材/工具清单整体替换（若模板带清单）。
+   *  深拷贝、重算 nextId 防 id 冲突。 */
+  function applyStandaloneTemplate(state: StandaloneTemplateState): void {
     const p = currentProject.value; if (!p) return;
-    const snapshot = deepCopy(state) as StandalonePrepSheet;
-    if (p.standalonePrepSheet?.base) snapshot.base = p.standalonePrepSheet.base;
-    p.standalonePrepSheet = snapshot;
+    const prep = deepCopy(state.prep) as StandalonePrepSheet;
+    if (p.standalonePrepSheet?.base) prep.base = p.standalonePrepSheet.base;
+    p.standalonePrepSheet = prep;
     markField("standalonePrepSheet");
+    if (state.material) { p.materialList = deepCopy(state.material) as ToolState; markField("materialList"); }
+    if (state.tools) { p.data = deepCopy(state.tools) as ToolState; markField("data"); }
     computeNextId();
     persist();
-    notify("已加载模板");
+    const extra = [state.material ? "航材清单" : "", state.tools ? "工具清单" : ""].filter(Boolean);
+    notify(extra.length ? `已加载模板（含${extra.join("、")}）` : "已加载模板");
   }
 
   return {

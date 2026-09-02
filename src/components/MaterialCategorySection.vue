@@ -3,6 +3,8 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { sectionHex, sectionRgba } from "../utils/sectionColor";
 import type { ToolItem } from "../domain/toolbox";
+import { itemKey } from "../domain/toolbox";
+import { createEditLockDirective } from "../utils/editLock";
 import StandardPicker from "./StandardPicker.vue";
 
 const props = defineProps<{ store: ToolboxStore; category: string; highlighted?: boolean }>();
@@ -29,6 +31,13 @@ const showBody = computed(() => {
   return !collapsed.value || props.store.forceExpandAll.value;
 });
 const isLibrary = computed(() => Boolean(props.store.editingMaterialLibrary.value));
+// 单独项目类：航材清单与标准库脱钩（不再整体替换导入 / 隐藏标准库类型替换下拉 / 添加部位不再从库带入）。
+const isStandalone = computed(() => props.store.currentProject.value?.type === "单独项目");
+/** 物品行软锁 key（项目模式 materialList；库模式空串=不锁）。 */
+const vLock = createEditLockDirective(props.store);
+function lock(it: ToolItem, prop: string): string {
+  return isLibrary.value ? "" : `materialList|item|${itemKey(it)}|${prop}`;
+}
 
 /** 类型卡片列数：始终 1 列（类型卡片全宽），与其他部位 sub-grid 布局一致，
  *  物品卡 4 字段（件号/名称/数量/删除）有足够横向空间，避免 ENG 等多类型部位拥挤显示。 */
@@ -104,13 +113,13 @@ const matStdSubs = computed(() => {
  *  命中「工具标准库 ∪ 航材标准库」任一部位名即触发导入（部位名称共享）。 */
 /** 部位名输入框：失焦/回车时改名。
  *  仅当名称命中本机型「航材标准库」部位名时，才整体替换为该标准部位并导入其物品；
- *  其它情况（含仅工具标准库有的部位名）仅改名、不跨标准库取。 */
+ *  其它情况（含仅工具标准库有的部位名）仅改名、不跨标准库取。单独项目类已与标准库脱钩 → 仅改名。 */
 function onRenameCat(event: Event): void {
   const input = event.target as HTMLInputElement;
   const name = input.value.trim();
   if (!name || name === props.category) { input.value = props.category; return; }
   const matStd = props.store.standardMaterialCategories.value;
-  if (matStd.includes(name)) {
+  if (!isStandalone.value && matStd.includes(name)) {
     if (!window.confirm(`将部位“${props.category}”替换为标准部位“${name}”并导入航材标准库中的物品？\n（原有物品将被替换）`)) { input.value = props.category; return; }
     props.store.mReplaceCategoryFromStandard(props.category, name);
   } else {
@@ -125,7 +134,7 @@ const stdCats = computed<string[]>(() => {
   return [...set];
 });
 function deleteCategory() {
-  if (window.confirm(`确认删除部位“${props.category}”及其全部航材？`)) props.store.mDeleteCategory(props.category);
+  if (window.confirm(`删除部位引用：移除部位“${props.category}”及其全部航材？\n（仅影响当前清单，标准库与其他项目不受影响）`)) props.store.mDeleteCategory(props.category);
 }
 function renameSub(oldName: string, event: Event): void {
   props.store.mRenameSub(props.category, oldName, (event.target as HTMLInputElement).value.trim());
@@ -154,7 +163,7 @@ async function supplementPart(): Promise<void> {
       <div class="spacer" />
       <button @click="store.mAddSub(category)">+ 类型</button>
       <button v-if="!isLibrary" class="ghost" @click="supplementPart">补充标准库</button>
-      <button class="danger" @click="deleteCategory">删除</button>
+      <button class="danger" title="删除部位引用（仅当前清单，标准库与他项目不受影响）" @click="deleteCategory">删除</button>
     </header>
     <div v-if="showBody" class="category-body">
       <textarea v-model="catNote" class="notes" rows="2" placeholder="部位备注" @input="store.persist" />
@@ -162,7 +171,7 @@ async function supplementPart(): Promise<void> {
         <section v-for="sub in subNames" :key="`${category}-${sub}`" class="sub-card">
           <header class="sub-head">
             <button class="collapse sub-collapse" :aria-label="collapsedSubs.has(sub) ? '展开' : '收起'" @click="toggleSub(sub)">{{ collapsedSubs.has(sub) ? '›' : '⌄' }}</button>
-            <StandardPicker v-if="!isLibrary" :options="matStdSubs" :category="category" :sub="sub" :store="store" :material="true" />
+            <StandardPicker v-if="!isLibrary && !isStandalone" :options="matStdSubs" :category="category" :sub="sub" :store="store" :material="true" />
             <input v-else class="type-name" :value="sub" aria-label="类型名称" @change="renameSub(sub, $event)" />
             <div class="spacer" />
             <button @click="store.mAddItem(category, sub)">+ 物品</button>
@@ -170,15 +179,15 @@ async function supplementPart(): Promise<void> {
           </header>
           <div v-if="!collapsedSubs.has(sub)" class="item-grid" :style="{ gridTemplateColumns: 'repeat(2, 1fr)' }">
             <div v-for="it in store.mItemsOf(category, sub)" :key="it.id" class="m-item" :class="{ 'flash-update': store.isFlashing(it) }">
-              <label class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.partNo" @input="onAutoSize" class="m-name m-partno"></textarea></label>
-              <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" @input="onAutoSize" class="m-name"></textarea></label>
-              <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" type="number" min="0" @input="store.persist" /></label>
+              <label class="m-field m-field-no"><span>件号</span><textarea rows="1" v-model="it.partNo" v-lock="lock(it, 'partNo')" @input="onAutoSize" class="m-name m-partno"></textarea></label>
+              <label class="m-field m-field-name"><span>名称</span><textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" @input="onAutoSize" class="m-name"></textarea></label>
+              <label class="m-field m-field-qty"><span>数量</span><input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" @input="store.persist" /></label>
               <div class="m-ops">
                 <button class="m-op m-op-del" title="删除" @click="store.mDeleteItem(it.id)">×</button>
                 <button class="m-op" :title="it.note ? '编辑备注' : '添加备注'" @click="toggleNote(it)">+</button>
               </div>
               <div v-if="noteVisible(it)" class="m-note-row">
-                <label class="m-field"><span>备注</span><textarea rows="1" v-model="it.note" placeholder="输入备注" @input="onAutoSize" @blur="commitNote(it)" class="m-name"></textarea></label>
+                <label class="m-field"><span>备注</span><textarea rows="1" v-model="it.note" v-lock="lock(it, 'note')" placeholder="输入备注" @input="onAutoSize" @blur="commitNote(it)" class="m-name"></textarea></label>
                 <button class="m-op m-op-del" title="删除备注" @click="removeNote(it)">×</button>
               </div>
             </div>

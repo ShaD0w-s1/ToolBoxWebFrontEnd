@@ -13,6 +13,8 @@ const barColor = computed(() => sectionHex(props.category));
 const headBg = computed(() => sectionRgba(props.category, 0.5));
 const cardBg = computed(() => sectionRgba(props.category, 0.2));
 const subNames = computed(() => props.store.subsOf(props.category));
+// 单独项目类：工具清单与标准库脱钩（不再整体替换导入 / 隐藏标准库工作替换下拉）。
+const isStandalone = computed(() => props.store.currentProject.value?.type === "单独项目");
 // highlighted 由父组件工作查询控制：有查询时 highlighted 部位强制展开，非 highlighted 强制折叠
 const showBody = computed(() => {
   if (props.highlighted === true) return true;
@@ -81,7 +83,7 @@ const stdCats = computed<string[]>(() => {
 
 /** 部位名输入框：失焦/回车时改名。
  *  项目模式：仅当名称命中本机型「工具标准库」部位名时，才整体替换为该标准部位并导入其物品；
- *  其它情况（含仅航材标准库有的部位名）仅改名、不跨标准库取。库模式仅改名。 */
+ *  其它情况（含仅航材标准库有的部位名）仅改名、不跨标准库取。库模式仅改名。单独项目类已与标准库脱钩 → 仅改名。 */
 function onRenameCat(event: Event): void {
   const input = event.target as HTMLInputElement;
   const name = input.value.trim();
@@ -91,7 +93,7 @@ function onRenameCat(event: Event): void {
     return;
   }
   const toolStd = props.store.standardCategories.value;
-  if (toolStd.includes(name)) {
+  if (!isStandalone.value && toolStd.includes(name)) {
     if (!window.confirm(`将部位“${props.category}”替换为标准部位“${name}”并导入工具标准库中的物品？\n（原有物品将被替换）`)) { input.value = props.category; return; }
     props.store.replaceCategoryFromStandard(props.category, name);
   } else {
@@ -100,7 +102,7 @@ function onRenameCat(event: Event): void {
 }
 
 function deleteCategory() {
-  if (window.confirm(`确认删除部位“${props.category}”及其全部物品？`)) props.store.deleteCategory(props.category);
+  if (window.confirm(`删除部位引用：移除部位“${props.category}”及其全部物品？\n（仅影响当前清单，标准库与其他项目不受影响）`)) props.store.deleteCategory(props.category);
 }
 
 function renameSub(oldName: string, event: Event): void {
@@ -132,7 +134,7 @@ async function supplementStdLib(sub: string): Promise<void> {
       <span>合计 {{ store.catTotal(category) }}</span>
       <div class="spacer" />
       <button @click="store.addSub(category)">+ 工作</button>
-      <button class="danger" @click="deleteCategory">删除</button>
+      <button class="danger" title="删除部位引用（仅当前清单，标准库与他项目不受影响）" @click="deleteCategory">删除</button>
     </header>
     <div v-if="showBody" class="category-body">
       <textarea v-model="categoryNote" class="notes" rows="2" placeholder="部位备注" @input="store.persist" />
@@ -146,7 +148,7 @@ async function supplementStdLib(sub: string): Promise<void> {
         >
           <header class="sub-head">
             <StandardPicker
-              v-if="!store.editingLibrary.value"
+              v-if="!store.editingLibrary.value && !isStandalone"
               :options="standardSubs"
               :category="category"
               :sub="sub"
@@ -163,6 +165,8 @@ async function supplementStdLib(sub: string): Promise<void> {
               v-for="item in store.itemsOf(category, sub)"
               :key="item.id"
               :item="item"
+              :store="store"
+              :lock-field="store.editingLibrary.value ? '' : 'data'"
               :class="{ 'flash-update': store.isFlashing(item) }"
               :duplicate="store.isCartDuplicate(item.name)"
               :same-name="sameNameColors.get(item.name.trim().toLowerCase()) || null"

@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import type { ToolItem } from "../domain/toolbox";
+import { itemKey } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
+import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore; partNo: string; name: string; items: ToolItem[] }>();
+
+// 重复梳理视图的物品行软锁：项目模式（materialList）；航材标准库模式不锁。
+const vLock = createEditLockDirective(props.store);
+function lock(it: ToolItem, prop: string): string {
+  return props.store.editingMaterialLibrary.value ? "" : `materialList|item|${itemKey(it)}|${prop}`;
+}
 
 function remove(it: ToolItem): void {
   props.store.mDeleteItem(it.id);
@@ -26,9 +34,9 @@ function subLabel(it: ToolItem): string {
     <div class="pnc-body">
       <div v-for="it in items" :key="it.id" class="pnc-item">
         <span class="pnc-type">{{ subLabel(it) }}</span>
-        <input v-model.number="it.qty" type="number" min="0" class="pnc-qty" aria-label="数量" @input="store.persist" />
+        <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" class="pnc-qty" aria-label="数量" @input="store.persist" />
         <button class="pnc-del" title="删除" @click="remove(it)">×</button>
-        <textarea v-model="it.note" class="pnc-note" rows="1" placeholder="备注" @input="commitNote(it)" />
+        <textarea v-model="it.note" v-lock="lock(it, 'note')" class="pnc-note" rows="1" placeholder="备注" @input="commitNote(it)" />
       </div>
     </div>
   </article>
