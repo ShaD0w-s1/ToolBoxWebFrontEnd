@@ -171,21 +171,22 @@ export function useToolbox() {
   const editingByOthers = reactive(new Map<string, string>());
   // 他人编辑快照刷新计数：UI 组件绑定时读取它触发重渲染（disabled/class 跟随黄锁）。
   const lockVersion = ref(0);
-  let lastEditingReportAt = 0;
   let lastEditingFetchAt = 0;
   let editingTimer: ReturnType<typeof setInterval> | undefined;
+  let editingKeepalive: ReturnType<typeof setInterval> | undefined;
+  let lastReportedSnapshot = ""; // 上次成功上报的 key 快照，仅变化时上报（事件驱动，无节流）
   let pidWatchStopper: (() => void) | undefined;
-  /** 上报编辑会话心跳（前端 ~12s 一次，后端 TTL 60s 兜底自动释放）。pid 为空默认当前项目。 */
-  async function reportEditingHeartbeat(pidOverride?: string): Promise<void> {
+  /** 上报编辑会话快照。pid 为空默认当前项目；force=true 强制上报（释放/超时用，无视快照去重）。
+   *  持续编辑由 10s 保活定时器续期，后端 TTL 60s 兜底自动释放。 */
+  async function reportEditingHeartbeat(pidOverride?: string, force = false): Promise<void> {
     const pid = pidOverride ?? currentProjectId.value;
     if (!pid || !identityName.value.trim()) return;
-    const now = Date.now();
-    if (now - lastEditingReportAt < 12000 && !pidOverride) return;
-    if (!pidOverride) lastEditingReportAt = now;
     const key = editingLocal.size ? [...editingLocal.keys()].join("\u0001") : "";
+    if (!force && !pidOverride && key === lastReportedSnapshot) return; // 集合未变化：交给保活定时器
     try {
       await backend.reportEditing({ session_id: sessionId, name: identityName.value.trim(), project_id: pid, key: key.slice(0, 1800) });
-    } catch { /* 上报失败忽略（下轮重试） */ }
+      if (!pidOverride) lastReportedSnapshot = key;
+    } catch { /* 上报失败忽略（下次变化或保活重试） */ }
   }
   /** 拉取他人编辑会话（前端 ~4s 一次，仅当前打开某项目时）。 */
   async function fetchEditingOthers(): Promise<void> {
@@ -262,8 +263,8 @@ export function useToolbox() {
     const pid = currentProjectId.value;
     if (!pid || !editingLocal.size) return;
     flushEditingProject(pid);
-    lastEditingReportAt = 0;
-    void reportEditingHeartbeat();
+    lastReportedSnapshot = ""; // 强制上报空快照 → 释放
+    void reportEditingHeartbeat(pid, true);
   }
   /** 他人是否正在编辑该 key（UI 用于 disabled + 亮黄）。 */
   function isLockedByOther(key: string): boolean { return editingByOthers.has(key); }
@@ -284,9 +285,19 @@ export function useToolbox() {
           for (const f of fields) persistFieldOfProject(pid, f);
           notify("编辑会话超时，已自动保存并脱离编辑状态");
         }
-        void reportEditingHeartbeat();
+        lastReportedSnapshot = "";
+        if (pid) void reportEditingHeartbeat(pid, true);
       }
-      // 2) 轮询他人编辑态（黄锁刷新）。
+      // 2) 编辑保活续期：每 ~12s 上报一次当前快照（后端 TTL 60s，连续编辑不丢锁）。
+      if (editingLocal.size) {
+        if (!editingKeepalive) {
+          editingKeepalive = setInterval(() => { void reportEditingHeartbeat(undefined, true); }, 12000);
+        }
+      } else if (editingKeepalive) {
+        clearInterval(editingKeepalive);
+        editingKeepalive = undefined;
+      }
+      // 3) 轮询他人编辑态（黄锁刷新）。
       void fetchEditingOthers();
     }, 3000);
     document.addEventListener("visibilitychange", () => { if (document.hidden) endAllEditing(); });
@@ -296,7 +307,8 @@ export function useToolbox() {
         if (prev && next !== prev && editingLocal.size) {
           flushEditingProject(prev);
           editingLocal.clear();
-          void reportEditingHeartbeat(prev); // 用旧项目 pid 释放
+          lastReportedSnapshot = "";
+          void reportEditingHeartbeat(prev, true); // 用旧项目 pid 释放
         }
         lockVersion.value += 1;
       });
