@@ -333,13 +333,15 @@ input.remote-locked {
 .itg { display: grid; width: 100%; margin-top: 4px; }
 .itg .itg-head, .itg .itg-row { display: contents; }
 .itg .itg-head > * {
-  padding: 6px 8px; font-size: var(--fs-12, 12px); color: var(--n6); font-weight: 600;
+  padding: 6px 8px; font-size: var(--fs-12, 12px); color: var(--n10, #1f2329); font-weight: 600;
   background: #f6f8fc; border-bottom: 2px solid var(--n4); border-left: 1px dashed var(--n3);
+  display: flex; align-items: center;
 }
 .itg .itg-head > *:first-child { border-left: none; }
 .itg .itg-row > * {
   padding: 3px 8px; min-width: 0; border-bottom: 1px solid var(--n4);
   border-left: 1px dashed var(--n3); display: flex; align-items: center;
+  background: var(--n0); /* 物品行白底，与分隔线区分 */
 }
 .itg .itg-row > *:first-child { border-left: none; }
 .itg .itg-row:last-child > * { border-bottom: none; }
@@ -348,6 +350,7 @@ input.remote-locked {
   width: 100%; border: 1px solid transparent; background: transparent;
   font: inherit; font-size: var(--fs-13, 13px); line-height: 1.4; color: inherit;
   padding: 5px 2px; border-radius: 0; outline: none; resize: none; font-family: inherit; min-height: 30px;
+  vertical-align: middle;
 }
 .itg textarea { overflow: hidden; }
 .itg input[type="number"] { text-align: center; }
