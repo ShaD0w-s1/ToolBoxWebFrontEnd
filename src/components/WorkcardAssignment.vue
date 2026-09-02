@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, nextTick, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, nextTick, reactive, ref, watch } from "vue";
 import {
   WORKCARD_SECTIONS,
   WORKCARD_COLUMNS,
@@ -190,9 +190,10 @@ function removeSection(section: string): void {
 /** 部位选择后，把卡片移到所选分组（store 负责移动到目标；临时分组不写标准库）。 */
 function onSectionChange(section: string, index: number, event: Event): void {
   const to = (event.target as HTMLSelectElement).value as string;
-  // 移动完成后收起部位列，避免误操作。
-  showMove[section] = false;
+  if (!to || to === section) return; // 未变更：不视为修改操作
   props.store.moveCard(section, index, to);
+  // 有实际部位变更：刷新该组计时（勾选态保持；超过 120s 无变更自动关闭）
+  showMoveAt[section] = Date.now();
 }
 
 /** 未分配部位的工卡选择分组后插入对应分组（标准部位写入工卡分配标准库；临时分组不写库）。 */
@@ -253,11 +254,33 @@ function normalizeInspection(): void {
   }
 }
 
+/** 「工卡修改部位」为勾选启用：勾选显示部位列；取消勾选，或勾选后 120s 内无实际部位变更 → 自动关闭。 */
+const MOVE_SECTION_TIMEOUT = 120000;
+const showMoveAt = reactive<Record<string, number>>({});
+function setShowMove(section: string, on: boolean): void {
+  showMove[section] = on;
+  if (on) showMoveAt[section] = Date.now();
+}
+let moveAutoCloseTimer: ReturnType<typeof setInterval> | undefined;
+function startMoveAutoClose(): void {
+  if (moveAutoCloseTimer) return;
+  moveAutoCloseTimer = setInterval(() => {
+    const now = Date.now();
+    for (const k of sectionList.value) {
+      if (showMove[k] && now - (showMoveAt[k] || 0) > MOVE_SECTION_TIMEOUT) showMove[k] = false;
+    }
+  }, 2000);
+}
+
 onMounted(() => {
   growAll();
   normalizeInspection();
+  startMoveAutoClose();
   // 需求 4：已存在数据也按 AV/CB 子部位排序（导入时已排，此处理非导入来源的旧数据）。
   props.store.sortAvCbCards();
+});
+onBeforeUnmount(() => {
+  if (moveAutoCloseTimer) clearInterval(moveAutoCloseTimer);
 });
 </script>
 
@@ -374,10 +397,15 @@ onMounted(() => {
             :title="isTemp(section) && assignment.sections[section].cards.length ? '删除分组，组内工卡将移回未分配部位' : '删除该分组（标准部位删除后再次导入工卡会重新生成）'"
             @click="removeSection(section)"
           >删除分组</button>
-          <!-- 工卡修改部位按钮，点击后显示“部位”选项列 -->
-          <button class="ghost wa-move-toggle" @click="showMove[section] = !showMove[section]">
-            {{ showMove[section] ? '完成修改部位' : '工卡修改部位' }}
-          </button>
+          <!-- 工卡修改部位：勾选启用显示“部位”列；取消勾选或 120s 无变更自动关闭 -->
+          <label
+            class="ghost wa-move-toggle"
+            :class="{ on: !!showMove[section] }"
+            :title="showMove[section] ? '取消勾选关闭“部位”列（120 秒无变更也会自动关闭）' : '勾选后显示“部位”列以修改工卡所在分组'"
+          >
+            <input type="checkbox" class="wa-move-check" :checked="!!showMove[section]" @change="setShowMove(section, ($event.target as HTMLInputElement).checked)" />
+            工卡修改部位
+          </label>
         </div>
       </div>
       <div v-if="waCardExpanded[section]" class="table-wrap">
@@ -586,4 +614,9 @@ onMounted(() => {
 .wa-del-group:hover { background: #f9dcdc; }
 .wa-segment { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; }
 @media (max-width: 768px) { .wa-seg-btn { padding: 6px 12px; } }
+
+/* 「工卡修改部位」勾选式开关 */
+.wa-move-toggle { display: inline-flex; align-items: center; gap: 6px; user-select: none; }
+.wa-move-toggle .wa-move-check { width: 14px; height: 14px; margin: 0; accent-color: var(--blue); }
+.wa-move-toggle.on { background: var(--blue-light, #eaf1fa); border-color: var(--blue); }
 </style>
