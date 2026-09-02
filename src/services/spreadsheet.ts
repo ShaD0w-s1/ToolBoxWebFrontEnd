@@ -4,6 +4,7 @@ import {
   PREP_PERSONNEL_LAYOUT,
   PREP_PERSONNEL_FULL_ROWS,
   WORKCARD_SECTIONS,
+  genUid,
   normalizeState,
   type PrepSheet,
   type StandalonePrepSheet,
@@ -55,7 +56,7 @@ export async function importState(file: File): Promise<ToolState> {
     const name = String(row[2] || "").trim();
     if (!cat || !name) continue;
     if (!categories.includes(cat)) categories.push(cat);
-    items.push({ id: id++, cat, sub: String(row[1] || "").trim(), name, qty: Math.max(0, Number.parseInt(String(row[3]), 10) || 0) });
+    items.push({ id: id++, uid: genUid(), cat, sub: String(row[1] || "").trim(), name, qty: Math.max(0, Number.parseInt(String(row[3]), 10) || 0) });
   }
   const notes: Record<string, string> = {};
   const notesName = workbook.SheetNames.find((name) => name.includes("部位备注"));
@@ -82,7 +83,7 @@ export async function importMaterialList(file: File): Promise<ToolState> {
     if (!cat || !name) continue;
     if (!categories.includes(cat)) categories.push(cat);
     items.push({
-      id: id++, cat,
+      id: id++, uid: genUid(), cat,
       sub: String(row[1] || "").trim(),
       name,
       qty: Math.max(0, Number.parseInt(String(row[4]), 10) || 0),
@@ -115,7 +116,7 @@ export async function importStateFlat(file: File, defaultCat = ""): Promise<Tool
     const cat = catIdx >= 0 ? String(row[catIdx] ?? "").trim() : defaultCat;
     if (cat && !categories.includes(cat)) categories.push(cat);
     items.push({
-      id: id++,
+      id: id++, uid: genUid(),
       cat,
       sub: subIdx >= 0 ? String(row[subIdx] ?? "").trim() : "固定",
       name,

@@ -270,6 +270,9 @@ export interface StandalonePrepSheet {
 
 export interface ToolItem {
   id: number;
+  /** 持久行身份（uuid，随 sections 序列化/回读）：改名/改件号等键字段变化时身份不变，
+   *  跨端合并据此“更新原行”而不是新增复制行。旧数据缺失时用内容键+指纹启发兜底。 */
+  uid?: string;
   cat: string;
   sub: string;
   name: string;
@@ -278,6 +281,14 @@ export interface ToolItem {
   partNo?: string;
   /** 航材物品的备注（默认无，物品卡片「+」按钮新增，另起一行显示）。 */
   note?: string;
+}
+
+/** 生成稳定行 id（优先 crypto.randomUUID；旧环境退化为时间戳+随机数）。 */
+export function genUid(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  } catch { /* ignore */ }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** 单机机型数据（更新机型标准库弹窗/接口使用），字段与飞机信息标准库行一致。 */
@@ -455,7 +466,7 @@ export interface ToolboxApp {
   standardLibraries: Record<StandardLibKey, StandardLib>;
 }
 
-export interface SectionItemPayload { name: string; quantity: number; partNo?: string; note?: string }
+export interface SectionItemPayload { name: string; quantity: number; partNo?: string; note?: string; uid?: string }
 export interface WorkPayload { name: string; items: SectionItemPayload[] }
 export interface SectionPayload { name: string; notes: string; works: WorkPayload[] }
 export interface ProjectPayload {
@@ -616,6 +627,7 @@ export function normalizeState(value: StateInput = {}): ToolState {
     categories: Array.isArray(value.categories) ? value.categories.map(String) : [],
     items: Array.isArray(value.items) ? value.items.map((entry) => ({
       id: Number(entry.id) || 0,
+      uid: (entry as { uid?: string }).uid ? String((entry as { uid?: string }).uid) : undefined,
       cat: String(entry.cat || ""),
       sub: String(entry.sub || ""),
       name: String(entry.name || ""),
@@ -679,7 +691,11 @@ export function stateFromSections(sections: SectionPayload[] = [], useCart = fal
     if (section.notes) notes[cat] = section.notes;
     for (const work of section.works || []) {
       for (const entry of work.items || []) {
-        items.push({ id: id++, cat, sub: String(work.name || ""), name: String(entry.name || ""), qty: Math.max(0, Number(entry.quantity) || 0), partNo: entry.partNo != null ? String(entry.partNo) : "", note: entry.note != null ? String(entry.note) : "" });
+        items.push({
+          id: id++, cat, sub: String(work.name || ""), name: String(entry.name || ""),
+          qty: Math.max(0, Number(entry.quantity) || 0), partNo: entry.partNo != null ? String(entry.partNo) : "",
+          note: entry.note != null ? String(entry.note) : "", uid: entry.uid != null ? String(entry.uid) : undefined,
+        });
       }
     }
   }
@@ -701,7 +717,7 @@ export function sectionsFromState(state: ToolState): SectionPayload[] {
       notes: state.notes[cat] || "",
       works: subNames.map((sub) => ({
         name: sub,
-        items: state.items.filter((item) => item.cat === cat && item.sub === sub).map((item) => ({ name: item.name, quantity: item.qty, ...(item.partNo ? { partNo: item.partNo } : {}), ...(item.note ? { note: item.note } : {}) })),
+        items: state.items.filter((item) => item.cat === cat && item.sub === sub).map((item) => ({ name: item.name, quantity: item.qty, ...(item.partNo ? { partNo: item.partNo } : {}), ...(item.note ? { note: item.note } : {}), ...(item.uid ? { uid: item.uid } : {}) })),
       })),
     };
   });

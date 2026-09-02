@@ -10,6 +10,7 @@ import {
   defaultStandalonePrepSheet,
   defaultWorkcardAssignment,
   deepCopy,
+  genUid,
   emptyProcessRow,
   emptySigningRow,
   normalizeApp,
@@ -982,7 +983,7 @@ export function useToolbox() {
     const subs = subsOf(cat);
     const fixedSub = subs.find((sub) => sub.trim() === "固定");
     const sub = `新工作${subs.length + 1}`;
-    const newItem = { id: nextId++, cat, sub, name: "新物品", qty: 1 };
+    const newItem = { id: nextId++, uid: genUid(), cat, sub, name: "新物品", qty: 1 };
     if (fixedSub) {
       // 名称为「固定」的工作卡片默认占满首行，新增工作排到它下方第一格
       let anchor = state.items.length;
@@ -1036,7 +1037,7 @@ export function useToolbox() {
     const state = requireActive();
     if (!state) return;
     if (!state.categories.includes(cat)) state.categories.push(cat);
-    const item = { id: nextId++, cat, sub, name: "新物品", qty: 1 };
+    const item = { id: nextId++, uid: genUid(), cat, sub, name: "新物品", qty: 1 };
     // prepend=true 时插入到数据库首项（满足“添加行”默认显示在首行）；否则追加到末尾。
     if (prepend) state.items.unshift(item);
     else state.items.push(item);
@@ -1246,7 +1247,7 @@ export function useToolbox() {
     if (!state) return;
     if (!mCategoryList().includes(cat)) mAddCategory(cat);
     const subs = mSubsOf(cat);
-    state.items.push({ id: nextId++, cat, sub: `新类型${subs.length + 1}`, name: "", qty: 1, partNo: "" });
+    state.items.push({ id: nextId++, uid: genUid(), cat, sub: `新类型${subs.length + 1}`, name: "", qty: 1, partNo: "" });
     persist();
   }
   function mRenameSub(cat: string, oldName: string, name: string): void {
@@ -1264,7 +1265,7 @@ export function useToolbox() {
   function mAddItem(cat: string, sub: string, prepend = false): void {
     const state = requireMaterial();
     if (!state) return;
-    const item = { id: nextId++, cat, sub, name: "", qty: 1, partNo: "" };
+    const item = { id: nextId++, uid: genUid(), cat, sub, name: "", qty: 1, partNo: "" };
     // prepend=true 插入首项：新增类型卡按“首次出现顺序”自然显示在清单顶端
     if (prepend) state.items.unshift(item);
     else state.items.push(item);
@@ -1656,18 +1657,24 @@ export function useToolbox() {
     const localKeys = new Set(local.items.map((it) => itemKey(it)));
     let updatedCount = 0;
     const remoteOnly: ToolItem[] = [];
+    // 本端有行正在编辑（输入中）时：不采纳远端“同名/孪生行”更新，避免打断输入；新行仍并入。
+    const editingActive = isItemRowEditing();
     for (const r of remote.items) {
       if (localKeys.has(itemKey(r))) continue; // 同内容键已存在：本地优先（note 由下方字段级处理）
       if (isDraftRow(r)) continue;
-      // 键字段（名称/件号）漂移但指纹相同、备注一致 → 同一行的“改名/更新”：同步远端值，不新增复制行
-      const twin = merged.find((l) => sameFingerprint(l, r) && (l.note || "") === (r.note || ""));
-      if (twin) {
-        twin.name = r.name;
-        twin.qty = r.qty;
-        if (r.partNo !== undefined) twin.partNo = r.partNo;
-        if (!noteDirtyKeys.has(itemKey(twin))) twin.note = r.note || "";
-        updatedCount += 1;
-        continue;
+      if (!editingActive) {
+        // 同一行（持久 uid 相等 或 指纹+备注一致）的“改名/更新”：同步远端值，不新增复制行
+        const twin = merged.find((l) => (Boolean(r.uid && l.uid) ? l.uid === r.uid : false)
+          || (sameFingerprint(l, r) && (l.note || "") === (r.note || "")));
+        if (twin) {
+          twin.name = r.name;
+          twin.qty = r.qty;
+          if (r.partNo !== undefined) twin.partNo = r.partNo;
+          if (!noteDirtyKeys.has(itemKey(twin))) twin.note = r.note || "";
+          if (!twin.uid && r.uid) twin.uid = r.uid; // 本地旧数据补 uid，此后身份稳定
+          updatedCount += 1;
+          continue;
+        }
       }
       remoteOnly.push(r);
     }
