@@ -4,9 +4,10 @@ import {
   WORKCARD_SECTIONS,
   WORKCARD_COLUMNS,
   AREA_BY_SECTION,
-  type WorkcardSection,
+  isStdWorkcardSection,
   type WorkCardRow,
   type WorkcardArrange,
+  type WorkcardSectionData,
 } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { exportWorkcardAssignment } from "../services/spreadsheet";
@@ -22,7 +23,7 @@ const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
 const lockKey = (kind: string, id: string, field: string): string => `workcardAssignment|${kind}|${id}|${field}`;
 const vLock = createEditLockDirective(props.store);
 /** 工卡行稳定 key：行级合并主键 = section + 工卡号（空号回退行序，避免同 section 空号互锁）。 */
-function rowKeyOf(section: WorkcardSection, card: WorkCardRow, index: number): string {
+function rowKeyOf(section: string, card: WorkCardRow, index: number): string {
   return `${section}:${(card.工卡号 || "").trim() || `r${index}`}`;
 }
 
@@ -30,26 +31,37 @@ const rootEl = ref<HTMLElement | null>(null);
 const project = computed(() => props.store.currentProject.value);
 const assignment = computed(() => project.value?.workcardAssignment || null);
 
+/** 分组渲染顺序：内置标准部位（FC/LG/AV CB/ENG）在前 + 用户自建临时分组（按创建序）。 */
+const sectionList = computed<string[]>(() => {
+  const s = assignment.value?.sections || {};
+  const keys = Object.keys(s);
+  const std = WORKCARD_SECTIONS.filter((k) => k in s);
+  const temp = keys.filter((k) => !isStdWorkcardSection(k));
+  return [...std, ...temp];
+});
+/** 标准部位分组（自建分组名不在此列即为「临时分组」，其内改动不写标准库）。 */
+const isStd = (section: string): boolean => isStdWorkcardSection(section);
+const isTemp = (section: string): boolean => !isStdWorkcardSection(section);
+/** Segmented 分段视图：全部 / 人员安排 / 各分组（含临时分组，自适应）。 */
+const segOptions = computed<string[]>(() => ["全部", "人员安排", ...sectionList.value]);
+
 /** 工卡分级取值（需求 1）。 */
 const WORKCARD_LEVELS = ["一类", "二类", "三类"] as const;
 
-/** 需求 2：每个部位是否显示“部位”修改列（默认隐藏，点“工卡修改部位”才出现）。 */
-const showMove = reactive<Record<WorkcardSection, boolean>>({
-  FC: false,
-  LG: false,
-  "AV CB": false,
-  ENG: false,
-});
+/** 需求 2：每个分组是否显示“部位”修改列（默认隐藏，点“工卡修改部位”才出现）。 */
+const showMove = reactive<Record<string, boolean>>({ FC: false, LG: false, "AV CB": false, ENG: false });
 
-/** Segmented 分段视图：全部 / 人员安排 / 各部位（仅本地 UI 状态，不写入数据、不同步云端）。 */
-const WA_SEGMENTS = ["全部", "人员安排", "FC", "LG", "AV CB", "ENG"] as const;
-type WaSegment = (typeof WA_SEGMENTS)[number];
-const waSegment = ref<WaSegment>("全部");
-/** 各部位工卡安排「缩进/放出」（默认放出；仅本地运行状态，不参与 persist/合并）。 */
-const waCardExpanded = reactive<Record<WorkcardSection, boolean>>({ FC: true, LG: true, "AV CB": true, ENG: true });
+/** Segmented 分段视图：全部 / 人员安排 / 各分组（含临时分组，仅本地 UI 状态，不写入数据、不同步云端）。 */
+const waSegment = ref<string>("全部");
+/** 各分组工卡安排「缩进/放出」（默认放出；仅本地运行状态，不参与 persist/合并）。 */
+const waCardExpanded = reactive<Record<string, boolean>>({ FC: true, LG: true, "AV CB": true, ENG: true });
+// 新出现的分组（临时分组）默认放出
+watch(sectionList, (list) => {
+  for (const k of list) if (waCardExpanded[k] === undefined) waCardExpanded[k] = true;
+});
 // 选「人员安排」时工卡安排统一缩进；切回「全部/部位」统一放出
 watch(waSegment, (v) => {
-  const keys = Object.keys(waCardExpanded) as WorkcardSection[];
+  const keys = sectionList.value;
   for (const k of keys) waCardExpanded[k] = v !== "人员安排";
 });
 
@@ -58,7 +70,7 @@ const GRID_WITH_MOVE = "0.5fr 2fr 2fr var(--wa-level,0.5fr) 2fr 1fr 1fr 1.2fr 56
 const GRID_NO_MOVE = "0.5fr 2fr 2fr var(--wa-level,0.5fr) 2fr 1fr 1fr 56px";
 
 /** 各部位“人员安排”的字段（按空白模板 A检工卡分配.xlsx 顺序）。 */
-const PERSONNEL_FIELDS: Record<WorkcardSection, string[]> = {
+const PERSONNEL_FIELDS: Record<string, string[]> = {
   FC: ["人员", "部位工具负责", "工具清点", "构型设置确认", "梯架设备准备", "货舱清洁", "完工现场清理", "完工驾驶舱检查", "耳机监控", "高空车保障"],
   LG: ["人员", "部位工具负责", "工具清点", "构型设置确认", "梯架设备准备", "舱门保持架（前）", "舱门保持架（后）", "镜面勤务（前）", "镜面勤务（后）", "耳机监控", "完工现场清理"],
   "AV CB": ["人员", "部位工具负责", "工具清点", "构型设置确认", "梯架设备准备", "航后人员", "座椅标牌检查", "客舱检查（TA）", "驾驶舱清理", "完工现场清理", "客舱负责人"],
@@ -67,10 +79,12 @@ const PERSONNEL_FIELDS: Record<WorkcardSection, string[]> = {
 
 /** 第二行固定 4 个字段。 */
 const SECOND_ROW_FIELDS = ["部位工具负责", "工具清点", "构型设置确认", "梯架设备准备"];
+/** 临时分组默认人员安排：仅「人员」整行（可增删岗位通过 新增安排 补充）。 */
+const TEMP_PERSONNEL_FIELDS = ["人员"];
 
-/** 需求 4：把人员安排字段拆成 置顶人员 / 第二行 4 格 / 其余。 */
-function personnelLayout(section: WorkcardSection) {
-  const fields = PERSONNEL_FIELDS[section];
+/** 需求 4：把人员安排字段拆成 置顶人员 / 第二行 4 格 / 其余。临时分组走默认人员字段。 */
+function personnelLayout(section: string) {
+  const fields = PERSONNEL_FIELDS[section] || TEMP_PERSONNEL_FIELDS;
   const startIdx = fields.findIndex((f) => SECOND_ROW_FIELDS.includes(f));
   const top = startIdx > 0 ? fields.slice(0, startIdx) : [];
   const second = startIdx >= 0 ? fields.slice(startIdx, startIdx + 4) : [];
@@ -84,58 +98,126 @@ function blankCard(): WorkCardRow {
   return row;
 }
 
-function addCard(section: WorkcardSection): void {
-  assignment.value?.sections[section].cards.push(blankCard());
+/** 确保分组存在（被删除的标准分组在移入工卡时重建）。 */
+function ensureSection(section: string): WorkcardSectionData {
+  const a = assignment.value;
+  if (!a) return { personnel: {}, cards: [], extra: [] };
+  if (!a.sections[section]) a.sections[section] = { personnel: {}, cards: [], extra: [] };
+  return a.sections[section];
+}
+
+function addCard(section: string): void {
+  ensureSection(section).cards.push(blankCard());
   props.store.persist();
   nextTick(growAll);
 }
 
-function deleteCard(section: WorkcardSection, index: number): void {
+function deleteCard(section: string, index: number): void {
   assignment.value?.sections[section].cards.splice(index, 1);
   props.store.persist();
 }
 
 /** 需求 5：新增一个“安排 + 人员”条目（长度不超过 1.7 列）。 */
-function addArrange(section: WorkcardSection): void {
-  const list = assignment.value?.sections[section].extra;
-  if (!list) return;
+function addArrange(section: string): void {
+  const list = ensureSection(section).extra;
   list.push({ arrange: "", personnel: "" } as WorkcardArrange);
   props.store.persist();
 }
 
-function deleteArrange(section: WorkcardSection, index: number): void {
+function deleteArrange(section: string, index: number): void {
   assignment.value?.sections[section].extra.splice(index, 1);
   props.store.persist();
 }
 
-/** 需求 3：部位选择后，把卡片移到所选部位分组（store 负责移动到目标并同步标准库）。 */
-function onSectionChange(section: WorkcardSection, index: number, event: Event): void {
-  const to = (event.target as HTMLSelectElement).value as WorkcardSection;
+/** 新增临时分组：默认名「临时组N」，可随时在组名处修改。 */
+function addTempGroup(): void {
+  const a = assignment.value;
+  if (!a) return;
+  const exists = new Set(Object.keys(a.sections));
+  let n = 1;
+  let name = `临时组${n}`;
+  while (exists.has(name)) { n += 1; name = `临时组${n}`; }
+  a.sections[name] = { personnel: {}, cards: [], extra: [] };
+  props.store.persist();
+  props.store.notify(`已新增分组“${name}”，点击组名可重命名`, "ok");
+  waCardExpanded[name] = true;
+}
+
+/** 重命名分组（标准部位名只读，仅临时分组可改）。 */
+function renameSection(oldName: string, event: Event): void {
+  const a = assignment.value;
+  if (!a) return;
+  const input = event.target as HTMLInputElement;
+  const name = input.value.trim();
+  if (!name || name === oldName) { input.value = oldName; return; }
+  if (a.sections[name]) {
+    props.store.notify(`分组“${name}”已存在`, "err");
+    input.value = oldName;
+    return;
+  }
+  a.sections[name] = a.sections[oldName];
+  delete a.sections[oldName];
+  // 组内工卡「部位」标记同步为新组名；其它组中部位=旧名的工卡一并改（跨组引用只可能来自误置，一并修正）。
+  for (const k of Object.keys(a.sections)) {
+    for (const c of a.sections[k].cards) if (c.部位 === oldName) c.部位 = name;
+  }
+  const exp = waCardExpanded[oldName];
+  if (exp !== undefined) { delete waCardExpanded[oldName]; waCardExpanded[name] = exp; }
+  if (waSegment.value === oldName) waSegment.value = name;
+  props.store.persist();
+  props.store.notify(`分组已重命名为“${name}”`, "ok");
+}
+
+/** 删除分组：标准部位仅空分组可删；临时分组含卡时确认后移回「未分配部位」。 */
+function removeSection(section: string): void {
+  const a = assignment.value;
+  if (!a) return;
+  const cards = a.sections[section]?.cards || [];
+  if (isTemp(section) && cards.length) {
+    if (!window.confirm(`删除临时分组“${section}”？其中 ${cards.length} 张工卡将移回“未分配部位”。`)) return;
+    a.unassigned.push(...cards.map((c) => ({ ...c })));
+  } else if (isStd(section) && cards.length) {
+    props.store.notify(`标准部位“${section}”仍有 ${cards.length} 张工卡，清空后才能删除`, "info");
+    return;
+  } else if (!window.confirm(`确认删除分组“${section}”？`)) {
+    return;
+  }
+  delete a.sections[section];
+  if (waSegment.value === section) waSegment.value = "全部";
+  props.store.persist();
+}
+
+/** 部位选择后，把卡片移到所选分组（store 负责移动到目标；临时分组不写标准库）。 */
+function onSectionChange(section: string, index: number, event: Event): void {
+  const to = (event.target as HTMLSelectElement).value as string;
   // 移动完成后收起部位列，避免误操作。
   showMove[section] = false;
   props.store.moveCard(section, index, to);
 }
 
-/** 需求 1/4：未分配部位的工卡选择部位后，插入对应分组并写入工卡分配标准库。 */
+/** 未分配部位的工卡选择分组后插入对应分组（标准部位写入工卡分配标准库；临时分组不写库）。 */
 function onUnassignedSectionChange(index: number, event: Event): void {
-  const to = (event.target as HTMLSelectElement).value as WorkcardSection;
+  const to = (event.target as HTMLSelectElement).value as string;
   if (!to) return;
   props.store.moveUnassignedToSection(index, to);
-  // 归入“AV CB”分组时按 AV/CB 子部位排序，保证顺序正确。
-  props.store.sortAvCbCards();
+  // 归入“AV CB”标准分组时按 AV/CB 子部位排序，保证顺序正确。
+  if (isStd(to)) props.store.sortAvCbCards();
 }
 
-/** 需求 1/3：工卡分级变更时，同步保存到工卡分配标准库；非“三类”行必检默认 N/A。 */
-function onLevelChange(section: WorkcardSection, card: WorkCardRow): void {
-  // 需求 3：非“三类” → 必检强制 N/A；“三类” → 清空让用户填写。
+/** 需求 1/3：工卡分级变更：标准部位同步保存到工卡分配标准库；临时分组仅存项目（不写库）。
+ *  非“三类”行必检默认 N/A。 */
+function onLevelChange(section: string, card: WorkCardRow): void {
+  // 非“三类” → 必检强制 N/A；“三类” → 清空让用户填写。
   if (card.工卡分级 !== "三类") {
     card.必检 = "N/A";
   } else if (card.必检 === "N/A") {
     card.必检 = "";
   }
   props.store.persist();
-  // upsert 时保留卡片原始子部位（AV CB 分组的 AV/CB 区分），没有则用 section 默认值。
-  props.store.upsertWorkcardStdLib(card.工卡号, card.工卡名称, card.部位 || AREA_BY_SECTION[section], card.工卡分级);
+  if (isStd(section)) {
+    // upsert 时保留卡片原始子部位（AV CB 分组的 AV/CB 区分），没有则用 section 默认值。
+    props.store.upsertWorkcardStdLib(card.工卡号, card.工卡名称, card.部位 || AREA_BY_SECTION[section as (typeof WORKCARD_SECTIONS)[number]], card.工卡分级);
+  }
 }
 
 /** 需求 3：宽列（工卡号/工卡名称/参与人员）用 textarea，自动撑高以完整显示并换行。 */
@@ -159,10 +241,10 @@ function exportTable(): void {
   exportWorkcardAssignment(assignment.value, exportFileName(project.value?.name || "", "工卡分配清单"));
 }
 
-/** 需求 3：加载时补全——非“三类”且必检为空的行，必检默认 N/A（仅本地修正，不主动写云）。 */
+/** 加载时补全：非“三类”且必检为空的行，必检默认 N/A（仅本地修正，不主动写云）。 */
 function normalizeInspection(): void {
   if (!assignment.value) return;
-  for (const section of WORKCARD_SECTIONS) {
+  for (const section of sectionList.value) {
     for (const card of assignment.value.sections[section].cards) {
       if (card.工卡分级 && card.工卡分级 !== "三类" && !card.必检) {
         card.必检 = "N/A";
@@ -184,6 +266,7 @@ onMounted(() => {
     <div class="subpage-head">
       <h3>工卡分配清单</h3>
       <div class="subpage-actions">
+        <button class="ghost" @click="addTempGroup" title="新增一个可命名分组，用于把工卡临时归组（不写入工卡分配标准库）">+ 临时分组</button>
         <button class="ghost" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTable">导出表格</button>
       </div>
@@ -208,7 +291,7 @@ onMounted(() => {
               <!-- :value="" 受控：选择即移动，行被 splice 后 DOM 复用不会残留上一行的选中态（index key 复用场景必加） -->
               <select :value="''" aria-label="选择部位" @change="onUnassignedSectionChange(index, $event)">
                 <option value="">选择部位</option>
-                <option v-for="s in WORKCARD_SECTIONS" :key="s" :value="s">{{ s }}</option>
+                <option v-for="s in sectionList" :key="s" :value="s">{{ s }}<template v-if="isTemp(s)">（临时）</template></option>
               </select>
             </div>
             <div class="wa-cell wa-ops"><button class="danger wa-x" @click="store.deleteUnassigned(index)" title="删除">×</button></div>
@@ -219,19 +302,20 @@ onMounted(() => {
       </div>
     </section>
 
-    <!-- Segmented 分段视图：全部 / 人员安排 / FC / LG / AV CB / ENG（仅本地状态，不同步） -->
+    <!-- Segmented 分段视图：全部 / 人员安排 / 各分组（含临时分组，自适应；仅本地状态，不同步） -->
     <div class="wa-segment">
-      <button v-for="opt in WA_SEGMENTS" :key="opt" class="wa-seg-btn" :class="{ on: waSegment === opt }" @click="waSegment = opt">{{ opt }}</button>
+      <button v-for="opt in segOptions" :key="opt" class="wa-seg-btn" :class="{ on: waSegment === opt }" @click="waSegment = opt">{{ opt }}</button>
     </div>
 
     <section
-      v-for="section in WORKCARD_SECTIONS"
+      v-for="section in sectionList"
       :key="section"
       v-show="waSegment === '全部' || waSegment === '人员安排' || waSegment === section"
       class="wa-section"
+      :class="{ 'wa-temp-section': isTemp(section) }"
       :style="{ '--sec-color': sectionHex(section), '--sec-bg': sectionRgba(section, 0.5) }"
     >
-      <h4>{{ section }} 人员安排</h4>
+      <h4>{{ section }} 人员安排 <span v-if="isTemp(section)" class="wa-temp-tag">临时</span></h4>
 
       <!-- 人员安排布局 -->
       <div class="wa-personnel">
@@ -273,10 +357,24 @@ onMounted(() => {
             :title="waCardExpanded[section] ? '缩进工卡安排' : '放出工卡安排'"
             @click="waCardExpanded[section] = !waCardExpanded[section]"
           >{{ waCardExpanded[section] ? '▾' : '▸' }}</button>
-          {{ section }} 工卡安排
+          <input
+            v-if="isTemp(section)"
+            class="wa-sec-name"
+            :value="section"
+            title="临时分组：点击修改组名"
+            @change="renameSection(section, $event)"
+          />
+          <template v-else>{{ section }}</template>
+          <span class="wa-sec-suffix">工卡安排</span>
         </h4>
         <div class="wa-card-actions">
-          <!-- 需求 2：工卡修改部位按钮，点击后显示“部位”选项列 -->
+          <button
+            v-if="isTemp(section) || !assignment.sections[section].cards.length"
+            class="ghost wa-del-group"
+            :title="isTemp(section) && assignment.sections[section].cards.length ? '删除分组，组内工卡将移回未分配部位' : '删除该分组（标准部位删除后再次导入工卡会重新生成）'"
+            @click="removeSection(section)"
+          >删除分组</button>
+          <!-- 工卡修改部位按钮，点击后显示“部位”选项列 -->
           <button class="ghost wa-move-toggle" @click="showMove[section] = !showMove[section]">
             {{ showMove[section] ? '完成修改部位' : '工卡修改部位' }}
           </button>
@@ -326,7 +424,7 @@ onMounted(() => {
             <template v-if="showMove[section]">
               <div class="wa-cell">
                 <select :value="section" aria-label="选择部位" @change="onSectionChange(section, index, $event)">
-                  <option v-for="s in WORKCARD_SECTIONS" :key="s" :value="s">{{ s }}</option>
+                  <option v-for="s in sectionList" :key="s" :value="s">{{ s }}<template v-if="isTemp(s)">（临时）</template></option>
                 </select>
               </div>
             </template>
@@ -468,4 +566,24 @@ onMounted(() => {
   .wa-x { width: 20px; height: 20px; font-size: var(--fs-12); }
   .wa-grid-unassigned { min-width: 360px; }
 }
+
+/* —— 临时分组（自建分组）视觉与组名编辑 —— */
+.wa-temp-section { border-color: #d8c48f !important; }
+.wa-temp-tag {
+  display: inline-block; margin-left: 6px; vertical-align: 1px;
+  font-size: var(--fs-11, 11px); font-weight: 600; color: #8a6d1a;
+  background: #f7efd8; border: 1px solid #e3cf96; border-radius: 999px; padding: 0 8px; line-height: 1.7;
+}
+.wa-sec-name {
+  border: 1px dashed transparent; background: transparent; border-radius: var(--r-sm, 6px);
+  font: inherit; font-weight: 700; font-size: var(--fs-14, 14px); color: #8a6d1a;
+  min-width: 4em; max-width: 12em; padding: 1px 4px; margin: 0 2px; font-family: inherit;
+}
+.wa-sec-name:hover { border-color: #e3cf96; background: #fffdf4; }
+.wa-sec-name:focus { outline: none; border-color: var(--focus); background: var(--n0); color: var(--n8); }
+.wa-sec-suffix { margin-left: 2px; }
+.wa-del-group { color: var(--danger, #b53a3a); border-color: #f2cdcd; background: #fdecec; }
+.wa-del-group:hover { background: #f9dcdc; }
+.wa-segment { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+@media (max-width: 768px) { .wa-seg-btn { padding: 6px 12px; } }
 </style>

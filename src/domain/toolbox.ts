@@ -41,6 +41,10 @@ export const AREA_BY_SECTION: Record<WorkcardSection, string> = {
   ENG: "ENG",
   "AV CB": "AV",
 };
+/** 是否内置标准部位分组（FC/LG/AV CB/ENG）。非标准键即用户自建的「临时分组」（不写标准库）。 */
+export function isStdWorkcardSection(section: string): boolean {
+  return (WORKCARD_SECTIONS as readonly string[]).includes(section);
+}
 /** 工卡分配清单的 7 列表头（已移除 工卡1级检查 / 工卡2级检查 / 工作准备抽查）。 */
 export const WORKCARD_COLUMNS = [
   "序号",
@@ -175,7 +179,8 @@ export interface WorkcardSectionData {
 }
 
 export interface WorkcardAssignment {
-  sections: Record<WorkcardSection, WorkcardSectionData>;
+  /** 分组：内置 4 个标准部位（FC/LG/AV CB/ENG）+ 用户自建「临时分组」（任意命名键）。 */
+  sections: Record<string, WorkcardSectionData>;
   /** 未分配部位：导入时未能在标准库匹配到部位的工卡，等待用户在页面上指定部位。 */
   unassigned: WorkCardRow[];
 }
@@ -543,7 +548,7 @@ export function defaultPrepSheet(): PrepSheet {
 }
 
 export function defaultWorkcardAssignment(): WorkcardAssignment {
-  const sections = {} as Record<WorkcardSection, WorkcardSectionData>;
+  const sections = {} as Record<string, WorkcardSectionData>;
   for (const section of WORKCARD_SECTIONS) {
     sections[section] = { personnel: {}, cards: [], extra: [] };
   }

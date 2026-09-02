@@ -28,6 +28,7 @@ import {
   STANDARD_LIB_META,
   AREA_BY_SECTION,
   WORKCARD_SECTIONS,
+  isStdWorkcardSection,
   type WorkcardAssignment,
   type AircraftType,
   type AircraftInfoPayload,
@@ -1476,28 +1477,39 @@ export function useToolbox() {
     persist();
   }
 
-  /** 把已分配工卡在部位之间移动，并同步标准库部位。 */
-  function moveCard(from: WorkcardSection, index: number, to: WorkcardSection): void {
+  /** 把已分配工卡在分组之间移动。目标为标准部位 → 同步标准库部位；目标为临时分组 → 仅存本项目不写库。 */
+  function moveCard(from: string, index: number, to: string): void {
     const a = currentProject.value?.workcardAssignment;
     if (!a || from === to) return;
     const [card] = a.sections[from].cards.splice(index, 1);
     if (!card) return;
-    // 移动到目标部位时重置子部位为目标部位默认值（AV CB → "AV"）
-    card.部位 = AREA_BY_SECTION[to];
+    if (!a.sections[to]) a.sections[to] = { personnel: {}, cards: [], extra: [] }; // 目标分组若曾被删除则重建
+    if (isStdWorkcardSection(to)) {
+      // 移动到标准部位时重置子部位为目标部位默认值（AV CB → "AV"）并同步回标准库
+      card.部位 = AREA_BY_SECTION[to as WorkcardSection];
+      upsertWorkcardStdLib(card.工卡号, card.工卡名称, AREA_BY_SECTION[to as WorkcardSection], card.工卡分级);
+    } else {
+      // 临时分组：不写标准库
+      card.部位 = to;
+    }
     a.sections[to].cards.push(card);
-    upsertWorkcardStdLib(card.工卡号, card.工卡名称, AREA_BY_SECTION[to], card.工卡分级);
     persist();
   }
 
-  /** 把「未分配部位」工卡指定部位后插入对应分组，并写入工卡分配标准库。 */
-  function moveUnassignedToSection(index: number, to: WorkcardSection): void {
+  /** 把「未分配部位」工卡指定分组后插入。目标为标准部位 → 写入工卡分配标准库；临时分组 → 不写库。 */
+  function moveUnassignedToSection(index: number, to: string): void {
     const a = currentProject.value?.workcardAssignment;
     if (!a) return;
     const [card] = a.unassigned.splice(index, 1);
     if (!card) return;
-    card.部位 = AREA_BY_SECTION[to];
+    if (!a.sections[to]) a.sections[to] = { personnel: {}, cards: [], extra: [] };
+    if (isStdWorkcardSection(to)) {
+      card.部位 = AREA_BY_SECTION[to as WorkcardSection];
+      upsertWorkcardStdLib(card.工卡号, card.工卡名称, AREA_BY_SECTION[to as WorkcardSection], card.工卡分级);
+    } else {
+      card.部位 = to;
+    }
     a.sections[to].cards.push(card);
-    upsertWorkcardStdLib(card.工卡号, card.工卡名称, AREA_BY_SECTION[to], card.工卡分级);
     persist();
   }
 
@@ -1744,9 +1756,14 @@ export function useToolbox() {
   function mergeWorkcardAssignment(local: WorkcardAssignment, remote: WorkcardAssignment, localDirty: boolean): WorkcardAssignment {
     if (!localDirty) return remote;
     const merged: WorkcardAssignment = { sections: {} as WorkcardAssignment["sections"], unassigned: [...local.unassigned] };
-    for (const section of WORKCARD_SECTIONS) {
+    // 分组键 = 本地 + 远端并集：标准部位在前（保持 FC/LG/AV CB/ENG 顺序），临时分组（非标准键）按本地插入序 + 远端补充。
+    const keys = new Set<string>([...Object.keys(local.sections), ...Object.keys(remote.sections)]);
+    const keyOrder = [...WORKCARD_SECTIONS.filter((k) => keys.has(k)), ...[...keys].filter((k) => !isStdWorkcardSection(k))];
+    for (const section of keyOrder) {
       const ls = local.sections[section];
       const rs = remote.sections[section];
+      if (!ls) { merged.sections[section] = deepCopy(rs); continue; }
+      if (!rs) { merged.sections[section] = deepCopy(ls); continue; }
       const localIds = new Set(ls.cards.map((c) => String(c.工卡号 || "").trim()).filter(Boolean));
       const cards = [...ls.cards];
       for (const rc of rs.cards) {

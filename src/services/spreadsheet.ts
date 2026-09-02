@@ -341,7 +341,9 @@ export function exportWorkcardAssignment(assignment: WorkcardAssignment, name: s
     ]);
   };
   for (const card of assignment.unassigned) pushCard("未分配", card);
-  for (const section of WORKCARD_SECTIONS) {
+  const sectionKeys = Object.keys(assignment.sections);
+  const orderedSections = [...WORKCARD_SECTIONS.filter((s) => sectionKeys.includes(s)), ...sectionKeys.filter((s) => !WORKCARD_SECTIONS.includes(s as (typeof WORKCARD_SECTIONS)[number]))];
+  for (const section of orderedSections) {
     for (const card of assignment.sections[section].cards) pushCard(section, card);
   }
   blank();
@@ -349,7 +351,7 @@ export function exportWorkcardAssignment(assignment: WorkcardAssignment, name: s
   // 2) 人员安排 + 新增安排：分组 / 项目 / 内容
   aoa.push(["人员安排"]);
   aoa.push(["分组", "项目", "内容"]);
-  for (const section of WORKCARD_SECTIONS) {
+  for (const section of orderedSections) {
     const data = assignment.sections[section];
     for (const [field, value] of Object.entries(data.personnel)) {
       if (value) aoa.push([section, field, value]);
