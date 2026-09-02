@@ -1756,9 +1756,14 @@ export function useToolbox() {
   function mergeWorkcardAssignment(local: WorkcardAssignment, remote: WorkcardAssignment, localDirty: boolean): WorkcardAssignment {
     if (!localDirty) return remote;
     const merged: WorkcardAssignment = { sections: {} as WorkcardAssignment["sections"], unassigned: [...local.unassigned] };
-    // 分组键 = 本地 + 远端并集：标准部位在前（保持 FC/LG/AV CB/ENG 顺序），临时分组（非标准键）按本地插入序 + 远端补充。
-    const keys = new Set<string>([...Object.keys(local.sections), ...Object.keys(remote.sections)]);
-    const keyOrder = [...WORKCARD_SECTIONS.filter((k) => keys.has(k)), ...[...keys].filter((k) => !isStdWorkcardSection(k))];
+    // 合并键 = 本地现有分组（标准部位在前保持顺序；本地已删除的标准键不复活）+ 远端新增的临时分组。
+    const localKeys = Object.keys(local.sections);
+    const remoteKeys = Object.keys(remote.sections);
+    const keyOrder = [
+      ...WORKCARD_SECTIONS.filter((k) => localKeys.includes(k)),
+      ...localKeys.filter((k) => !isStdWorkcardSection(k)),
+      ...remoteKeys.filter((k) => !isStdWorkcardSection(k) && !(k in local.sections)),
+    ];
     for (const section of keyOrder) {
       const ls = local.sections[section];
       const rs = remote.sections[section];

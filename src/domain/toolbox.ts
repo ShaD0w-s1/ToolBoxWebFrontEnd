@@ -820,15 +820,19 @@ function prepSheetFromDoc(doc: Record<string, unknown>): PrepSheet {
 }
 
 function workcardAssignmentFromDoc(doc: Record<string, unknown>): WorkcardAssignment {
-  const assignment = defaultWorkcardAssignment();
   const raw = (doc.workcard_assignment && typeof doc.workcard_assignment === "object" ? doc.workcard_assignment : {}) as Record<string, unknown>;
   const rawSections = (raw.sections && typeof raw.sections === "object" ? raw.sections : {}) as Record<string, unknown>;
-  for (const section of WORKCARD_SECTIONS) {
-    const entry = (rawSections[section] && typeof rawSections[section] === "object" ? rawSections[section] : {}) as Record<string, unknown>;
+  const keys = Object.keys(rawSections);
+  const assignment: WorkcardAssignment = { sections: {}, unassigned: [] };
+  if (!keys.length) {
+    // 全新项目（尚无工卡分配数据）：默认 4 个标准部位骨架。
+    return defaultWorkcardAssignment();
+  }
+  const normEntry = (entry: Record<string, unknown>): WorkcardSectionData => {
     const personnel = (entry.personnel && typeof entry.personnel === "object" ? entry.personnel : {}) as Record<string, unknown>;
     const cards = Array.isArray(entry.cards) ? (entry.cards as unknown[]) : [];
     const extras = Array.isArray(entry.extra) ? (entry.extra as unknown[]) : [];
-    assignment.sections[section] = {
+    return {
       personnel: Object.fromEntries(Object.entries(personnel).map(([k, v]) => [k, String(v ?? "")])),
       cards: cards.map((card) => {
         const row = (card && typeof card === "object" ? card : {}) as Record<string, unknown>;
@@ -843,6 +847,14 @@ function workcardAssignmentFromDoc(doc: Record<string, unknown>): WorkcardAssign
         return { arrange: String(o.arrange ?? ""), personnel: String(o.personnel ?? "") };
       }),
     };
+  };
+  // 分组键与 doc 完全一致：标准部位（FC/LG/AV CB/ENG）在前保持原序，其后为用户自建临时分组（含被删除的标准键不回补）。
+  const ordered = [
+    ...WORKCARD_SECTIONS.filter((k) => keys.includes(k)),
+    ...keys.filter((k) => !(WORKCARD_SECTIONS as readonly string[]).includes(k)),
+  ];
+  for (const section of ordered) {
+    assignment.sections[section] = normEntry((rawSections[section] as Record<string, unknown>) || {});
   }
   // 未分配部位：项目级数组，标准库无法匹配部位的工卡
   const unassignedRaw = Array.isArray(raw.unassigned) ? (raw.unassigned as unknown[]) : [];
