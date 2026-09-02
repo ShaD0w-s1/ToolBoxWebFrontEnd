@@ -528,42 +528,11 @@ async function batchDeleteNoDate(): Promise<void> {
           </div>
         </section>
 
-        <!-- 系统设置（一级页数据库子页卡片）：轮询频率 / 会话超时 / 终止编辑视为保存 -->
+        <!-- 系统设置（数据库子页卡片）：项目目录导出 + 数据维护（协同编辑设置已移入网站管理弹窗） -->
         <section class="db-group">
           <h3 class="db-group-title">系统设置</h3>
           <div class="db-group-cards">
             <article class="library-card settings-card">
-              <div class="settings-row">
-                <div class="settings-field">
-                  <label>轮询频率（前台）</label>
-                  <select :value="String(store.syncSettings.pollMs)" @change="setPollMs(Number(($event.target as HTMLSelectElement).value))">
-                    <option value="500">0.5s（最快，请求最多）</option>
-                    <option value="1000">1s</option>
-                    <option value="2000">2s（推荐）</option>
-                    <option value="3000">3s</option>
-                    <option value="5000">5s（省流量）</option>
-                  </select>
-                  <span>同步他人改动到本机的间隔；后台标签页自动放宽到 10s。</span>
-                </div>
-                <div class="settings-field">
-                  <label>编辑会话超时</label>
-                  <select :value="String(store.syncSettings.sessionTimeoutMs)" @change="setSessionTimeout(Number(($event.target as HTMLSelectElement).value))">
-                    <option value="60000">60s</option>
-                    <option value="90000">90s</option>
-                    <option value="120000">120s（推荐）</option>
-                    <option value="180000">180s</option>
-                  </select>
-                  <span>输入框持续编辑超过该时长未失焦 → 自动保存并脱离编辑状态。</span>
-                </div>
-                <div class="settings-field">
-                  <label>终止编辑视为保存</label>
-                  <label class="settings-toggle">
-                    <input type="checkbox" :checked="store.syncSettings.autoSaveOnEnd" @change="setAutoSaveOnEnd(($event.target as HTMLInputElement).checked)" />
-                    <span>{{ store.syncSettings.autoSaveOnEnd ? "已开启" : "已关闭" }}</span>
-                  </label>
-                  <span>失焦 / 切换项目 / 关闭页面时，自动保存当前编辑内容并释放锁。</span>
-                </div>
-              </div>
               <div class="settings-row">
                 <div class="settings-field">
                   <label>导出项目目录</label>
@@ -579,9 +548,9 @@ async function batchDeleteNoDate(): Promise<void> {
                   <label>数据维护</label>
                   <div class="settings-dir-row">
                     <button class="danger" @click="batchDeleteNoDate" title="批量删除云端储存的未设置执行日期的项目">清理无日期项目</button>
-                    <button @click="openSiteAdmin" title="查看登录过的账号目录（需 AIRNAV 密码）">网站管理</button>
+                    <button @click="openSiteAdmin" title="登录账号目录 + 协同编辑设置（需 AIRNAV 密码）">网站管理</button>
                   </div>
-                  <span>清理无日期项目：批量删除未设置执行日期的云端项目；网站管理：登录账号目录（需 AIRNAV 密码）。</span>
+                  <span>清理无日期项目：批量删除未设置执行日期的云端项目；网站管理：账号目录与协同编辑设置（需 AIRNAV 密码）。</span>
                 </div>
               </div>
             </article>
@@ -593,9 +562,43 @@ async function batchDeleteNoDate(): Promise<void> {
     <div v-if="showSiteAdmin" class="site-admin-modal" @click.self="showSiteAdmin = false">
       <div class="site-admin-card">
         <div class="site-admin-head">
-          <h3>网站管理 · 登录账号目录</h3>
+          <h3>网站管理</h3>
           <button @click="showSiteAdmin = false">关闭</button>
         </div>
+        <div class="admin-sec-title">协同编辑设置（本机浏览器）</div>
+        <div class="settings-row admin-settings">
+          <div class="settings-field">
+            <label>轮询频率（前台）</label>
+            <span class="tip-el" data-tip="同步他人改动到本机的间隔；后台标签页自动放宽到 10s。">
+              <select :value="String(store.syncSettings.pollMs)" @change="setPollMs(Number(($event.target as HTMLSelectElement).value))">
+                <option value="500">0.5s（最快，请求最多）</option>
+                <option value="1000">1s</option>
+                <option value="2000">2s（推荐）</option>
+                <option value="3000">3s</option>
+                <option value="5000">5s（省流量）</option>
+              </select>
+            </span>
+          </div>
+          <div class="settings-field">
+            <label>编辑会话超时</label>
+            <span class="tip-el" data-tip="输入框持续编辑超过该时长未失焦 → 自动保存并脱离编辑状态。">
+              <select :value="String(store.syncSettings.sessionTimeoutMs)" @change="setSessionTimeout(Number(($event.target as HTMLSelectElement).value))">
+                <option value="60000">60s</option>
+                <option value="90000">90s</option>
+                <option value="120000">120s（推荐）</option>
+                <option value="180000">180s</option>
+              </select>
+            </span>
+          </div>
+          <div class="settings-field">
+            <label>终止编辑视为保存</label>
+            <label class="settings-toggle tip-el" data-tip="失焦 / 切换项目 / 关闭页面时，自动保存当前编辑内容并释放锁。">
+              <input type="checkbox" :checked="store.syncSettings.autoSaveOnEnd" @change="setAutoSaveOnEnd(($event.target as HTMLInputElement).checked)" />
+              <span>{{ store.syncSettings.autoSaveOnEnd ? "已开启" : "已关闭" }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="admin-sec-title">登录账号目录</div>
         <p v-if="accountsLoading" class="loading-state">加载中…</p>
         <table v-else-if="accounts.length" class="site-admin-table">
           <thead>
@@ -822,4 +825,18 @@ async function batchDeleteNoDate(): Promise<void> {
 .settings-dir-row .settings-date { flex: 0 1 140px; min-width: 0; }
 .settings-dir-row .settings-dir-sep { font-size: var(--fs-13, 13px); color: var(--n7, #888); flex: 0 0 auto; }
 .settings-dir-row button { min-height: 34px; padding: 5px 12px; }
+/* 网站管理弹窗：分节标题（同 db-group-title 小号风格） */
+.admin-sec-title { font-size: var(--fs-13); font-weight: 700; color: var(--n8); margin: 14px 0 8px; padding-left: 4px; border-left: 4px solid #378add; }
+.site-admin-card .admin-settings { margin-bottom: 4px; }
+/* 选框 Tooltip：hover 选框控件显示说明（注释不再常显） */
+.tip-el { position: relative; display: block; }
+.settings-toggle.tip-el { display: inline-flex; }
+.tip-el:hover::after {
+  content: attr(data-tip);
+  position: absolute; z-index: 40; bottom: calc(100% + 8px); left: 0;
+  width: 250px; max-width: 80vw; padding: 7px 10px;
+  background: #243447; color: #fff; font-size: var(--fs-12, 12px); line-height: 1.5;
+  border-radius: var(--r-sm, 6px); box-shadow: var(--sh-2); white-space: normal; text-align: left;
+  pointer-events: none;
+}
 </style>
