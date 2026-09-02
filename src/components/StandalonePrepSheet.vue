@@ -318,44 +318,42 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 
     <!-- 工序安排 -->
     <section class="prep-block">
-      <div class="prep-sec-row">
-        <h4>工序安排</h4>
-        <div class="prep-block-actions">
-          <button class="ghost" @click="exportProcessXlsx" title="导出工序安排为 xlsx（含各工序组）">导出表格</button>
-          <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importProcessXlsx" /></label>
-          <button class="ghost" @click="store.spAddProcessGroup">+ 新增工序组</button>
-        </div>
-      </div>
-      <div v-for="(g, gi) in sheet.processGroups" :key="g.id" class="sp-group-card">
-        <header class="sp-part-head">
-          <input class="sp-group-name" v-model="g.name" @input="store.persist" :placeholder="`工序组 ${gi + 1}`" v-lock="lockKey('group', String(g.id), 'name')" />
-          <button class="ghost danger-cell" @click="store.spRemoveProcessGroup(g.id)">删除</button>
-        </header>
-        <!-- 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） -->
-        <div class="sp-process-list">
-          <div v-for="r in g.rows" :key="r.id" class="sp-process-card">
-            <div class="sp-card-title">
-              <div class="sp-card-drag" title="拖动调整行序" @pointerdown="startSpRowDrag($event, gi, r.id)">⠿</div>
-              <textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell" placeholder="工作步骤" v-lock="lockKey('row', String(r.id), '工作步骤')"></textarea>
+      <h4>工序安排</h4>
+      <div class="sp-groups">
+        <div v-for="(g, gi) in sheet.processGroups" :key="g.id" class="sp-group-card">
+          <header class="sp-part-head">
+            <input class="sp-group-name" v-model="g.name" @input="store.persist" :placeholder="`工序组 ${gi + 1}`" v-lock="lockKey('group', String(g.id), 'name')" />
+            <button class="ghost danger-cell" @click="store.spRemoveProcessGroup(g.id)">删除</button>
+          </header>
+          <!-- 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） -->
+          <div class="sp-process-list">
+            <div v-for="r in g.rows" :key="r.id" class="sp-process-card">
+              <div class="sp-card-title">
+                <div class="sp-card-drag" title="拖动调整行序" @pointerdown="startSpRowDrag($event, gi, r.id)">⠿</div>
+                <textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell" placeholder="工作步骤" v-lock="lockKey('row', String(r.id), '工作步骤')"></textarea>
+              </div>
+              <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell sp-assign" placeholder="人员安排" v-lock="lockKey('row', String(r.id), '人员安排')"></textarea>
+              <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell sp-check" placeholder="检测&必检" v-lock="lockKey('row', String(r.id), '检测&必检')"></textarea>
+              <textarea rows="1" v-model="r.备注" @input="onRowInput" class="sp-cell sp-note" placeholder="备注" v-lock="lockKey('row', String(r.id), '备注')"></textarea>
+              <button class="sp-del-x" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">×</button>
             </div>
-            <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell sp-assign" placeholder="人员安排" v-lock="lockKey('row', String(r.id), '人员安排')"></textarea>
-            <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell sp-check" placeholder="检测&必检" v-lock="lockKey('row', String(r.id), '检测&必检')"></textarea>
-            <textarea rows="1" v-model="r.备注" @input="onRowInput" class="sp-cell sp-note" placeholder="备注" v-lock="lockKey('row', String(r.id), '备注')"></textarea>
-            <button class="sp-del-x" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">×</button>
+          </div>
+          <div class="prep-block-actions">
+            <button class="ghost" @click="store.spAddProcessRow(gi)">+ 新增行</button>
+            <button class="ghost" title="在该工序组下方新增一个工序组" @click="store.spInsertProcessGroup(gi)">+ 新增工序组</button>
           </div>
         </div>
-        <div class="prep-block-actions">
-          <button class="ghost" @click="store.spAddProcessRow(gi)">+ 新增行</button>
-          <button class="ghost" title="在该工序组下方新增一个工序组" @click="store.spInsertProcessGroup(gi)">+ 新增工序组</button>
-        </div>
       </div>
-      <div class="prep-sec-row">
-        <h4 class="sp-sub-h4">工卡签署安排</h4>
-        <div class="prep-block-actions">
-          <button class="ghost" @click="exportSigningXlsxLocal" title="导出工卡签署安排为 xlsx">导出表格</button>
-          <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importSigningXlsxLocal" /></label>
-        </div>
+      <div class="prep-block-actions">
+        <button class="ghost" @click="store.spAddProcessGroup">+ 新增工序组</button>
+        <button class="ghost" @click="exportProcessXlsx" title="导出工序安排为 xlsx（含各工序组）">导出表格</button>
+        <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importProcessXlsx" /></label>
       </div>
+    </section>
+
+    <!-- 工卡签署安排 -->
+    <section class="prep-block">
+      <h4>工卡签署安排</h4>
       <div class="table-wrap"><table class="sp-table">
         <thead><tr><th>手册号</th><th>工卡名</th><th>签署人</th><th>功能</th></tr></thead>
         <tbody>
@@ -367,7 +365,11 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
           </tr>
         </tbody>
       </table></div>
-      <div class="prep-block-actions"><button class="ghost" @click="store.spAddSigningRow">+ 新增行</button></div>
+      <div class="prep-block-actions">
+        <button class="ghost" @click="store.spAddSigningRow">+ 新增行</button>
+        <button class="ghost" @click="exportSigningXlsxLocal" title="导出工卡签署安排为 xlsx">导出表格</button>
+        <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importSigningXlsxLocal" /></label>
+      </div>
     </section>
 
     <!-- 单项工作模板弹窗（调取/保存共用，与换发/APU 二级页一致：调取=仅加载；保存=新模板+覆盖/改名/删除） -->
@@ -405,7 +407,6 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-title-input { font-size: var(--fs-18); padding: 4px 8px; border: 1px solid #6f8ad6; border-radius: var(--r-sm); min-width: 240px; }
 .prep-block { margin-bottom: 18px; background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
 .prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: var(--n0); padding: 8px 12px; border-radius: var(--r-md); }
-.sp-sub-h4 { margin: 18px 0 10px; }
 .field-label { font-size: var(--fs-13); color: #000; font-weight: 500; }
 .prep-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 14px; margin-bottom: 8px; }
 .prep-field { display: flex; flex-direction: column; gap: 4px; }
@@ -428,12 +429,14 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-w-no { flex: 0 0 22%; min-width: 90px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .sp-w-content { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .sp-parts { display: flex; flex-direction: column; gap: 10px; }
+/* 工序组卡列表：与部件信息 sp-parts 一致的纵向等距排列 */
+.sp-groups { display: flex; flex-direction: column; gap: 10px; }
 .sp-part-card { border: 1px solid var(--n3); border-radius: var(--r-md); padding: 10px 12px; background: var(--n1); }
 .sp-part-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-weight: 600; color: #4a5160; }
 .sp-part-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sp-subcard { display: flex; flex-direction: column; gap: 6px; }
 .sp-sub-title { font-size: var(--fs-13); font-weight: 600; color: #185FA5; }
-.sp-group-card { border: 1px solid var(--n3); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 12px; background: var(--n1); }
+.sp-group-card { border: 1px solid var(--n3); border-radius: var(--r-md); padding: 10px 12px; background: var(--n1); }
 /* 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） */
 .sp-process-list { display: flex; flex-direction: column; gap: 6px; }
 .sp-process-card { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); padding: 3px 6px; background: var(--n0); }
@@ -505,9 +508,4 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   .prep-personnel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .sp-part-body { grid-template-columns: 1fr; }
 }
-
-/* 区块标题行：标题居左、操作按钮靠右 */
-.prep-sec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.prep-sec-row h4 { margin: 0; }
-.prep-sec-row .sp-sub-h4 { margin: 0; }
 </style>
