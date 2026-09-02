@@ -1397,6 +1397,36 @@ export function useToolbox() {
   }
   function spRemoveProcessGroup(id: number): void { const p = currentProject.value; if (!p) return; p.standalonePrepSheet.processGroups = p.standalonePrepSheet.processGroups.filter((g) => g.id !== id); markCurrentDirty(); persist(); }
   function spAddProcessRow(groupIdx: number): void { const p = currentProject.value; if (!p) return; const g = p.standalonePrepSheet.processGroups[groupIdx]; if (!g) return; g.rows.push(emptyProcessRow()); markCurrentDirty(); persist(); }
+  /** 在某工序组（gi）下方插入一个新的工序组（不含行 id 由 emptyProcessRow 分配）。 */
+  function spInsertProcessGroup(gi: number): void {
+    const p = currentProject.value; if (!p) return;
+    const groups = p.standalonePrepSheet.processGroups;
+    if (!Array.isArray(groups) || gi < 0 || gi >= groups.length) return;
+    groups.splice(gi + 1, 0, { id: nextId++, name: `工序组 ${gi + 2}`, rows: [emptyProcessRow(), emptyProcessRow(), emptyProcessRow()] });
+    markCurrentDirty(); persist();
+  }
+  /** 导入替换整份工序安排（数据不含 id，由 emptyProcessRow 重建行 id）。 */
+  function spReplaceProcessGroups(data: Array<{ name: string; rows: Array<{ 工作步骤: string; 人员安排: string; "检测&必检": string; 备注: string }> }>): void {
+    const p = currentProject.value; if (!p) return;
+    p.standalonePrepSheet.processGroups = data.map((d, i) => ({
+      id: nextId++,
+      name: String(d.name || "").trim() || `工序组 ${i + 1}`,
+      rows: (Array.isArray(d.rows) ? d.rows : []).map((r) => ({
+        ...emptyProcessRow(),
+        工作步骤: String(r?.工作步骤 ?? ""), 人员安排: String(r?.人员安排 ?? ""),
+        "检测&必检": String(r?.["检测&必检"] ?? ""), 备注: String(r?.备注 ?? ""),
+      })),
+    }));
+    markCurrentDirty(); persist();
+  }
+  /** 导入替换工卡签署安排（行 id 重建）。 */
+  function spReplaceSigningRows(data: Array<{ 手册号: string; 工卡名: string; 签署人: string }>): void {
+    const p = currentProject.value; if (!p) return;
+    p.standalonePrepSheet.signingRows = (Array.isArray(data) ? data : []).map((r) => ({
+      ...emptySigningRow(), 手册号: String(r?.手册号 ?? ""), 工卡名: String(r?.工卡名 ?? ""), 签署人: String(r?.签署人 ?? ""),
+    }));
+    markCurrentDirty(); persist();
+  }
   function spRemoveProcessRow(groupIdx: number, rowId: number): void { const p = currentProject.value; if (!p) return; const g = p.standalonePrepSheet.processGroups[groupIdx]; if (!g) return; g.rows = g.rows.filter((r) => r.id !== rowId); markCurrentDirty(); persist(); }
   /** 工序组内行拖拽排序：把 rowId 行移动到 targetIndex 位置（拖拽落点，越界自动收敛）。 */
   function spMoveProcessRow(groupIdx: number, rowId: number, targetIndex: number): void {
@@ -2188,7 +2218,7 @@ export function useToolbox() {
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,
     mImportStandardSub, mSyncSubToMaterialLib, saveMaterialLibraryNow, replaceMaterialActive, mergeMaterialSections, mergeMaterialImport, markNoteDirty,
     spOnAircraftChange, spAddWork, spRemoveWork, spAddPart, spRemovePart, spAddArrange, spRemoveArrange,
-    spAddProcessGroup, spRemoveProcessGroup, spAddProcessRow, spRemoveProcessRow, spMoveProcessRow, spAddSigningRow, spRemoveSigningRow,
+    spAddProcessGroup, spRemoveProcessGroup, spInsertProcessGroup, spAddProcessRow, spRemoveProcessRow, spMoveProcessRow, spReplaceProcessGroups, spAddSigningRow, spRemoveSigningRow, spReplaceSigningRows,
     moveCard, moveUnassignedToSection, deleteUnassigned, upsertWorkcardStdLib,
     sortAvCbCards,
     lookupAircraftRow, fetchAircraftInfo,

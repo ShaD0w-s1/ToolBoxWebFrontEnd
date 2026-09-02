@@ -8,6 +8,8 @@ import {
   normalizeState,
   type PrepSheet,
   type StandalonePrepSheet,
+  type StandaloneProcessGroup,
+  type StandaloneSigningRow,
   type ToolCartItem,
   type ToolState,
   type WorkCardRow,
@@ -438,4 +440,118 @@ export function exportMaterialList(state: ToolState, name: string): void {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
   void saveFile(file).catch(() => {});
+}
+
+// ============ 单独项目：按页面格式导出 Word（含表格） ============
+const W_ESC = (v: unknown): string => String(v ?? "")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function wTable(headers: string[], rows: Array<Array<string | number>>): string {
+  const th = headers.map((h) => `<th>${W_ESC(h)}</th>`).join("");
+  const trs = rows.map((r) => `<tr>${r.map((c) => `<td>${W_ESC(c)}</td>`).join("")}</tr>`).join("");
+  return `<table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`;
+}
+/** 单独项目 单项准备单 → Word(.doc，HTML 结构，按页面分节含表格)。 */
+export function exportStandaloneWord(sheet: StandalonePrepSheet, name: string): void {
+  const b = sheet.base || ({} as StandalonePrepSheet["base"]);
+  const pairRows = (pairs: Array<[string, string]>): Array<[string, string]> => pairs.filter(([, v]) => String(v).trim());
+  const basePairs: Array<[string, string]> = [
+    ["机号", b.机号], ["FSN", b.FSN], ["MSN", b.MSN], ["发动机", b.发动机], ["机型", b.机型], ["ETOPS", b.ETOPS],
+    ["ELT-DT", b["ELT-DT"]], ["地点", b.地点], ["落地航班", b.落地航班], ["落地时间", b.落地时间], ["起飞时间", b.起飞时间],
+  ];
+  const personKeys: Array<[string, string]> = [
+    ["项目负责人", ""], ["值班组", ""], ["主卡签署", ""], ["必检", ""], ["参与人员", ""],
+    ["工具负责", ""], ["工具参与", ""], ["航材负责", ""], ["航材参与", ""], ["工卡负责", ""], ["工卡打印", ""],
+    ["试车人员", ""], ["报工/完工反馈", ""], ["运输跟踪", ""], ["飞机监护", ""],
+  ];
+  const personnel = (sheet.personnel || {}) as unknown as Record<string, string>;
+  const personPairs: Array<[string, string]> = personKeys
+    .map(([k]) => [k, personnel[k] || ""] as [string, string]).filter(([, v]) => String(v).trim());
+  const parts = sheet.parts || [];
+  const works = (sheet.works || []).filter((w) => String(w.指令号 || "").trim() || String(w.工作内容 || "").trim());
+  const sections: string[] = [];
+
+  sections.push(`<h2 style="text-align:center">${W_ESC(sheet.title || "单项工作准备单")}</h2>`);
+  sections.push(`<h3>基础信息</h3>` + wTable(["项目", "内容"], pairRows(basePairs)));
+  if (works.length) sections.push(`<h3>指令 / 工作内容</h3>` + wTable(["指令号", "工作内容"], works.map((w) => [w.指令号, w.工作内容])));
+  if (parts.length) {
+    sections.push(`<h3>部件卡片</h3>` + wTable(
+      ["部件名称", "拆下件号", "拆下序号", "装上件号", "装上序号"],
+      parts.map((p) => [p.name || "", p.拆下件号 || "", p.拆下序号 || "", p.装上件号 || "", p.装上序号 || ""]),
+    ));
+  }
+  if (personPairs.length) sections.push(`<h3>人员安排</h3>` + wTable(["岗位", "人员"], personPairs));
+  const extras = (sheet.personnel?.extra || []).filter((e) => String(e.内容 || "").trim());
+  if (extras.length) sections.push(`<h3>新增安排</h3>` + wTable(["内容", "人员"], extras.map((e) => [e.内容, e.人员])));
+  const groups = sheet.processGroups || [];
+  if (groups.length) {
+    const gHtml = groups.map((g) =>
+      `<h4>${W_ESC(g.name || "工序组")}</h4>` +
+      wTable(["工作步骤", "人员安排", "检测&必检", "备注"],
+        g.rows.filter((r) => [r.工作步骤, r.人员安排, r["检测&必检"], r.备注].some((c) => String(c).trim()))
+          .map((r) => [r.工作步骤, r.人员安排, r["检测&必检"], r.备注])),
+    ).join("");
+    sections.push(`<h3>工序安排</h3>` + gHtml);
+  }
+  const signing = (sheet.signingRows || []).filter((r) => [r.手册号, r.工卡名, r.签署人].some((c) => String(c).trim()));
+  if (signing.length) sections.push(`<h3>工卡签署安排</h3>` + wTable(["手册号", "工卡名", "签署人"], signing.map((r) => [r.手册号, r.工卡名, r.签署人])));
+
+  const html = `<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+<meta charset="utf-8"><title>${W_ESC(name)}</title>
+<style>
+  @page { size: A4; margin: 18mm; } body { font-family: "宋体", SimSun, serif; font-size: 12pt; color: #000; }
+  h2 { font-size: 16pt; margin: 6px 0 10px; } h3 { font-size: 13pt; margin: 14px 0 6px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+  h4 { font-size: 12pt; margin: 8px 0 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 4px 0 10px; }
+  th, td { border: 0.5pt solid #000; padding: 3px 6px; font-size: 10.5pt; vertical-align: top; word-break: break-all; }
+  th { background: #eceff3; font-weight: bold; }
+</style></head><body>${sections.join("")}</body></html>`;
+  const file = new File(["\ufeff", html], `${name || "单项工作准备单"}.doc`, { type: "application/msword" });
+  void saveFile(file).catch(() => {});
+}
+
+/** 工序安排 → xlsx（组名列分组，支持原样导回）。 */
+export function exportProcessGroupsXlsx(groups: StandaloneProcessGroup[], name: string): void {
+  const rows: SheetCell[][] = [["工序组", "工作步骤", "人员安排", "检测&必检", "备注"]];
+  for (const g of groups) for (const r of g.rows || []) {
+    rows.push([g.name || "", r.工作步骤, r.人员安排, r["检测&必检"], r.备注]);
+  }
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "工序安排");
+  const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const file = new File([data], `${name || "工序安排"}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  void saveFile(file).catch(() => {});
+}
+
+/** 解析工序安排 xlsx（表头 工序组|工作步骤|人员安排|检测&必检|备注；组间连续行聚合为组）。 */
+export async function importProcessGroupsXlsx(file: File): Promise<Array<{ name: string; rows: Array<{ 工作步骤: string; 人员安排: string; "检测&必检": string; 备注: string }> }>> {
+  const workbook = XLSX.read(await readFile(file), { type: "array" });
+  const aoa = XLSX.utils.sheet_to_json<SheetCell[]>(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "" });
+  const header = aoa.findIndex((r) => String(r[0]) === "工序组");
+  const groups: Array<{ name: string; rows: Array<{ 工作步骤: string; 人员安排: string; "检测&必检": string; 备注: string }> }> = [];
+  let cur: (typeof groups)[number] | null = null;
+  for (const row of aoa.slice(header < 0 ? 1 : header + 1)) {
+    const gname = String(row[0] || "").trim();
+    const rowData = { 工作步骤: String(row[1] || ""), 人员安排: String(row[2] || ""), "检测&必检": String(row[3] || ""), 备注: String(row[4] || "") };
+    if (!gname && !rowData.工作步骤.trim() && !rowData.人员安排.trim()) continue;
+    if (gname && (!cur || cur.name !== gname)) { cur = { name: gname, rows: [] }; groups.push(cur); }
+    (cur || groups[groups.length - 1]).rows.push(rowData);
+  }
+  return groups;
+}
+
+/** 工卡签署安排 → xlsx。 */
+export function exportSigningXlsx(rows: StandaloneSigningRow[], name: string): void {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["手册号", "工卡名", "签署人"], ...rows.map((r) => [r.手册号, r.工卡名, r.签署人])]), "工卡签署安排");
+  const data = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const file = new File([data], `${name || "工卡签署安排"}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  void saveFile(file).catch(() => {});
+}
+/** 解析工卡签署 xlsx（手册号|工卡名|签署人）。 */
+export async function importSigningXlsx(file: File): Promise<Array<{ 手册号: string; 工卡名: string; 签署人: string }>> {
+  const workbook = XLSX.read(await readFile(file), { type: "array" });
+  const aoa = XLSX.utils.sheet_to_json<SheetCell[]>(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: "" });
+  const header = aoa.findIndex((r) => String(r[0]) === "手册号" || /手册/.test(String(r[0])));
+  return aoa.slice(header < 0 ? 1 : header + 1).filter((r) => String(r[0] || "").trim() || String(r[1] || "").trim() || String(r[2] || "").trim())
+    .map((r) => ({ 手册号: String(r[0] || ""), 工卡名: String(r[1] || ""), 签署人: String(r[2] || "") }));
 }

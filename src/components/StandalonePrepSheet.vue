@@ -4,7 +4,9 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import { backend } from "../api";
 import type { StandaloneTemplateState } from "../domain/toolbox";
 import { normalizeStandaloneTemplateState } from "../domain/toolbox";
-import { exportStandalonePrep } from "../services/spreadsheet";
+import {
+  exportStandaloneWord, exportProcessGroupsXlsx, importProcessGroupsXlsx, exportSigningXlsx, importSigningXlsx,
+} from "../services/spreadsheet";
 import { exportFileName } from "../utils/format";
 import { growTextarea, growAllTextareas } from "../utils/dom";
 import { createEditLockDirective } from "../utils/editLock";
@@ -40,10 +42,52 @@ const personnelLayout: Array<Array<{ key: string; cols: number }>> = [
 ];
 
 function exportImage(): void { emit("export-image", captureRef.value); }
-function exportTableXlsx(): void {
+/** 按页面格式导出 Word（含各节表格）。 */
+function exportWord(): void {
   if (!sheet.value) return;
-  exportStandalonePrep(sheet.value, exportFileName(project.value?.name || "", "单项准备单"));
-  props.store.notify("表格已导出");
+  exportStandaloneWord(sheet.value, exportFileName(project.value?.name || "", "单项工作准备单"));
+  props.store.notify("Word 已导出", "ok");
+}
+/** 工序安排 → xlsx。 */
+function exportProcessXlsx(): void {
+  if (!sheet.value) return;
+  exportProcessGroupsXlsx(sheet.value.processGroups || [], exportFileName(project.value?.name || "", "工序安排"));
+  props.store.notify("工序安排表格已导出", "ok");
+}
+/** 工序安排 ← xlsx（整体替换该区）。 */
+async function importProcessXlsx(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !sheet.value) return;
+  try {
+    const parsed = await importProcessGroupsXlsx(file);
+    const rows = parsed.reduce((n, g) => n + (g.rows?.length || 0), 0);
+    if (!rows) { props.store.notify("未解析到工序数据（表头需含：工序组/工作步骤/…）"); return; }
+    if (!window.confirm(`确认用导入的 ${parsed.length} 个工序组（${rows} 行）替换当前“工序安排”？`)) return;
+    props.store.spReplaceProcessGroups(parsed);
+    props.store.notify("工序安排导入完成", "ok");
+  } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
+}
+/** 工卡签署安排 → xlsx。 */
+function exportSigningXlsxLocal(): void {
+  if (!sheet.value) return;
+  exportSigningXlsx(sheet.value.signingRows || [], exportFileName(project.value?.name || "", "工卡签署安排"));
+  props.store.notify("签署安排表格已导出", "ok");
+}
+/** 工卡签署安排 ← xlsx（整体替换）。 */
+async function importSigningXlsxLocal(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !sheet.value) return;
+  try {
+    const parsed = await importSigningXlsx(file);
+    if (!parsed.length) { props.store.notify("未解析到签署行（表头需含：手册号/工卡名/签署人）"); return; }
+    if (!window.confirm(`确认用导入的 ${parsed.length} 行替换当前“工卡签署安排”？`)) return;
+    props.store.spReplaceSigningRows(parsed);
+    props.store.notify("签署安排导入完成", "ok");
+  } catch (error) { props.store.notify(error instanceof Error ? error.message : "导入失败"); }
 }
 
 // ===== 单项工作模板（调取/保存双模式，与换发/APU 二级页一致：调取仅加载；保存=新模板+覆盖/改名/删除） =====
@@ -187,7 +231,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
         <button class="ghost" @click="openTplModal('load')">调取模板</button>
         <button class="ghost" @click="openTplModal('save')">保存模板</button>
         <button class="ghost" @click="exportImage">导出图片</button>
-        <button class="ghost" @click="exportTableXlsx">导出表格</button>
+        <button class="ghost" @click="exportWord" title="按页面格式导出含表格的 Word 文档">导出 Word</button>
       </div>
     </div>
 
@@ -274,8 +318,14 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 
     <!-- 工序安排 -->
     <section class="prep-block">
-      <h4>工序安排</h4>
-      <div class="prep-block-actions"><button class="ghost" @click="store.spAddProcessGroup">+ 新增工序组</button></div>
+      <div class="prep-sec-row">
+        <h4>工序安排</h4>
+        <div class="prep-block-actions">
+          <button class="ghost" @click="exportProcessXlsx" title="导出工序安排为 xlsx（含各工序组）">导出表格</button>
+          <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importProcessXlsx" /></label>
+          <button class="ghost" @click="store.spAddProcessGroup">+ 新增工序组</button>
+        </div>
+      </div>
       <div v-for="(g, gi) in sheet.processGroups" :key="g.id" class="sp-group-card">
         <header class="sp-part-head">
           <input class="sp-group-name" v-model="g.name" @input="store.persist" :placeholder="`工序组 ${gi + 1}`" v-lock="lockKey('group', String(g.id), 'name')" />
@@ -294,9 +344,18 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
             <button class="sp-del-x" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">×</button>
           </div>
         </div>
-        <div class="prep-block-actions"><button class="ghost" @click="store.spAddProcessRow(gi)">+ 新增行</button></div>
+        <div class="prep-block-actions">
+          <button class="ghost" @click="store.spAddProcessRow(gi)">+ 新增行</button>
+          <button class="ghost" title="在该工序组下方新增一个工序组" @click="store.spInsertProcessGroup(gi)">+ 新增工序组</button>
+        </div>
       </div>
-      <h4 class="sp-sub-h4">工卡签署安排</h4>
+      <div class="prep-sec-row">
+        <h4 class="sp-sub-h4">工卡签署安排</h4>
+        <div class="prep-block-actions">
+          <button class="ghost" @click="exportSigningXlsxLocal" title="导出工卡签署安排为 xlsx">导出表格</button>
+          <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importSigningXlsxLocal" /></label>
+        </div>
+      </div>
       <div class="table-wrap"><table class="sp-table">
         <thead><tr><th>手册号</th><th>工卡名</th><th>签署人</th><th>功能</th></tr></thead>
         <tbody>
@@ -446,4 +505,9 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   .prep-personnel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .sp-part-body { grid-template-columns: 1fr; }
 }
+
+/* 区块标题行：标题居左、操作按钮靠右 */
+.prep-sec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.prep-sec-row h4 { margin: 0; }
+.prep-sec-row .sp-sub-h4 { margin: 0; }
 </style>
