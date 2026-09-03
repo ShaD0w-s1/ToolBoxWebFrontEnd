@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   AIRCRAFT_TYPES,
   PROJECT_TYPES,
@@ -194,14 +194,17 @@ function editEngTemplate(t: { name: string; state: GanttPrepState }): void {
   showEngTemplates.value = false;
   props.store.openEngTemplateForEdit(t.name, t.state, "edit");
 }
-const newEngTplName = ref("");
-/** 新增换发/APU 模板：命名后新建空白模板并打开编辑页（编辑完「保存为新模板」创建）。 */
+const engTplQuery = ref("");
+/** 换发/APU 模板库模糊过滤。 */
+const filteredEngTemplates = computed(() => {
+  const q = engTplQuery.value.trim().toLowerCase();
+  if (!q) return engTemplates.value;
+  return engTemplates.value.filter((t) => String(t.name || "").toLowerCase().includes(q));
+});
+/** 新增换发/APU 模板：无需先命名，直接打开新增模板编辑子页（保存时再命名）。 */
 function addEngTemplate(): void {
-  const name = newEngTplName.value.trim();
-  if (!name) { props.store.notify("请输入模板名称"); return; }
   showEngTemplates.value = false;
-  newEngTplName.value = "";
-  props.store.openEngTemplateForEdit(name, defaultGanttPrep());
+  props.store.openEngTemplateForEdit("未命名模板", defaultGanttPrep());
 }
 
 /** 单项工作模板库（单独项目）：拉取模板列表并打开弹窗。 */
@@ -275,14 +278,17 @@ function editStandaloneTemplate(t: { name: string; state: StandaloneTemplateStat
   props.store.openStandaloneTemplateForEdit(t.name, t.state, "edit");
 }
 
-const newStandaloneTplName = ref("");
-/** 新增单项工作模板：命名后新建空白模板并打开编辑页（编辑完「保存为新模板」创建）。 */
+const standaloneTplQuery = ref("");
+/** 单项工作模板库模糊过滤。 */
+const filteredStandaloneTemplates = computed(() => {
+  const q = standaloneTplQuery.value.trim().toLowerCase();
+  if (!q) return standaloneTemplates.value;
+  return standaloneTemplates.value.filter((t) => String(t.name || "").toLowerCase().includes(q));
+});
+/** 新增单项工作模板：无需先命名，直接打开新增模板编辑子页（保存时再命名）。 */
 function addStandaloneTemplate(): void {
-  const name = newStandaloneTplName.value.trim();
-  if (!name) { props.store.notify("请输入模板名称"); return; }
   showStandaloneTemplates.value = false;
-  newStandaloneTplName.value = "";
-  props.store.openStandaloneTemplateForEdit(name, { prep: defaultStandalonePrepSheet(), material: null, tools: null });
+  props.store.openStandaloneTemplateForEdit("未命名模板", { prep: defaultStandalonePrepSheet(), material: null, tools: null });
 }
 
 /** 公告栏编辑。 */
@@ -624,12 +630,15 @@ async function batchDeleteNoDate(): Promise<void> {
           <button @click="showEngTemplates = false">关闭</button>
         </div>
         <div class="site-admin-newtpl">
-          <input v-model="newEngTplName" placeholder="新模板名称" @keydown.enter="addEngTemplate" />
-          <button class="primary" @click="addEngTemplate">新增模板</button>
+          <button class="primary" @click="addEngTemplate" title="直接打开新增模板编辑页（保存时再命名）">+ 新增模板</button>
+          <label class="tpl-search">
+            <input v-model="engTplQuery" class="inp" placeholder="模糊搜索模板名称…" aria-label="模糊搜索模板" />
+            <button v-if="engTplQuery" class="clear-btn" type="button" @click="engTplQuery = ''" aria-label="清空搜索">×</button>
+          </label>
         </div>
         <p v-if="engTemplatesLoading" class="loading-state">加载中…</p>
-        <template v-else-if="engTemplates.length">
-          <div v-for="t in engTemplates" :key="t._id" class="eng-tpl-row">
+        <template v-else-if="filteredEngTemplates.length">
+          <div v-for="t in filteredEngTemplates" :key="t._id" class="eng-tpl-row">
             <div class="eng-tpl-info">
               <strong>{{ t.name }}</strong>
               <span>{{ templateSummary(t.state) }}</span>
@@ -642,7 +651,8 @@ async function batchDeleteNoDate(): Promise<void> {
             </div>
           </div>
         </template>
-        <p v-else class="site-admin-empty">暂无模板。</p>
+        <p v-else-if="engTemplates.length" class="site-admin-empty">未找到匹配“{{ engTplQuery }}”的模板。</p>
+        <p v-else class="site-admin-empty">暂无模板，点击「+ 新增模板」开始创建。</p>
       </div>
     </div>
 
@@ -653,12 +663,15 @@ async function batchDeleteNoDate(): Promise<void> {
           <button @click="showStandaloneTemplates = false">关闭</button>
         </div>
         <div class="site-admin-newtpl">
-          <input v-model="newStandaloneTplName" placeholder="新模板名称" @keydown.enter="addStandaloneTemplate" />
-          <button class="primary" @click="addStandaloneTemplate">新增模板</button>
+          <button class="primary" @click="addStandaloneTemplate" title="直接打开新增模板编辑页（保存时再命名）">+ 新增模板</button>
+          <label class="tpl-search">
+            <input v-model="standaloneTplQuery" class="inp" placeholder="模糊搜索模板名称…" aria-label="模糊搜索模板" />
+            <button v-if="standaloneTplQuery" class="clear-btn" type="button" @click="standaloneTplQuery = ''" aria-label="清空搜索">×</button>
+          </label>
         </div>
         <p v-if="standaloneTemplatesLoading" class="loading-state">加载中…</p>
-        <template v-else-if="standaloneTemplates.length">
-          <div v-for="t in standaloneTemplates" :key="t._id" class="eng-tpl-row">
+        <template v-else-if="filteredStandaloneTemplates.length">
+          <div v-for="t in filteredStandaloneTemplates" :key="t._id" class="eng-tpl-row">
             <div class="eng-tpl-info">
               <strong>{{ t.name }}</strong>
               <span>{{ standaloneTemplateSummary(t.state) }}</span>
@@ -671,7 +684,8 @@ async function batchDeleteNoDate(): Promise<void> {
             </div>
           </div>
         </template>
-        <p v-else class="site-admin-empty">暂无模板。</p>
+        <p v-else-if="standaloneTemplates.length" class="site-admin-empty">未找到匹配“{{ standaloneTplQuery }}”的模板。</p>
+        <p v-else class="site-admin-empty">暂无模板，点击「+ 新增模板」开始创建。</p>
       </div>
     </div>
 
@@ -724,6 +738,15 @@ async function batchDeleteNoDate(): Promise<void> {
 .site-admin-card { width: min(560px, calc(100% - 48px)); max-height: none; margin: 24px auto; padding: 20px 24px; background: var(--n0); border-radius: var(--r-lg); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
 .site-admin-newtpl { display: flex; gap: 8px; margin-bottom: 12px; }
 .site-admin-newtpl input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); }
+.site-admin-newtpl .primary { flex: 0 0 auto; }
+/* 模板弹窗模糊搜索 */
+.tpl-search { position: relative; flex: 1 1 180px; min-width: 180px; display: block; }
+.tpl-search input { width: 100%; box-sizing: border-box; padding: 0 30px 0 10px; }
+.tpl-search .clear-btn {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  border: none; background: none; color: var(--n7); font-size: var(--fs-14); line-height: 1; cursor: pointer; padding: 2px;
+}
+.tpl-search .clear-btn:hover { color: var(--danger); }
 .site-admin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .site-admin-head h3 { margin: 0; font-size: var(--fs-16); color: var(--n8); }
 .site-admin-table { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }

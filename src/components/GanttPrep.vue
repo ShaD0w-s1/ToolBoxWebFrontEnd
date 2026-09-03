@@ -758,9 +758,17 @@ const tplMode = ref<"load" | "save">("load");
 const templates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: GanttPrepState }>>([]);
 const templatesLoading = ref(false);
 const saveTplInputRef = ref<HTMLInputElement | null>(null);
+const tplQuery = ref("");
+/** 模板弹窗模糊过滤（按名称，大小写不敏感）。 */
+const filteredTemplates = computed(() => {
+  const q = tplQuery.value.trim().toLowerCase();
+  if (!q) return templates.value;
+  return templates.value.filter((t) => String(t.name || "").toLowerCase().includes(q));
+});
 async function openTplModal(mode: "load" | "save" = tplMode.value): Promise<void> {
   tplMode.value = mode;
   showTplModal.value = true;
+  tplQuery.value = "";
   templatesLoading.value = true;
   try {
     const res = await backend.listEngTemplates();
@@ -2461,9 +2469,13 @@ async function importAllXlsx(event: Event): Promise<void> {
             <input ref="saveTplInputRef" v-model="saveTplName" placeholder="新模板名称" @keydown.enter="saveAsTemplate" />
             <button class="primary" @click="saveAsTemplate">保存为新模板</button>
           </div>
+          <div class="gp-tpl-search">
+            <input v-model="tplQuery" class="inp" placeholder="模糊搜索模板名称…" aria-label="模糊搜索模板" />
+            <button v-if="tplQuery" class="clear-btn" type="button" title="清空搜索" @click="tplQuery = ''">×</button>
+          </div>
           <p v-if="templatesLoading" class="loading-state">加载中…</p>
-          <template v-else-if="templates.length">
-            <div v-for="t in templates" :key="t._id" class="gp-tpl-row">
+          <template v-else-if="filteredTemplates.length">
+            <div v-for="t in filteredTemplates" :key="t._id" class="gp-tpl-row">
               <div class="gp-tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>{{ t.state.charts.length }} DAY · {{ t.state.charts.reduce((n, c) => n + c.cards.length, 0) }} 工序</span></div>
               <div class="gp-tpl-actions">
                 <button v-if="tplMode === 'load'" class="ghost" @click="applyTemplate(t)">加载</button>
@@ -2475,6 +2487,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               </div>
             </div>
           </template>
+          <p v-else-if="templates.length" class="gp-empty">未找到匹配“{{ tplQuery }}”的模板。</p>
           <p v-else class="gp-empty">暂无模板。</p>
         </div>
       </div>
@@ -2991,4 +3004,10 @@ textarea.remote-locked:disabled,
 input.remote-locked:disabled {
   opacity: 0.85; color: #6d4c00 !important; -webkit-text-fill-color: #6d4c00;
 }
+
+/* 模板弹窗模糊搜索行 */
+.gp-tpl-search { display: flex; align-items: center; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--line, var(--n4)); }
+.gp-tpl-search input { flex: 1; height: 32px; padding: 0 10px; border: 1.5px solid var(--line, var(--n4)); border-radius: var(--r-md); font-size: var(--fs-13); font-family: inherit; }
+.gp-tpl-search input:focus { border-color: var(--focus); outline: none; }
+.gp-tpl-search .clear-btn { border: none; background: none; color: var(--n7, #888); font-size: 15px; line-height: 1; cursor: pointer; }
 </style>
