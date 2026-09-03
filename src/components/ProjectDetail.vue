@@ -12,6 +12,7 @@ import GanttPrep from "./GanttPrep.vue";
 import ProjectFormModal from "./ProjectFormModal.vue";
 import { parseWorkCardList } from "../services/workcard";
 import { backend } from "../api";
+import { growTextarea } from "../utils/dom";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{
@@ -76,7 +77,8 @@ const toolDedupeGroups = computed<ToolDedupeGroup[]>(() => {
 });
 const toolDuplicates = computed(() => toolDedupeGroups.value.filter((g) => g.items.length >= 2));
 const toolSingles = computed(() => toolDedupeGroups.value.filter((g) => g.items.length === 1));
-function onToolDedupeNote(it: ToolItem): void {
+function onToolDedupeNote(it: ToolItem, event: Event): void {
+  growTextarea(event.target as HTMLTextAreaElement);
   props.store.markNoteDirty(it);
   props.store.persist();
 }
@@ -484,7 +486,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <div v-for="it in g.items" :key="it.id" class="itg-row">
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
                   <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
-                  <textarea v-model="it.note" rows="1" class="itg-note-input" placeholder="备注" @input="onToolDedupeNote(it)"></textarea>
+                  <textarea v-model="it.note" rows="1" class="itg-note-input" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
                   <div class="itg-ops"><button class="del" title="删除该工具" @click="store.deleteItem(it.id)">×</button></div>
                 </div>
               </div>
@@ -503,7 +505,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <div v-for="it in g.items" :key="it.id" class="itg-row">
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
                   <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
-                  <textarea v-model="it.note" rows="1" class="itg-note-input" placeholder="备注" @input="onToolDedupeNote(it)"></textarea>
+                  <textarea v-model="it.note" rows="1" class="itg-note-input" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
                   <div class="itg-ops"><button class="del" title="删除该工具" @click="store.deleteItem(it.id)">×</button></div>
                 </div>
               </div>

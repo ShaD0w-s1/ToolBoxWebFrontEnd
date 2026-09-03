@@ -136,7 +136,7 @@ async function supplementPart(): Promise<void> {
       <button class="danger" title="删除部位引用（仅当前清单，标准库与他项目不受影响）" @click="deleteCategory">删除</button>
     </header>
     <div v-if="showBody" class="category-body">
-      <textarea v-model="catNote" class="notes" rows="2" placeholder="部位备注" @input="store.persist" />
+      <textarea v-model="catNote" class="notes" rows="2" placeholder="部位备注" @input="onAutoSize" />
       <div class="sub-grid" :style="{ gridTemplateColumns: `repeat(${subCols()}, 1fr)` }">
         <section v-for="sub in subNames" :key="`${category}-${sub}`" class="sub-card">
           <header class="sub-head">

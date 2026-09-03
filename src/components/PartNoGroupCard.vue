@@ -3,6 +3,7 @@ import type { ToolItem } from "../domain/toolbox";
 import { itemKey } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { createEditLockDirective } from "../utils/editLock";
+import { growTextarea } from "../utils/dom";
 
 const props = defineProps<{ store: ToolboxStore; partNo: string; name: string; items: ToolItem[] }>();
 
@@ -15,7 +16,8 @@ function lock(it: ToolItem, prop: string): string {
 function remove(it: ToolItem): void {
   props.store.mDeleteItem(it.id);
 }
-function commitNote(it: ToolItem): void {
+function commitNote(it: ToolItem, event: Event): void {
+  growTextarea(event.target as HTMLTextAreaElement);
   props.store.markNoteDirty(it);
   props.store.persist();
 }
@@ -37,7 +39,7 @@ function subLabel(it: ToolItem): string {
         <div v-for="it in items" :key="it.id" class="itg-row">
           <span class="itg-tag">{{ subLabel(it) }}</span>
           <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
-          <textarea v-model="it.note" v-lock="lock(it, 'note')" rows="1" class="itg-note-input" placeholder="备注" @input="commitNote(it)" />
+          <textarea v-model="it.note" v-lock="lock(it, 'note')" rows="1" class="itg-note-input" placeholder="备注" @input="commitNote(it, $event)" />
           <div class="itg-ops"><button class="del" title="删除" @click="remove(it)">×</button></div>
         </div>
       </div>

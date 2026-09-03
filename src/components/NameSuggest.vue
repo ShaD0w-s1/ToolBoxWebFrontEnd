@@ -6,6 +6,8 @@ const props = defineProps<{
   suggestions: string[];
   placeholder?: string;
   disabled?: boolean;
+  /** 追加到内部 textarea 的 class（供宿主按布局微调，如 sp-cell 系列）。 */
+  textareaClass?: string;
 }>();
 const emit = defineEmits<{ "update:modelValue": [string] }>();
 
@@ -76,9 +78,11 @@ function blurHide(): void {
     <textarea
       ref="ta"
       class="ns-input textwrap"
+      :class="textareaClass"
       rows="1"
       :value="modelValue"
       :placeholder="placeholder"
+      :disabled="disabled"
       @input="onInput"
       @focus="onFocus"
       @keydown="onKeydown"

@@ -10,6 +10,7 @@ import {
 import { exportFileName } from "../utils/format";
 import { growTextarea, growAllTextareas } from "../utils/dom";
 import AttachmentSection from "./AttachmentSection.vue";
+import NameSuggest from "./NameSuggest.vue";
 import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
@@ -41,6 +42,36 @@ const personnelLayout: Array<Array<{ key: string; cols: number }>> = [
   [{ key: "工卡负责", cols: 1 }, { key: "工卡打印", cols: 3 }],
   [{ key: "试车人员", cols: 1 }, { key: "报工/完工反馈", cols: 1 }, { key: "运输跟踪", cols: 1 }, { key: "飞机监护", cols: 1 }],
 ];
+
+/** 姓名联想池：收集当前准备单内已填人名（人员安排全员格 + 工序 人员安排/检测&必检 + 签署人），
+ *  供各人名填写格按空格/分隔符取词后模糊联想。 */
+const NAME_STOP = new Set(["必检", "检查", "复核", "检验", "参与", "负责", "人员", "值班", "无", "na", "n/a", "待定"]);
+const peoplePool = computed<string[]>(() => {
+  const s = sheet.value;
+  if (!s) return [];
+  const set = new Set<string>();
+  const add = (t: unknown): void => {
+    const parts = String(t ?? "").split(/[，,、;；/\s]+/u);
+    for (const part of parts) {
+      const n = part.trim();
+      const low = n.toLowerCase();
+      if (!n || n.length < 2 || n.length > 12) continue;
+      if (/^\d+$/.test(n)) continue;
+      if (/^[^一-鿿a-zA-Z·]+$/u.test(n)) continue;
+      if (NAME_STOP.has(low) || NAME_STOP.has(n)) continue;
+      set.add(n);
+    }
+  };
+  for (const v of Object.values(s.personnel || {})) add(v);
+  for (const g of s.processGroups || []) {
+    for (const r of g.rows || []) {
+      add((r as unknown as Record<string, unknown>)["人员安排"]);
+      add((r as unknown as Record<string, unknown>)["检测&必检"]);
+    }
+  }
+  for (const r of s.signingRows || []) add((r as unknown as Record<string, unknown>)["签署人"]);
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "zh-CN"));
+});
 
 function exportImage(): void { emit("export-image", captureRef.value); }
 /** 按页面格式导出 Word（含各节表格）。 */
@@ -307,7 +338,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
           <span class="field-label">{{ cell.key }}</span><input v-model="(sheet.personnel as unknown as Record<string, string>)[cell.key]" @input="store.persist" v-lock="lockKey('personnel', 'single', cell.key)" />
         </label>
       </div>
-      <label class="prep-personnel-fullrow"><span class="field-label">参与人员</span><textarea v-model="sheet.personnel.参与人员" rows="2" @input="store.persist" v-lock="lockKey('personnel', 'single', '参与人员')" /></label>
+      <div class="prep-personnel-fullrow"><span class="field-label">参与人员</span><NameSuggest :model-value="String(sheet.personnel.参与人员 || '')" :suggestions="peoplePool" placeholder="参与人员（空格/顿号分隔，模糊联想已填姓名）" @update:model-value="sheet.personnel.参与人员 = $event; store.persist()" v-lock="lockKey('personnel', 'single', '参与人员')" /></div>
       <div class="prep-personnel-grid">
         <template v-for="(row, ri) in personnelLayout.slice(1)" :key="`pr-${ri}`">
           <label v-for="cell in row" :key="cell.key" class="prep-personnel-cell" :style="{ gridColumn: `span ${cell.cols}` }">
@@ -341,8 +372,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
                 <div class="sp-card-drag" title="拖动调整行序" @pointerdown="startSpRowDrag($event, gi, r.id)">⠿</div>
                 <textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell" placeholder="工作步骤" v-lock="lockKey('row', String(r.id), '工作步骤')"></textarea>
               </div>
-              <textarea rows="1" v-model="r.人员安排" @input="onRowInput" class="sp-cell sp-assign" placeholder="人员安排" v-lock="lockKey('row', String(r.id), '人员安排')"></textarea>
-              <textarea rows="1" v-model="r['检测&必检']" @input="onRowInput" class="sp-cell sp-check" placeholder="检测&必检" v-lock="lockKey('row', String(r.id), '检测&必检')"></textarea>
+            <NameSuggest class="sp-assign" :model-value="String(r.人员安排 || '')" :suggestions="peoplePool" placeholder="人员安排" @update:model-value="r.人员安排 = $event; store.persist()" v-lock="lockKey('row', String(r.id), '人员安排')" />
+            <NameSuggest class="sp-check" :model-value="String(r['检测&必检'] || '')" :suggestions="peoplePool" placeholder="检测&必检" @update:model-value="r['检测&必检'] = $event; store.persist()" v-lock="lockKey('row', String(r.id), '检测&必检')" />
               <textarea rows="1" v-model="r.备注" @input="onRowInput" class="sp-cell sp-note" placeholder="备注" v-lock="lockKey('row', String(r.id), '备注')"></textarea>
               <button class="sp-del-x" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">×</button>
             </div>
@@ -530,4 +561,14 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .gp-tpl-search input { flex: 1; height: 32px; padding: 0 10px; border: 1.5px solid var(--line, var(--n4)); border-radius: var(--r-md); font-size: var(--fs-13); font-family: inherit; }
 .gp-tpl-search input:focus { border-color: var(--focus); outline: none; }
 .gp-tpl-search .clear-btn { border: none; background: none; color: var(--n7, #888); font-size: 15px; line-height: 1; cursor: pointer; }
+
+/* 人名联想格（工序行）：输入框融入原 sp-cell 视觉（透明底融入卡片，聚焦显边） */
+.sp-process-card :deep(.ns-wrap.sp-assign textarea.ns-input),
+.sp-process-card :deep(.ns-wrap.sp-check textarea.ns-input) {
+  border-color: transparent; background: var(--n1); padding: 5px 6px; font-size: var(--fs-13);
+}
+.sp-process-card :deep(.ns-wrap.sp-assign textarea.ns-input:focus),
+.sp-process-card :deep(.ns-wrap.sp-check textarea.ns-input:focus) { background: var(--n0); border-color: var(--focus); }
+/* 参与人员整行联想：占满宽度 */
+.prep-personnel-fullrow .ns-wrap { width: 100%; }
 </style>

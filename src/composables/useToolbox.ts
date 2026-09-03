@@ -170,6 +170,13 @@ export function useToolbox() {
   }
   // 本地正在编辑的输入框 key -> 最近一次活动时间戳（Date.now()）。
   const editingLocal = reactive(new Map<string, number>());
+  /** 编辑免并发窗口：自最近一次真实编辑动作（focus/input）起 120s 内视为“编辑会话中”。
+   *  期间发生 409 乐观锁冲突 → 静默采纳远端版本 + 保留本地修改延后重试，不再弹「并发修改」打断输入。 */
+  let editingWindowUntil = 0;
+  const EDITING_GRACE_MS = 120_000;
+  function isEditingWindow(): boolean {
+    return editingLocal.size > 0 || Date.now() < editingWindowUntil;
+  }
   // 远端其他用户正在编辑的 key -> 姓名（轮询拉取，用于渲染黄锁 + disabled）。
   const editingByOthers = reactive(new Map<string, string>());
   // 他人编辑快照刷新计数：UI 组件绑定时读取它触发重渲染（disabled/class 跟随黄锁）。
@@ -236,12 +243,16 @@ export function useToolbox() {
   function beginEdit(key: string): void {
     if (!key) return;
     editingLocal.set(key, Date.now());
+    editingWindowUntil = Date.now() + EDITING_GRACE_MS;
     void reportEditingHeartbeat();
   }
-  /** 输入中刷新活动时间（超时判定用）。 */
+  /** 输入中刷新活动时间（超时判定用）+ 顺延免并发窗口。 */
   function touchEdit(key: string): void {
     const ts = editingLocal.get(key);
-    if (ts !== undefined) editingLocal.set(key, Date.now());
+    if (ts !== undefined) {
+      editingLocal.set(key, Date.now());
+      editingWindowUntil = Date.now() + EDITING_GRACE_MS;
+    }
   }
   /** 收集指定项目下全部编辑会话涉及字段并保存落盘（供项目切换/关页前调用）。 */
   function flushEditingProject(pid: string): void {
@@ -531,8 +542,16 @@ export function useToolbox() {
           : (typeof p?.details?.current_version === "number" ? p.details.current_version : undefined);
         if (typeof current === "number") {
           project.version = current;
-          notify("检测到并发修改，将以你的修改为准重新保存");
-          dirtyProjects.add(project.id);
+          if (isEditingWindow()) {
+            // 编辑会话中（输入中 / 无数据写入的编辑状态 120s 内）：静默采纳远端版本、保留本地 dirty，
+            // 延后 2.5s 重试——不弹「并发修改」打断输入；窗口结束后的保存自然以新版本成功推送。
+            dirtyProjects.add(project.id);
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => { void saveRemote(); }, 2500);
+          } else {
+            notify("检测到并发修改，将以你的修改为准重新保存");
+            dirtyProjects.add(project.id);
+          }
         } else {
           // 拿不到远端版本号：拉取最新避免用旧 version 无限重试
           dirtyProjects.add(project.id);

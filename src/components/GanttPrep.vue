@@ -2330,7 +2330,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                     </td>
                     <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save"></textarea></td>
                     <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><input :value="r.jc" placeholder="工卡号" @input="r.jc = ($event.target as HTMLInputElement).value; save()" v-lock="lockKey('sprow', r.id, 'jc')" /></td>
-                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><textarea class="sp-name" rows="1" :value="r.name" placeholder="工卡名称" @input="r.name = ($event.target as HTMLTextAreaElement).value; save()" v-lock="lockKey('sprow', r.id, 'name')"></textarea></td>
+                    <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><textarea class="sp-name" rows="1" :value="r.name" placeholder="工卡名称" @input="r.name = ($event.target as HTMLTextAreaElement).value; onPartAutoSize($event)" v-lock="lockKey('sprow', r.id, 'name')"></textarea></td>
                     <td v-if="ri === 0" :rowspan="a.rows.length"><button class="icon-btn" title="删除整条串件安排" @click="removeSpArrangement(a.id)">×</button></td>
                   </tr>
                 </template>
@@ -2396,7 +2396,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div v-for="row in g.rows" :key="row.item.id" class="itg-row">
                         <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
                         <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
-                        <textarea rows="1" class="itg-note-input" v-model="row.item.note" placeholder="备注" @input="save" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
+                        <textarea rows="1" class="itg-note-input" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
                         <div class="itg-ops"><button class="del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button></div>
                       </div>
                     </div>
@@ -2420,7 +2420,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div v-for="row in g.rows" :key="row.item.id" class="itg-row">
                         <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
                         <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
-                        <textarea rows="1" class="itg-note-input" v-model="row.item.note" placeholder="备注" @input="save" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
+                        <textarea rows="1" class="itg-note-input" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
                         <div class="itg-ops"><button class="del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button></div>
                       </div>
                     </div>

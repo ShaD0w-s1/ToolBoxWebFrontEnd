@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { useWorkColumns } from "../composables/useResponsiveGrid";
 import { sectionHex, sectionRgba } from "../utils/sectionColor";
+import { growTextarea } from "../utils/dom";
 import ItemEditor from "./ItemEditor.vue";
 import StandardPicker from "./StandardPicker.vue";
 
@@ -101,6 +102,11 @@ function onRenameCat(event: Event): void {
   }
 }
 
+function onNotesInput(event: Event): void {
+  growTextarea(event.target as HTMLTextAreaElement);
+  props.store.persist();
+}
+
 function deleteCategory() {
   if (window.confirm(`删除部位引用：移除部位“${props.category}”及其全部物品？\n（仅影响当前清单，标准库与其他项目不受影响）`)) props.store.deleteCategory(props.category);
 }
@@ -137,7 +143,7 @@ async function supplementStdLib(sub: string): Promise<void> {
       <button class="danger" title="删除部位引用（仅当前清单，标准库与他项目不受影响）" @click="deleteCategory">删除</button>
     </header>
     <div v-if="showBody" class="category-body">
-      <textarea v-model="categoryNote" class="notes" rows="2" placeholder="部位备注" @input="store.persist" />
+      <textarea v-model="categoryNote" class="notes" rows="2" placeholder="部位备注" @input="onNotesInput" />
       <div class="sub-grid" :style="{ gridTemplateColumns: `repeat(${workCols}, 1fr)` }">
         <section
           v-for="sub in subNames"
@@ -207,4 +213,6 @@ async function supplementStdLib(sub: string): Promise<void> {
   border-color: var(--focus);
   background: var(--n0);
 }
+
+textarea.notes { resize: none; overflow: hidden; min-height: 40px; width: 100%; box-sizing: border-box; }
 </style>
