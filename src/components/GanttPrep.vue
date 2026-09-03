@@ -4,6 +4,7 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
 import { backend } from "../api";
 import NameSuggest from "./NameSuggest.vue";
+import AttachmentSection from "./AttachmentSection.vue";
 import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
@@ -2144,6 +2145,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           </section>
 
           <button class="add-day-card" @click="addChart"><span>+ 增加一天</span></button>
+          <AttachmentSection :store="store" />
         </div>
 
         <!-- 甘特图 -->

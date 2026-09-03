@@ -271,6 +271,8 @@ export interface StandalonePrepSheet {
   processGroups: StandaloneProcessGroup[];
   /** 工卡签署安排：单个表格若干行。 */
   signingRows: StandaloneSigningRow[];
+  /** 准备单附件（元数据引用，随模板保存/调取）。 */
+  attachments?: AttachmentMeta[];
 }
 
 export interface ToolItem {
@@ -409,6 +411,41 @@ export interface GanttSpArrangement {
   rows: GanttSpRow[];
 }
 /** 换发/APU 甘特准备单完整 state（对应 gantt-web 的 state，localStorage key toolbox-gantt-v4）。 */
+/** 附件元数据（换发/单独项目准备单「附件卡片」）：文件实体存云端对象存储（fileKey），引用列表随项目/模板透传。 */
+export interface AttachmentMeta {
+  /** 引用 id（uuid），跨端稳定（两端各上传时不冲突）。 */
+  id: string;
+  /** 展示文件名（可重复）。 */
+  name: string;
+  /** 云端存储对象 key（upload 返回，模板/项目共享同一对象，删除仅移引用）。 */
+  fileKey: string;
+  /** 文件大小（字节，可选）。 */
+  size?: number;
+  /** 上传时间（ISO 字符串）。 */
+  uploadedAt: string;
+}
+
+/** 从 doc/模板原始值归一化附件引用列表（非法/旧数据兜底空数组）。 */
+export function attachmentsFrom(raw: unknown): AttachmentMeta[] {
+  if (!Array.isArray(raw)) return [];
+  const list: AttachmentMeta[] = [];
+  for (const a of raw) {
+    if (!a || typeof a !== "object") continue;
+    const o = a as Record<string, unknown>;
+    const fileKey = String(o.fileKey || "");
+    const name = String(o.name || "");
+    if (!fileKey || !name) continue;
+    list.push({
+      id: String(o.id || fileKey),
+      name,
+      fileKey,
+      size: Number(o.size) > 0 ? Number(o.size) : undefined,
+      uploadedAt: String(o.uploadedAt || ""),
+    });
+  }
+  return list;
+}
+
 export interface GanttPrepState {
   version: number;
   charts: GanttChart[];
@@ -420,6 +457,8 @@ export interface GanttPrepState {
   toolParts: GanttPartList[];
   spArrangements: GanttSpArrangement[];
   meta: Record<string, unknown>;
+  /** 准备单附件（元数据引用，随模板保存/调取）。 */
+  attachments?: AttachmentMeta[];
 }
 
 /** 换发/APU 甘特准备单默认空结构。 */
@@ -905,6 +944,7 @@ function standalonePrepSheetFromDoc(doc: Record<string, unknown>): StandalonePre
   if (Array.isArray(raw.signingRows)) {
     sheet.signingRows = (raw.signingRows as Array<Record<string, unknown>>).map((r) => ({ id: spId(), 手册号: String(r?.手册号 ?? ""), 工卡名: String(r?.工卡名 ?? ""), 签署人: String(r?.签署人 ?? "") }));
   }
+  sheet.attachments = attachmentsFrom(raw.attachments);
   return sheet;
 }
 
@@ -925,6 +965,7 @@ function ganttPrepFromDoc(doc: Record<string, unknown>): GanttPrepState {
     toolParts: Array.isArray(raw.toolParts) ? (raw.toolParts as GanttPartList[]) : [],
     spArrangements: Array.isArray(raw.spArrangements) ? (raw.spArrangements as GanttSpArrangement[]) : [],
     meta: raw.meta && typeof raw.meta === "object" ? (raw.meta as Record<string, unknown>) : {},
+    attachments: attachmentsFrom(raw.attachments),
   };
 }
 

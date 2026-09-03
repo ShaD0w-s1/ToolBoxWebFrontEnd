@@ -9,6 +9,7 @@ import {
 } from "../services/spreadsheet";
 import { exportFileName } from "../utils/format";
 import { growTextarea, growAllTextareas } from "../utils/dom";
+import AttachmentSection from "./AttachmentSection.vue";
 import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
@@ -379,6 +380,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
         <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importSigningXlsxLocal" /></label>
       </div>
     </section>
+
+    <AttachmentSection :store="store" />
 
     <!-- 单项工作模板弹窗（调取/保存共用，与换发/APU 二级页一致：调取=仅加载；保存=新模板+覆盖/改名/删除） -->
     <div v-if="showTplModal" class="tpl-modal" @click.self="showTplModal = false">

@@ -85,6 +85,14 @@ export const backend = {
     request<ApiEnvelope<{ _id: string; type: string; fileName: string; cloudObjectId: string }>>("/api/control-docs/", { method: "POST", body: payload }),
   getControlDocUrl: (id: string) => request<ApiEnvelope<{ downloadUrl: string; fileName?: string }>>(`/api/control-docs/${encodeURIComponent(id)}/`),
   deleteControlDoc: (id: string) => request<ApiEnvelope>(`/api/control-docs/${encodeURIComponent(id)}/`, { method: "DELETE" }),
+  /** 准备单附件：上传（base64 中转，SCF ≤8MB）→ 云存储对象，返回引用元数据；引用列表由项目/模板保存同步。
+   *  下载/删除以 query file_key 传 cloudObjectId（含 ://与 /，path 传参会被网关还原为段）。 */
+  uploadPrepAttachment: (payload: { fileName: string; content: string }) =>
+    request<ApiEnvelope<{ fileKey: string; name: string; size: number }>>("/api/prep-attachments/", { method: "POST", body: payload }),
+  getPrepAttachmentUrl: (fileKey: string) =>
+    request<ApiEnvelope<{ downloadUrl: string }>>(`/api/prep-attachments/?file_key=${encodeURIComponent(fileKey)}`),
+  deletePrepAttachment: (fileKey: string) =>
+    request<ApiEnvelope>(`/api/prep-attachments/?file_key=${encodeURIComponent(fileKey)}`, { method: "DELETE" }),
   listProjects: () => request<ApiEnvelope<unknown>>("/api/projects/?limit=100"),
   createProject: (project: ProjectPayload) => request<ApiEnvelope<Record<string, unknown>>>("/api/projects/", { method: "POST", body: project }),
   updateProject: (id: string, project: ProjectPayload | Partial<ProjectPayload>, expectedVersion?: number) =>
