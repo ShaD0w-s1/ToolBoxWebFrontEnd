@@ -1607,6 +1607,134 @@ async function exportAllXlsx(): Promise<void> {
     props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
+// ===== 甘特图子页「导出表格」：全部 DAY 合并同一 sheet 的平铺行表（底色对齐网页）=====
+const ganttExportBusy = ref(false);
+/** 阶段跨度文本：单阶段显示名称；跨多阶段用 → 连接（网页卡片可横跨多个阶段列）。 */
+function ganttStageSpanText(chart: GanttChart, start: number, end: number): string {
+  const seg: string[] = [];
+  for (let i = start; i <= end; i++) seg.push(chart.stages[i]?.name || `阶段${i + 1}`);
+  return seg.join("→");
+}
+/** 估算内容换行后的行高（CJK 每字约 2 个宽度单位）。 */
+function ganttRowHpt(texts: Array<[string, number]>): number {
+  let lines = 1;
+  texts.forEach(([txt, wUnits]) => {
+    if (!txt) return;
+    const per = Math.max(1, Math.floor(wUnits / 2));
+    let n = 0;
+    String(txt).split(/\r?\n/).forEach((seg) => { n += Math.max(1, Math.ceil(seg.length / per)); });
+    lines = Math.max(lines, n);
+  });
+  return 22 + (lines - 1) * 15;
+}
+async function exportGanttTable(): Promise<void> {
+  const s = state.value; if (!s) return;
+  if (!s.charts.length) { props.store.notify("没有数据"); return; }
+  if (ganttExportBusy.value) return;
+  ganttExportBusy.value = true;
+  try {
+    const XLSX = await import("xlsx");
+    const C = { day: "E8F1FC", dayTxt: "2F5597", blue: "4472C4", yellow: "FDCA17", orange: "E8A44D", warnBg: "FFE8C7", warnTxt: "B45309", danger: "C0392B", line: "C9CFDA", white: "FFFFFF", ink: "1F1F1F" };
+    const W = [9, 12, 16, 46, 12, 18, 26];
+    const charts = s.charts.slice().sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0));
+    const wsRows: unknown[][] = [["DAY", "日期", "阶段", "工序内容", "负责人", "参与人", "备注"]];
+    const meta: Array<{ r: number; kind: "title" | "data" | "sp" | "ua-title" | "ua" }> = [];
+    let r = 0;
+    charts.forEach((chart, ci) => {
+      const dayNo = `DAY ${chart.day}`;
+      const date = chart.date || "";
+      const resp = (chart.responsibilities || []).map((x) => `${x.label || ""}${x.name ? "：" + x.name : ""}`).filter(Boolean).join("，");
+      // DAY 标题行（A:G 合并，浅蓝底，责任并入）
+      wsRows.push([`${dayNo}｜${chart.title || ""}｜${date}${resp ? "　责任：" + resp : ""}`]);
+      meta.push({ r, kind: "title" }); r++;
+      // 工序卡片（黄底，网页同色）
+      chart.cards.slice().sort((a, b) => (a.startStage - b.startStage) || ((a.order ?? 0) - (b.order ?? 0))).forEach((card) => {
+        wsRows.push([dayNo, date, ganttStageSpanText(chart, card.startStage, card.endStage), card.content || "", card.owner || "", card.participants || "", card.note || ""]);
+        meta.push({ r, kind: "data" }); r++;
+      });
+      // 已分配串件行（内容橙底，网页串件卡同色）
+      spCardsOfChart(chart).sort((a, b) => a.stageIdx - b.stageIdx).forEach((x) => {
+        const typeTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"}`;
+        wsRows.push([dayNo, date, chart.stages[x.stageIdx]?.name || `阶段${x.stageIdx + 1}`, `${typeTxt} ${x.arr.content || ""}`.trim(), x.row.owner || "", x.row.participants || "", x.row.note || ""]);
+        meta.push({ r, kind: "sp" }); r++;
+      });
+      // DAY 块之间空 2 行
+      if (ci < charts.length - 1) {
+        wsRows.push(["", "", "", "", "", "", ""]); r++;
+        wsRows.push(["", "", "", "", "", "", ""]); r++;
+      }
+    });
+    // 未分配串件区（网页横幅在每个 DAY 块内重复展示，导出仅在全部 DAY 之后列一次，避免 N 次重复）
+    const un = unassignedSpRows();
+    if (un.length) {
+      wsRows.push(["", "", "", "", "", "", ""]); r++;
+      wsRows.push([`▲ 未分配串件（${un.length}）——未指派执行阶段，可拖入任意 DAY`]);
+      meta.push({ r, kind: "ua-title" }); r++;
+      un.forEach((x) => {
+        const typeTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"}`;
+        wsRows.push(["", "", "未分配", `${typeTxt} ${x.arr.content || ""}`.trim(), x.row.owner || "未指派", x.row.participants || "", x.row.note || ""]);
+        meta.push({ r, kind: "ua" }); r++;
+      });
+    }
+    const ws = XLSX.utils.aoa_to_sheet(wsRows);
+    const addr = (row: number, col: number): string => XLSX.utils.encode_cell({ r: row, c: col });
+    const solid = (rgb: string): { patternType: "solid"; fgColor: { rgb: string } } => ({ patternType: "solid", fgColor: { rgb } });
+    const thin = { style: "thin" as const, color: { rgb: C.line } };
+    const border = { top: thin, bottom: thin, left: thin, right: thin };
+    // 表头（主蓝底白字）
+    for (let c = 0; c < 7; c++) {
+      const a = addr(0, c);
+      if (ws[a]) ws[a].s = { font: { bold: true, color: { rgb: C.white }, sz: 12 }, fill: solid(C.blue), alignment: { vertical: "center", horizontal: "center" }, border };
+    }
+    const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = [];
+    const heights: Array<{ hpt: number }> = [{ hpt: 26 }];
+    meta.forEach((m) => {
+      if (m.kind === "title" || m.kind === "ua-title") {
+        merges.push({ s: { r: m.r, c: 0 }, e: { r: m.r, c: 6 } });
+        const a = addr(m.r, 0);
+        if (ws[a]) ws[a].s = m.kind === "title"
+          ? { font: { bold: true, color: { rgb: C.dayTxt }, sz: 13 }, fill: solid(C.day), alignment: { vertical: "center" }, border }
+          : { font: { bold: true, color: { rgb: C.warnTxt }, sz: 12 }, fill: solid(C.warnBg), alignment: { vertical: "center" }, border };
+        heights[m.r] = { hpt: 24 };
+      } else {
+        const isUa = m.kind === "ua";
+        const isSp = m.kind === "sp";
+        for (let c = 0; c < 7; c++) {
+          const a = addr(m.r, c);
+          if (!ws[a]) continue;
+          const base: Record<string, unknown> = { border, alignment: { vertical: "top", wrapText: true } };
+          if (c === 0 && !isUa) { base.fill = solid(C.day); base.font = { bold: true, color: { rgb: C.dayTxt } }; base.alignment = { vertical: "center", horizontal: "center", wrapText: true }; }
+          else if (c === 1 && !isUa) { base.alignment = { vertical: "top", horizontal: "center", wrapText: true }; }
+          else if (c === 2) {
+            if (isUa) { base.fill = solid(C.warnBg); base.font = { bold: true, color: { rgb: C.warnTxt } }; }
+            else { base.fill = solid(C.blue); base.font = { bold: true, color: { rgb: C.white } }; }
+            base.alignment = { vertical: "center", horizontal: "center", wrapText: true };
+          }
+          else if (c === 3) {
+            if (isSp) { base.fill = solid(C.orange); base.font = { bold: true, color: { rgb: C.white } }; }
+            else if (!isUa) { base.fill = solid(C.yellow); base.font = { bold: true, color: { rgb: C.ink } }; }
+            else { base.font = { color: { rgb: C.warnTxt } }; }
+          }
+          else if (c === 6) { base.font = { color: { rgb: C.danger } }; }
+          ws[a].s = base as never;
+        }
+        const row = wsRows[m.r] as unknown[];
+        heights[m.r] = { hpt: ganttRowHpt([[String(row[2] ?? ""), W[2]], [String(row[3] ?? ""), W[3]], [String(row[4] ?? ""), W[4]], [String(row[5] ?? ""), W[5]], [String(row[6] ?? ""), W[6]]]) };
+      }
+    });
+    ws["!merges"] = merges;
+    ws["!cols"] = W.map((wch) => ({ wch }));
+    ws["!rows"] = heights;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "甘特表");
+    XLSX.writeFile(wb, `甘特表格_${stampDate()}.xlsx`);
+    props.store.notifyOk("甘特表格已导出");
+  } catch (e) {
+    props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
+  } finally {
+    ganttExportBusy.value = false;
+  }
+}
 // 手册清单表格导出：工包工卡 + 换发工卡 + 串件工卡 合并导出（串件工卡单独一个 sheet）
 async function exportDocsXlsx(): Promise<void> {
   const s = state.value; if (!s) return;
@@ -2156,6 +2284,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <div class="subpage-head">
             <div class="subpage-actions">
               <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportAllImage">导出图片</button>
+              <button class="ghost" :class="{ 'is-loading': ganttExportBusy }" :disabled="ganttExportBusy" @click="exportGanttTable" title="全部 DAY 合并同一 sheet 的平铺行表，底色按网页配色，DAY 间空 2 行">导出表格</button>
             </div>
           </div>
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
