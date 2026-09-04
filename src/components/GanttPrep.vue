@@ -1607,25 +1607,18 @@ async function exportAllXlsx(): Promise<void> {
     props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
-// ===== 甘特图子页「导出表格」：全部 DAY 合并同一 sheet 的平铺行表（底色对齐网页）=====
+// ===== 甘特图子页「导出表格」：矩阵式版式，与网页甘特图相同布局 =====
+// 每 DAY 一个区块：DAY 标题行 + 顶部责任行 + 阶段表头(横向列) + 卡片(工序卡横跨起止阶段合并多列、串件卡贴其阶段列)；
+// 卡片内容/负责/参与/备注在卡块内分行展示；未分配串件横幅每 DAY 重复；DAY 间空 2 行。
 const ganttExportBusy = ref(false);
-/** 阶段跨度文本：单阶段显示名称；跨多阶段用 → 连接（网页卡片可横跨多个阶段列）。 */
-function ganttStageSpanText(chart: GanttChart, start: number, end: number): string {
-  const seg: string[] = [];
-  for (let i = start; i <= end; i++) seg.push(chart.stages[i]?.name || `阶段${i + 1}`);
-  return seg.join("→");
-}
-/** 估算内容换行后的行高（CJK 每字约 2 个宽度单位）。 */
-function ganttRowHpt(texts: Array<[string, number]>): number {
-  let lines = 1;
-  texts.forEach(([txt, wUnits]) => {
-    if (!txt) return;
-    const per = Math.max(1, Math.floor(wUnits / 2));
-    let n = 0;
-    String(txt).split(/\r?\n/).forEach((seg) => { n += Math.max(1, Math.ceil(seg.length / per)); });
-    lines = Math.max(lines, n);
-  });
-  return 22 + (lines - 1) * 15;
+/** 估行高：按合并宽度(span×每列 wch，CJK 每字约占 2 字符位)计算换行后的行高。 */
+function ganttMatrixHpt(text: string, spanCols: number, colWch: number, minHpt = 20): number {
+  const t = String(text || "");
+  if (!t) return minHpt;
+  const per = Math.max(1, Math.floor((spanCols * colWch) / 2));
+  let lines = 0;
+  t.split(/\r?\n/).forEach((seg) => { lines += Math.max(1, Math.ceil(seg.length / per)); });
+  return Math.max(minHpt, 14 + lines * 13);
 }
 async function exportGanttTable(): Promise<void> {
   const s = state.value; if (!s) return;
@@ -1634,21 +1627,38 @@ async function exportGanttTable(): Promise<void> {
   ganttExportBusy.value = true;
   try {
     const XLSX = await import("xlsx");
-    const C = { day: "E8F1FC", dayTxt: "2F5597", blue: "4472C4", yellow: "FDCA17", orange: "E8A44D", warnBg: "FFE8C7", warnTxt: "B45309", danger: "C0392B", line: "C9CFDA", white: "FFFFFF", ink: "1F1F1F" };
-    const W = [9, 12, 16, 46, 12, 18, 26];
+    const C = { day: "E8F1FC", dayTxt: "2F5597", blue: "4472C4", headSub: "EDF2FC", yellow: "FDCA17", orange: "E8A44D", warnBg: "FFE8C7", warnTxt: "B45309", danger: "C0392B", white: "FFFFFF", ink: "1F1F1F" };
     const charts = s.charts.slice().sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0));
-    const wsRows: unknown[][] = [["DAY", "日期", "阶段", "工序内容", "负责人", "参与人", "备注"]];
-    const meta: Array<{ r: number; kind: "title" | "data" | "sp" | "ua-title" | "ua" }> = [];
-    let r = 0;
+    const colWch = 30; // 每阶段列宽（字符单位，CJK 每字约占 2 位 → 每列约容纳 15 个汉字）
+    const totalCols = Math.max(1, ...charts.map((c) => c.stages.length)); // sheet 总列数 = 最大阶段数
+    const rows: unknown[][] = [];
+    const heights: Array<{ hpt: number }> = [];
+    const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = [];
+    type LineKind = "day" | "resp" | "stagehead" | "chead" | "shead" | "meta" | "note" | "uat" | "uai";
+    const lines: Array<{ r: number; c0: number; c1: number; kind: LineKind }> = [];
+    const put = (kind: LineKind, text: string, c0: number, c1: number, hpt: number): void => {
+      const row: unknown[] = new Array(c1 + 1);
+      row[c0] = text;
+      rows.push(row); heights.push({ hpt }); lines.push({ r: rows.length - 1, c0, c1, kind });
+    };
+    const blank = (): void => { rows.push([]); heights.push({ hpt: 16 }); };
     charts.forEach((chart, ci) => {
+      const S = chart.stages.length;
       const dayNo = `DAY ${chart.day}`;
       const date = chart.date || "";
-      const resp = (chart.responsibilities || []).map((x) => `${x.label || ""}${x.name ? "：" + x.name : ""}`).filter(Boolean).join("，");
-      // DAY 标题行（A:G 合并，浅蓝底，对应网页 DAY 卡片头部：日期/DAY/标题 + 顶部责任）
-      wsRows.push([`${dayNo}｜${chart.title || ""}｜${date}${resp ? "　责任：" + resp : ""}`]);
-      meta.push({ r, kind: "title" }); r++;
-      // 维持线上甘特图结构：工序卡与已分配串件卡同处一网格，按行(row)→列(左→右)交错排布，
-      // 与网页 computeRows 行号一致；工序卡可跨多列（阶段文本用 → 连接），串件卡占单列。
+      // 1) DAY 标题行（对应网页 DAY 卡片头部：日期/DAY/标题；浅蓝底，占整块宽度）
+      put("day", `${dayNo}｜${date}${chart.title ? "｜" + chart.title : ""}`, 0, totalCols - 1, 26);
+      // 2) 顶部责任行（对应网页 resp-banner，浅灰蓝底；仅展示已填姓名项）
+      const respTxt = (chart.responsibilities || []).filter((x) => x.name).map((x) => `${x.label || ""}：${x.name}`).join("　");
+      if (respTxt) put("resp", `责任　${respTxt}`, 0, totalCols - 1, Math.max(22, ganttMatrixHpt(`责任　${respTxt}`, totalCols, colWch, 20)));
+      // 3) 阶段表头行（横向列，主蓝底白字，同网页 gantt-head）
+      if (S) {
+        const row: unknown[] = new Array(S);
+        chart.stages.forEach((st, i) => { row[i] = st.name || `阶段${i + 1}`; });
+        rows.push(row); heights.push({ hpt: 26 });
+        lines.push({ r: rows.length - 1, c0: 0, c1: S - 1, kind: "stagehead" });
+      }
+      // 4) 卡片：与网页同构——按 computeRows 行号升序、同行按列左→右；工序卡横跨起止阶段(合并多列)、串件卡贴其阶段列
       const gridRows = computeRows(chart);
       const items: Array<{ row: number; col: number; card?: GanttCard; sp?: { arr: GanttSpArrangement; row: GanttSpRow; stageIdx: number } }> = [];
       chart.cards.forEach((card) => items.push({ row: gridRows[card.id] ?? 0, col: card.startStage, card }));
@@ -1657,80 +1667,64 @@ async function exportGanttTable(): Promise<void> {
       items.forEach((it) => {
         if (it.card) {
           const card = it.card;
-          wsRows.push([dayNo, date, ganttStageSpanText(chart, card.startStage, card.endStage), card.content || "", card.owner || "", card.participants || "", card.note || ""]);
-          meta.push({ r, kind: "data" }); r++;
+          const c0 = clamp(card.startStage, 0, Math.max(0, S - 1));
+          const c1 = clamp(Math.max(card.endStage, c0), c0, Math.max(c0, S - 1));
+          const headTxt = card.content || "（空）";
+          put("chead", headTxt, c0, c1, Math.max(22, ganttMatrixHpt(headTxt, c1 - c0 + 1, colWch, 20)));
+          const metaTxt = `负责：${card.owner || "—"}${card.participants ? "　参与：" + card.participants : ""}`;
+          put("meta", metaTxt, c0, c1, Math.max(20, ganttMatrixHpt(metaTxt, c1 - c0 + 1, colWch, 18)));
+          if (card.note) put("note", `备注：${card.note}`, c0, c1, Math.max(20, ganttMatrixHpt(`备注：${card.note}`, c1 - c0 + 1, colWch, 18)));
         } else if (it.sp) {
           const x = it.sp;
-          const typeTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"}`;
-          wsRows.push([dayNo, date, chart.stages[x.stageIdx]?.name || `阶段${x.stageIdx + 1}`, `${typeTxt} ${x.arr.content || ""}`.trim(), x.row.owner || "", x.row.participants || "", x.row.note || ""]);
-          meta.push({ r, kind: "sp" }); r++;
+          const c0 = clamp(x.stageIdx, 0, Math.max(0, S - 1));
+          const headTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"} ${x.arr.content || "（空）"}`.trim();
+          put("shead", headTxt, c0, c0, Math.max(22, ganttMatrixHpt(headTxt, 1, colWch, 20)));
+          const metaTxt = `负责：${x.row.owner || "—"}${x.row.participants ? "　参与：" + x.row.participants : ""}`;
+          put("meta", metaTxt, c0, c0, Math.max(20, ganttMatrixHpt(metaTxt, 1, colWch, 18)));
+          if (x.row.note) put("note", `备注：${x.row.note}`, c0, c0, Math.max(20, ganttMatrixHpt(`备注：${x.row.note}`, 1, colWch, 18)));
         }
       });
-      // 网页每个 DAY 卡片底部都重复「未分配串件」横幅 → 导出同样在每个 DAY 块内重复（N 个 DAY 即 N 次）
+      // 5) 未分配串件横幅（网页每个 DAY 卡片底部都重复 → 此处每 DAY 块内重复）
       const un = unassignedSpRows();
       if (un.length) {
-        wsRows.push([`▲ 未分配串件（${un.length}）——拖拽到本 DAY 的阶段列即可分配`]);
-        meta.push({ r, kind: "ua-title" }); r++;
+        put("uat", `▲ 未分配串件（${un.length}）　拖拽到本 DAY 的阶段列即可分配`, 0, totalCols - 1, 24);
         un.forEach((x) => {
-          const typeTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"}`;
-          wsRows.push(["", "", "未分配", `${typeTxt} ${x.arr.content || ""}`.trim(), x.row.owner || "未指派", x.row.participants || "", x.row.note || ""]);
-          meta.push({ r, kind: "ua" }); r++;
+          const headTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"} · ${x.arr.content || "（空）"}　负责：${x.row.owner || "未指派"}${x.row.participants ? "　参与：" + x.row.participants : ""}${x.row.note ? "　备注：" + x.row.note : ""}`;
+          put("uai", headTxt, 0, totalCols - 1, Math.max(20, ganttMatrixHpt(headTxt, totalCols, colWch, 18)));
         });
       }
-      // DAY 块之间空 2 行
-      if (ci < charts.length - 1) {
-        wsRows.push(["", "", "", "", "", "", ""]); r++;
-        wsRows.push(["", "", "", "", "", "", ""]); r++;
-      }
+      // 6) DAY 块之间空 2 行
+      if (ci < charts.length - 1) { blank(); blank(); }
     });
-    const ws = XLSX.utils.aoa_to_sheet(wsRows);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
     const addr = (row: number, col: number): string => XLSX.utils.encode_cell({ r: row, c: col });
     const solid = (rgb: string): { patternType: "solid"; fgColor: { rgb: string } } => ({ patternType: "solid", fgColor: { rgb } });
-    const thin = { style: "thin" as const, color: { rgb: C.line } };
-    const border = { top: thin, bottom: thin, left: thin, right: thin };
-    // 表头（主蓝底白字）
-    for (let c = 0; c < 7; c++) {
-      const a = addr(0, c);
-      if (ws[a]) ws[a].s = { font: { bold: true, color: { rgb: C.white }, sz: 12 }, fill: solid(C.blue), alignment: { vertical: "center", horizontal: "center" }, border };
-    }
-    const merges: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }> = [];
-    const heights: Array<{ hpt: number }> = [{ hpt: 26 }];
-    meta.forEach((m) => {
-      if (m.kind === "title" || m.kind === "ua-title") {
-        merges.push({ s: { r: m.r, c: 0 }, e: { r: m.r, c: 6 } });
-        const a = addr(m.r, 0);
-        if (ws[a]) ws[a].s = m.kind === "title"
-          ? { font: { bold: true, color: { rgb: C.dayTxt }, sz: 13 }, fill: solid(C.day), alignment: { vertical: "center" }, border }
-          : { font: { bold: true, color: { rgb: C.warnTxt }, sz: 12 }, fill: solid(C.warnBg), alignment: { vertical: "center" }, border };
-        heights[m.r] = { hpt: 24 };
-      } else {
-        const isUa = m.kind === "ua";
-        const isSp = m.kind === "sp";
-        for (let c = 0; c < 7; c++) {
-          const a = addr(m.r, c);
-          if (!ws[a]) continue;
-          const base: Record<string, unknown> = { border, alignment: { vertical: "top", wrapText: true } };
-          if (c === 0 && !isUa) { base.fill = solid(C.day); base.font = { bold: true, color: { rgb: C.dayTxt } }; base.alignment = { vertical: "center", horizontal: "center", wrapText: true }; }
-          else if (c === 1 && !isUa) { base.alignment = { vertical: "top", horizontal: "center", wrapText: true }; }
-          else if (c === 2) {
-            if (isUa) { base.fill = solid(C.warnBg); base.font = { bold: true, color: { rgb: C.warnTxt } }; }
-            else { base.fill = solid(C.blue); base.font = { bold: true, color: { rgb: C.white } }; }
-            base.alignment = { vertical: "center", horizontal: "center", wrapText: true };
-          }
-          else if (c === 3) {
-            if (isSp) { base.fill = solid(C.orange); base.font = { bold: true, color: { rgb: C.white } }; }
-            else if (!isUa) { base.fill = solid(C.yellow); base.font = { bold: true, color: { rgb: C.ink } }; }
-            else { base.font = { color: { rgb: C.warnTxt } }; }
-          }
-          else if (c === 6) { base.font = { color: { rgb: C.danger } }; }
-          ws[a].s = base as never;
+    lines.forEach((ln) => {
+      const apply = (c: number, extra: Record<string, unknown>): void => {
+        const a = addr(ln.r, c);
+        if (ws[a]) ws[a].s = { alignment: { vertical: "center", wrapText: true }, ...extra } as never;
+      };
+      if (ln.kind === "stagehead") {
+        // 阶段表头：逐列独立单元格（不合并）
+        for (let c = ln.c0; c <= ln.c1; c++) {
+          apply(c, { font: { bold: true, color: { rgb: C.white }, sz: 12 }, fill: solid(C.blue), alignment: { vertical: "center", horizontal: "center", wrapText: true } });
         }
-        const row = wsRows[m.r] as unknown[];
-        heights[m.r] = { hpt: ganttRowHpt([[String(row[2] ?? ""), W[2]], [String(row[3] ?? ""), W[3]], [String(row[4] ?? ""), W[4]], [String(row[5] ?? ""), W[5]], [String(row[6] ?? ""), W[6]]]) };
+      } else {
+        if (ln.c1 > ln.c0) merges.push({ s: { r: ln.r, c: ln.c0 }, e: { r: ln.r, c: ln.c1 } });
+        const base: Record<string, unknown> = {};
+        if (ln.kind === "day") { base.font = { bold: true, color: { rgb: C.dayTxt }, sz: 13 }; base.fill = solid(C.day); }
+        else if (ln.kind === "resp") { base.font = { color: { rgb: C.ink }, sz: 11 }; base.fill = solid(C.headSub); }
+        else if (ln.kind === "chead") { base.font = { bold: true, color: { rgb: C.ink }, sz: 11 }; base.fill = solid(C.yellow); }
+        else if (ln.kind === "shead") { base.font = { bold: true, color: { rgb: C.white }, sz: 11 }; base.fill = solid(C.orange); }
+        else if (ln.kind === "note") { base.font = { color: { rgb: C.danger }, sz: 11 }; }
+        else if (ln.kind === "uat") { base.font = { bold: true, color: { rgb: C.warnTxt }, sz: 12 }; base.fill = solid(C.warnBg); }
+        else if (ln.kind === "uai") { base.font = { color: { rgb: C.warnTxt }, sz: 11 }; base.fill = solid(C.warnBg); }
+        else { base.font = { color: { rgb: C.ink }, sz: 11 }; } // meta
+        apply(ln.c0, base);
       }
     });
     ws["!merges"] = merges;
-    ws["!cols"] = W.map((wch) => ({ wch }));
+    ws["!cols"] = Array.from({ length: totalCols }, () => ({ wch: colWch }));
     ws["!rows"] = heights;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "甘特表");
@@ -1742,6 +1736,7 @@ async function exportGanttTable(): Promise<void> {
     ganttExportBusy.value = false;
   }
 }
+
 // 手册清单表格导出：工包工卡 + 换发工卡 + 串件工卡 合并导出（串件工卡单独一个 sheet）
 async function exportDocsXlsx(): Promise<void> {
   const s = state.value; if (!s) return;
@@ -2291,7 +2286,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <div class="subpage-head">
             <div class="subpage-actions">
               <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportAllImage">导出图片</button>
-              <button class="ghost" :class="{ 'is-loading': ganttExportBusy }" :disabled="ganttExportBusy" @click="exportGanttTable" title="维持线上甘特图结构：DAY 卡片标题 + 工序/串件按网页行序交错，未分配串件横幅每 DAY 重复，底色对齐网页，DAY 间空 2 行">导出表格</button>
+              <button class="ghost" :class="{ 'is-loading': ganttExportBusy }" :disabled="ganttExportBusy" @click="exportGanttTable" title="矩阵式版式同网页甘特图：每 DAY 一区块(标题+责任+阶段表头横列)，工序卡横跨起止阶段合并列、串件卡贴其阶段列，未分配串件每 DAY 重复，DAY 间空 2 行">导出表格</button>
             </div>
           </div>
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
