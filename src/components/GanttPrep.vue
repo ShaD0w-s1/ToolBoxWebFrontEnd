@@ -2,8 +2,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
-// docx 仅做类型引用（运行时保持动态 import 分包）；D* 别名用于类型标注
-import type { Paragraph as DParagraph, Table as DTable, TableRow as DTableRow, TableCell as DTableCell } from "docx";
 import { backend } from "../api";
 import NameSuggest from "./NameSuggest.vue";
 import AttachmentSection from "./AttachmentSection.vue";
@@ -1635,7 +1633,8 @@ async function exportGanttXlsx(): Promise<void> {
   if (ganttXlsxBusy.value) return;
   ganttXlsxBusy.value = true;
   try {
-    const XLSX = await import("xlsx");
+    const xlsxMod: any = await import("xlsx-js-style");
+    const XLSX: any = (xlsxMod.default && xlsxMod.default.utils) ? xlsxMod.default : xlsxMod;
     const charts = s.charts.slice().sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0));
     const COL_W = 13;                       // 每阶段小列宽（每阶段 3 列一组）
     const SEQ_W = 9;                        // A 列宽
@@ -1800,167 +1799,12 @@ async function exportGanttXlsx(): Promise<void> {
     ws["!rows"] = heights;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "甘特表");
-    XLSX.writeFile(wb, `甘特工序表_${stampDate()}.xlsx`);
+    XLSX.writeFile(wb, `甘特工序表_${stampDate()}.xlsx`, { cellStyles: true });
     props.store.notifyOk("甘特 Excel 已导出");
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "Excel 导出失败", "err");
   } finally {
     ganttXlsxBusy.value = false;
-  }
-}
-
-// ===== 甘特图子页「导出 Word」：原生表格，A4 横向，每个 DAY 卡片各占一页，维持网页甘特图布局 =====
-// 每 DAY 一个表格：DAY 标题行(浅蓝) + 责任行(灰蓝) + 阶段表头行(主蓝白字，横向列) +
-// 卡片行(工序卡按起止阶段横向合并多列/串件卡贴其阶段列，卡内 内容/负责·参与/备注 分行) +
-// 未分配串件横幅每 DAY 重复；表格用 docx 原生单元格（可编辑、可打印），非截图图片。
-const wordExportBusy = ref(false);
-async function exportGanttWord(): Promise<void> {
-  const s = state.value; if (!s) return;
-  if (!s.charts.length) { props.store.notify("没有数据"); return; }
-  if (wordExportBusy.value) return;
-  wordExportBusy.value = true;
-  try {
-    const docx = await import("docx");
-    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, TableLayoutType, WidthType, VerticalAlign, BorderStyle, AlignmentType, PageOrientation } = docx;
-    const mm = docx.convertMillimetersToTwip;
-    const C = { day: "E8F1FC", dayTxt: "2F5597", blue: "4472C4", headSub: "EDF2FC", yellow: "FDCA17", orange: "E8A44D", warnBg: "FFE8C7", warnTxt: "B45309", danger: "C0392B", white: "FFFFFF", ink: "1F1F1F", noteOnOrange: "FFE8C7", line: "C9CFDA" };
-    const charts = s.charts.slice().sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0));
-    props.store.notify("正在生成 Word…");
-    const children: Array<DParagraph | DTable> = [];
-    const p = (opts: ConstructorParameters<typeof DParagraph>[0]): DParagraph => new Paragraph(opts);
-    const border = { style: BorderStyle.SINGLE, size: 4, color: C.line };
-    const cardBorders = { top: border, bottom: border, left: border, right: border };
-    const emptyCell = (): DTableCell => new TableCell({ children: [p({ children: [] })] });
-    charts.forEach((chart, ci) => {
-      const S = chart.stages.length;
-      const dayNo = `DAY ${chart.day}`;
-      const date = chart.date || "";
-      const colW = S > 0 ? Math.floor((297 - 24) * 56.7 / S) : 0; // 可用宽度分列（twips）
-      if (ci > 0) children.push(p({ pageBreakBefore: true, spacing: { before: 0, after: 0 }, children: [] })); // 每 DAY 另起一页
-      if (S === 0) {
-        // 无阶段：仅标题/责任段落
-        children.push(p({ spacing: { after: 60 }, children: [new TextRun({ text: `${dayNo}｜${date}${chart.title ? "｜" + chart.title : ""}`, bold: true, color: C.dayTxt, size: 28 })] }));
-        const respTxt0 = (chart.responsibilities || []).filter((x) => x.name).map((x) => `${x.label || ""}：${x.name}`).join("　");
-        if (respTxt0) children.push(p({ children: [new TextRun({ text: `责任　${respTxt0}`, color: C.ink, size: 20 })] }));
-        children.push(p({ children: [new TextRun({ text: "（本 DAY 未设置阶段）", color: C.warnTxt, size: 20 })] }));
-        return;
-      }
-      const rows: DTableRow[] = [];
-      // ① DAY 标题行（合并整行，浅蓝底）
-      const titleTxt = `${dayNo}｜${date}${chart.title ? "｜" + chart.title : ""}`;
-      rows.push(new TableRow({ children: [new TableCell({
-        columnSpan: S, shading: { fill: C.day }, verticalAlign: VerticalAlign.CENTER,
-        margins: { top: 100, bottom: 100, left: 120, right: 120 },
-        borders: cardBorders,
-        children: [p({ spacing: { after: 0 }, children: [new TextRun({ text: titleTxt, bold: true, color: C.dayTxt, size: 24 })] })],
-      })] }));
-      // ② 顶部责任行（灰蓝底，合并整行；仅展示已填姓名项）
-      const respTxt = (chart.responsibilities || []).filter((x) => x.name).map((x) => `${x.label || ""}：${x.name}`).join("　");
-      if (respTxt) {
-        rows.push(new TableRow({ children: [new TableCell({
-          columnSpan: S, shading: { fill: C.headSub }, verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 60, bottom: 60, left: 120, right: 120 },
-          borders: cardBorders,
-          children: [p({ spacing: { after: 0 }, children: [new TextRun({ text: `责任　${respTxt}`, color: C.ink, size: 20 })] })],
-        })] }));
-      }
-      // ③ 阶段表头行（每个阶段一列，主蓝底白字）
-      rows.push(new TableRow({ children: chart.stages.map((st) => new TableCell({
-        shading: { fill: C.blue }, verticalAlign: VerticalAlign.CENTER,
-        margins: { top: 60, bottom: 60, left: 60, right: 60 },
-        borders: cardBorders,
-        children: [p({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [new TextRun({ text: st.name || "阶段", bold: true, color: C.white, size: 22 })] })],
-      })) }));
-      // ④ 卡片行：按网页 computeRows 行→列序；工序卡横跨起止阶段(columnSpan)、串件卡贴其阶段列
-      const gridRows = computeRows(chart);
-      const items: Array<{ row: number; col: number; card?: GanttCard; sp?: { arr: GanttSpArrangement; row: GanttSpRow; stageIdx: number } }> = [];
-      chart.cards.forEach((card) => items.push({ row: gridRows[card.id] ?? 0, col: card.startStage, card }));
-      spCardsOfChart(chart).forEach((x) => items.push({ row: gridRows["sp:" + x.row.id] ?? 0, col: x.stageIdx, sp: x }));
-      items.forEach((it) => { if ((it.col ?? 0) < 0 || (it.col ?? 0) >= S) return; });
-      const groups = new Map<number, typeof items>();
-      items.forEach((it) => { const arr = groups.get(it.row) || []; arr.push(it); groups.set(it.row, arr); });
-      [...groups.keys()].sort((a, b) => a - b).forEach((rowNo) => {
-        const group = groups.get(rowNo)!.slice().sort((a, b) => a.col - b.col);
-        const cells: DTableCell[] = [];
-        let cur = 0;
-        group.forEach((it) => {
-          if (it.col > cur) { for (let k = cur; k < it.col; k++) cells.push(emptyCell()); cur = it.col; }
-          const span = it.card ? Math.max(1, it.card.endStage - it.card.startStage + 1) : 1;
-          if (it.card) {
-            const card = it.card;
-            const cardParas: DParagraph[] = [p({ spacing: { after: 0 }, children: [new TextRun({ text: card.content || "（空）", bold: true, color: C.ink, size: 22 })] })];
-            const metaTxt = `负责：${card.owner || "—"}${card.participants ? "　参与：" + card.participants : ""}`;
-            cardParas.push(p({ spacing: { after: 0 }, children: [new TextRun({ text: metaTxt, color: C.ink, size: 20 })] }));
-            if (card.note) cardParas.push(p({ spacing: { after: 0 }, children: [new TextRun({ text: `备注：${card.note}`, color: C.danger, size: 20 })] }));
-            cells.push(new TableCell({
-              columnSpan: span, shading: { fill: C.yellow }, verticalAlign: VerticalAlign.CENTER,
-              margins: { top: 60, bottom: 60, left: 100, right: 100 },
-              borders: cardBorders,
-              children: cardParas,
-            }));
-          } else if (it.sp) {
-            const x = it.sp;
-            const headTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"} ${x.arr.content || "（空）"}`.trim();
-            const cardParas: DParagraph[] = [p({ spacing: { after: 0 }, children: [new TextRun({ text: headTxt, bold: true, color: C.white, size: 22 })] })];
-            const metaTxt = `负责：${x.row.owner || "—"}${x.row.participants ? "　参与：" + x.row.participants : ""}`;
-            cardParas.push(p({ spacing: { after: 0 }, children: [new TextRun({ text: metaTxt, color: C.white, size: 20 })] }));
-            if (x.row.note) cardParas.push(p({ spacing: { after: 0 }, children: [new TextRun({ text: `备注：${x.row.note}`, color: C.noteOnOrange, size: 20 })] }));
-            cells.push(new TableCell({
-              columnSpan: 1, shading: { fill: C.orange }, verticalAlign: VerticalAlign.CENTER,
-              margins: { top: 60, bottom: 60, left: 100, right: 100 },
-              borders: cardBorders,
-              children: cardParas,
-            }));
-          }
-          cur += span;
-        });
-        for (let k = cur; k < S; k++) cells.push(emptyCell());
-        rows.push(new TableRow({ children: cells }));
-      });
-      // ⑤ 未分配串件横幅（网页每个 DAY 卡片底部重复 → 每 DAY 表格内重复）
-      const un = unassignedSpRows();
-      if (un.length) {
-        rows.push(new TableRow({ children: [new TableCell({
-          columnSpan: S, shading: { fill: C.warnBg }, verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 60, bottom: 60, left: 120, right: 120 },
-          borders: cardBorders,
-          children: [p({ spacing: { after: 40 }, children: [new TextRun({ text: `▲ 未分配串件（${un.length}）　拖拽到本 DAY 的阶段列即可分配`, bold: true, color: C.warnTxt, size: 22 })] })],
-        })] }));
-        un.forEach((x) => {
-          const lineTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"} · ${x.arr.content || "（空）"}　负责：${x.row.owner || "未指派"}${x.row.participants ? "　参与：" + x.row.participants : ""}${x.row.note ? "　备注：" + x.row.note : ""}`;
-          rows.push(new TableRow({ children: [new TableCell({
-            columnSpan: S, shading: { fill: C.warnBg }, verticalAlign: VerticalAlign.CENTER,
-            margins: { top: 40, bottom: 40, left: 140, right: 120 },
-            borders: cardBorders,
-            children: [p({ spacing: { after: 0 }, children: [new TextRun({ text: lineTxt, color: C.warnTxt, size: 20 })] })],
-          })] }));
-        });
-      }
-      children.push(new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        columnWidths: Array.from({ length: S }, () => colW),
-        layout: TableLayoutType.FIXED,
-        rows,
-      }));
-    });
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            size: { orientation: PageOrientation.LANDSCAPE, width: mm(297), height: mm(210) },
-            margin: { top: mm(12), right: mm(12), bottom: mm(12), left: mm(12) },
-          },
-        },
-        children,
-      }],
-    });
-    const blob = await Packer.toBlob(doc);
-    downloadBlob(blob, `换发准备单_甘特图_${stampDate()}.docx`);
-    props.store.notifyOk("甘特 Word 已导出");
-  } catch (e) {
-    props.store.notify(e instanceof Error ? e.message : "Word 导出失败", "err");
-  } finally {
-    wordExportBusy.value = false;
   }
 }
 
@@ -2513,8 +2357,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <div class="subpage-head">
             <div class="subpage-actions">
               <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportAllImage">导出图片</button>
-              <button class="ghost" :class="{ 'is-loading': wordExportBusy }" :disabled="wordExportBusy" @click="exportGanttWord" title="导出 Word（A4 横向）：每 DAY 一页 Word 原生表格，阶段为横列表头、工序卡跨起止阶段合并列，维持网页甘特图布局">导出 Word</button>
-              <button class="ghost" :class="{ 'is-loading': ganttXlsxBusy }" :disabled="ganttXlsxBusy" @click="exportGanttXlsx" title="导出 Excel：泳道行排版同网页甘特；卡底色按网页配色(工序黄/串件橙)且标题加粗、卡片粗框线；阶段标题浅灰底黑字加粗+细框线">导出 Excel</button>
+              <button class="ghost" :class="{ 'is-loading': ganttXlsxBusy }" :disabled="ganttXlsxBusy" @click="exportGanttXlsx" title="导出表格：泳道行排版同网页甘特；卡底色按网页配色(工序黄/串件橙)且标题加粗、卡片粗框线；阶段标题浅灰底黑字加粗+细框线">导出表格</button>
             </div>
           </div>
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
