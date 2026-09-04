@@ -1609,10 +1609,11 @@ async function exportAllXlsx(): Promise<void> {
     props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
-// ===== 甘特图子页「导出 Excel」：仿参考工序模板（Sheet2/3 体例），卡块分行式 =====
+// ===== 甘特图子页「导出 Excel」：仿参考工序模板（Sheet2/3 体例），泳道行卡式 =====
 // 每 DAY 一个区块：DAY 横幅(日期+DAY) / 各项负责 / 阶段表头(每阶段 3 列一组) /
-// 每张卡一个三行块：①标题行(浅灰底，工序跨起止阶段合并多列)②人员行 ③备注行(红字)；
-// 行首 A 列纵向合并写「工序N/串件N」；未分配串件每 DAY 尾部；DAY 间空 2 行。
+// 工序卡按网页甘特「泳道行」排版：同一行(row)不同阶段的卡并排放置同一行，不占独立整行；
+// 每个泳道行导成三行：①卡标题行(浅灰/米黄底，卡按起止阶段合并多列)②人员行 ③备注行(红字)；
+// 行首 A 列三行纵向合并写「并列N」；未分配串件每 DAY 尾部；DAY 间空 2 行。
 const ganttXlsxBusy = ref(false);
 /** 行高估算：按合并宽度（列数×每列 wch，CJK 每字约 2 字符位）估换行后行高。 */
 function ganttExcelHpt(text: string, colCount: number, wchPer: number, minHpt = 20): number {
@@ -1674,13 +1675,15 @@ async function exportGanttXlsx(): Promise<void> {
       rows[rH][0] = "阶段";
       chart.stages.forEach((st, i) => { rows[rH][1 + i * 3] = st.name || `阶段${i + 1}`; });
       lines.push({ r: rH, c0: 0, c1: endCol, kind: "stagehead" });
-      // ④ 卡块：三行(标题/人员/备注) + A 列纵向合并序号
+      // ④ 卡行：与网页甘特图一致——同一泳道行(row)内不同阶段的工序/串件并排放置于同一行，
+      // 而不是每张卡独占多行；每个泳道行导成三行(①卡标题行灰/米黄 ②人员行 ③备注行红)，
+      // 卡按其起止阶段横向合并多列；行首 A 列三行纵向合并写「并列N」（对应网页同一 row 的并行工序组）。
       const gridRowsMap = computeRows(chart);
       const items: Array<{ row: number; col: number; card?: GanttCard; sp?: { arr: GanttSpArrangement; row: GanttSpRow; stageIdx: number } }> = [];
       chart.cards.forEach((card) => items.push({ row: gridRowsMap[card.id] ?? 0, col: card.startStage, card }));
       spCardsOfChart(chart).forEach((x) => items.push({ row: gridRowsMap["sp:" + x.row.id] ?? 0, col: x.stageIdx, sp: x }));
       items.sort((a, b) => (a.row - b.row) || (a.col - b.col));
-      let cardNo = 0; let spNo = 0;
+      const laneGroups = new Map<number, Array<{ c0: number; c1: number; isSp: boolean; headTxt: string; metaTxt: string; noteTxt: string }>>();
       items.forEach((it) => {
         const startIdx = it.card ? it.card.startStage : it.sp ? it.sp.stageIdx : 0;
         const endIdx = it.card ? it.card.endStage : it.sp ? it.sp.stageIdx : 0;
@@ -1694,23 +1697,42 @@ async function exportGanttXlsx(): Promise<void> {
         const owner = (isSp && it.sp ? it.sp.row.owner : it.card?.owner) || "";
         const participants = (isSp && it.sp ? it.sp.row.participants : it.card?.participants) || "";
         const note = (isSp && it.sp ? it.sp.row.note : it.card?.note) || "";
-        const label = isSp ? `串件${++spNo}` : `工序${++cardNo}`;
-        const rT = rows.length;
-        // 标题行（灰底/米黄底）+ A 序号
-        const rT2 = pushRow(Math.max(22, ganttExcelHpt(headTxt, span * 3, COL_W, 20)));
-        rows[rT2][0] = label; rows[rT2][c0] = headTxt;
-        lines.push({ r: rT2, c0, c1, kind: isSp ? "sp-head" : "card-head" });
-        // 人员行
         const metaTxt = `负责：${owner || "—"}${participants ? "　参与：" + participants : ""}`;
-        const rM = pushRow(Math.max(20, ganttExcelHpt(metaTxt, span * 3, COL_W, 18)));
-        rows[rM][c0] = metaTxt;
-        lines.push({ r: rM, c0, c1, kind: isSp ? "sp-meta" : "card-meta" });
-        // 备注行（红字；无备注留空白行保持三行节奏）
         const noteTxt = note ? `备注：${note}` : "";
-        const rN = pushRow(note ? Math.max(20, ganttExcelHpt(noteTxt, span * 3, COL_W, 18)) : 10);
-        if (note) rows[rN][c0] = noteTxt;
-        lines.push({ r: rN, c0, c1, kind: isSp ? "sp-note" : "card-note" });
-        // A 列纵向合并三行
+        const lane = laneGroups.get(it.row) ?? [];
+        lane.push({ c0, c1, isSp, headTxt, metaTxt, noteTxt });
+        laneGroups.set(it.row, lane);
+      });
+      let laneNo = 0;
+      [...laneGroups.keys()].sort((a, b) => a - b).forEach((rowNo) => {
+        const lane = laneGroups.get(rowNo)!.slice().sort((a, b) => a.c0 - b.c0);
+        laneNo++;
+        const rT = rows.length;
+        // 标题行（整泳道一行，卡按列区间合并）
+        const headH = Math.max(22, ...lane.map((c) => ganttExcelHpt(c.headTxt, c.c1 - c.c0 + 1, COL_W, 18)));
+        const r0 = pushRow(headH);
+        rows[r0][0] = `并列${laneNo}`;
+        lane.forEach((c) => {
+          rows[r0][c.c0] = c.headTxt;
+          lines.push({ r: r0, c0: c.c0, c1: c.c1, kind: c.isSp ? "sp-head" : "card-head" });
+        });
+        // 人员行（同一行并排）
+        const metaH = Math.max(18, ...lane.map((c) => ganttExcelHpt(c.metaTxt, c.c1 - c.c0 + 1, COL_W, 16)));
+        const r1 = pushRow(metaH);
+        lane.forEach((c) => {
+          rows[r1][c.c0] = c.metaTxt;
+          lines.push({ r: r1, c0: c.c0, c1: c.c1, kind: c.isSp ? "sp-meta" : "card-meta" });
+        });
+        // 备注行（红字，同一行并排；无备注留空行保三行节奏）
+        const anyNote = lane.some((c) => c.noteTxt);
+        const r2 = pushRow(anyNote ? Math.max(18, ...lane.map((c) => (c.noteTxt ? ganttExcelHpt(c.noteTxt, c.c1 - c.c0 + 1, COL_W, 16) : 0))) : 10);
+        lane.forEach((c) => {
+          if (c.noteTxt) {
+            rows[r2][c.c0] = c.noteTxt;
+            lines.push({ r: r2, c0: c.c0, c1: c.c1, kind: c.isSp ? "sp-note" : "card-note" });
+          }
+        });
+        // A 列三行纵向合并
         merges.push({ s: { r: rT, c: 0 }, e: { r: rT + 2, c: 0 } });
       });
       // ⑤ 未分配串件（网页每 DAY 底部横幅重复）
@@ -2498,7 +2520,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="subpage-actions">
               <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportAllImage">导出图片</button>
               <button class="ghost" :class="{ 'is-loading': wordExportBusy }" :disabled="wordExportBusy" @click="exportGanttWord" title="导出 Word（A4 横向）：每 DAY 一页 Word 原生表格，阶段为横列表头、工序卡跨起止阶段合并列，维持网页甘特图布局">导出 Word</button>
-              <button class="ghost" :class="{ 'is-loading': ganttXlsxBusy }" :disabled="ganttXlsxBusy" @click="exportGanttXlsx" title="导出 Excel：仿工序计划模板体例——每 DAY 一区块(日期横幅/各项负责/阶段表头)，每张卡为 灰标题行/人员行/红字备注行 三行块，行首序号纵向合并">导出 Excel</button>
+              <button class="ghost" :class="{ 'is-loading': ganttXlsxBusy }" :disabled="ganttXlsxBusy" @click="exportGanttXlsx" title="导出 Excel：仿工序计划模板体例，与网页甘特一致按泳道行排版——同一行不同阶段工序并排、卡跨起止阶段合并多列，三行节奏(标题/人员/备注)">导出 Excel</button>
             </div>
           </div>
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
