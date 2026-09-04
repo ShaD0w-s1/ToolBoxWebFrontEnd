@@ -1417,10 +1417,12 @@ function exportDocx(): void {
 // ===== 导出长图（html2canvas 渲染当前子页） =====
 const mainAreaRef = ref<HTMLElement | null>(null);
 async function exportAllImage(): Promise<void> {
+  if (props.store.imageExportBusy.value) return;
   const s = state.value; if (!s) return;
   if (!s.charts.length) { props.store.notify("没有数据"); return; }
   const target = mainAreaRef.value;
   if (!target) return;
+  props.store.imageExportBusy.value = true;
 
   // ① 先把所有 .gantt-grid 的列宽固定为当前实际列宽（替代百分比模板），保证横向内容能自然撑开
   const grids = Array.from(target.querySelectorAll<HTMLElement>(".gantt-grid"));
@@ -1561,6 +1563,7 @@ async function exportAllImage(): Promise<void> {
     });
     target.style.width = savedMain.width;
     target.style.minWidth = savedMain.minWidth;
+    props.store.imageExportBusy.value = false;
   }
 }
 
@@ -1967,7 +1970,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <label class="button ghost">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importAllXlsx" /></label>
               <button class="ghost" @click="exportAllXlsx">导出表格</button>
               <button class="ghost" @click="exportDocx">导出 Word</button>
-              <button class="ghost" @click="exportAllImage">导出图片</button>
+              <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportAllImage">导出图片</button>
             </div>
           </div>
           <!-- 全局飞机/项目信息 -->
@@ -2152,7 +2155,7 @@ async function importAllXlsx(event: Event): Promise<void> {
         <div v-else-if="tab === 'gantt'" class="gp-gantt">
           <div class="subpage-head">
             <div class="subpage-actions">
-              <button class="ghost" @click="exportAllImage">导出图片</button>
+              <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportAllImage">导出图片</button>
             </div>
           </div>
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
@@ -2396,7 +2399,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div v-for="row in g.rows" :key="row.item.id" class="itg-row">
                         <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
                         <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
-                        <textarea rows="1" class="itg-note-input" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
+                        <textarea rows="1" class="cell-inp is-note" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
                         <div class="itg-ops"><button class="del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button></div>
                       </div>
                     </div>
@@ -2420,7 +2423,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div v-for="row in g.rows" :key="row.item.id" class="itg-row">
                         <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
                         <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
-                        <textarea rows="1" class="itg-note-input" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
+                        <textarea rows="1" class="cell-inp is-note" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
                         <div class="itg-ops"><button class="del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button></div>
                       </div>
                     </div>
@@ -2450,7 +2453,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 </template>
                 <textarea rows="1" v-model="it.name" placeholder="名称" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'name')"></textarea>
                 <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', it.id, 'qty')" />
-                <textarea rows="1" class="itg-note-input" v-model="it.note" placeholder="备注" @input="onPartAutoSize" @blur="save" v-lock="lockKey('partitem', it.id, 'note')"></textarea>
+                <textarea rows="1" class="cell-inp is-note" v-model="it.note" placeholder="备注" @input="onPartAutoSize" @blur="save" v-lock="lockKey('partitem', it.id, 'note')"></textarea>
                 <div class="itg-ops"><button class="del" title="删除物品" @click="removePartItem(partKind, card.id, it.id)">×</button></div>
               </div>
             </div>

@@ -70,6 +70,7 @@ function downloadPreview(): void {
 
 async function exportImage(element: HTMLElement | null, subPageName = ""): Promise<void> {
   if (!element) return;
+  store.imageExportBusy.value = true;
   // html2canvas 按需加载：仅点击导出时才下载（首屏不再预取该 196KB chunk）
   const html2canvas = (await import("html2canvas")).default;
   lastImageName = `${exportFileName(store.currentProject.value?.name || store.detailTitle.value, subPageName)}.jpg`;
@@ -158,6 +159,8 @@ async function exportImage(element: HTMLElement | null, subPageName = ""): Promi
   } catch (error) {
     cleanup();
     store.notify(errorMessage(error) || "生成图片失败");
+  } finally {
+    store.imageExportBusy.value = false;
   }
 }
 

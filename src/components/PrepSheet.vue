@@ -113,7 +113,7 @@ function exportTableXlsx(): void {
       <input v-else class="prep-title-input" v-model="titleDraft" @blur="commitRenameTitle" @keydown.enter.prevent="commitRenameTitle" @keydown.esc.prevent="cancelRenameTitle" autofocus />
       <div class="subpage-actions">
         <label v-if="!titleEditing" class="ghost" @click="startRenameTitle">改名称</label>
-        <button class="ghost" @click="exportImage">导出图片</button>
+        <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTableXlsx">导出表格</button>
       </div>
     </div>

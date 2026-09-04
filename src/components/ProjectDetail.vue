@@ -434,7 +434,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
             <button v-if="isLibrary" class="ghost" @click="finishLibrary">完成</button>
             <button v-if="!isLibrary" class="ghost" @click="downloadControlDoc">下载现场管控单</button>
             <label v-if="isStandalone && !isLibrary" class="button ghost" title="导入表格整体替换（类型|名称|数量，可含部位列）">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="importFlatToolFile" /></label>
-            <button class="ghost" @click="emit('export-image', capture, isLibrary ? '工具标准库' : '工具清单')">导出图片</button>
+            <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="emit('export-image', capture, isLibrary ? '工具标准库' : '工具清单')">导出图片</button>
             <button class="ghost" @click="emit('export-sheet', displayCats)">导出表格</button>
             <button v-if="!isLibrary" class="danger" @click="clearToolList">清空清单</button>
           </div>
@@ -486,7 +486,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <div v-for="it in g.items" :key="it.id" class="itg-row">
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
                   <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
-                  <textarea v-model="it.note" rows="1" class="itg-note-input" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
+                  <textarea v-model="it.note" rows="1" class="cell-inp is-note" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
                   <div class="itg-ops"><button class="del" title="删除该工具" @click="store.deleteItem(it.id)">×</button></div>
                 </div>
               </div>
@@ -505,7 +505,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <div v-for="it in g.items" :key="it.id" class="itg-row">
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
                   <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
-                  <textarea v-model="it.note" rows="1" class="itg-note-input" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
+                  <textarea v-model="it.note" rows="1" class="cell-inp is-note" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
                   <div class="itg-ops"><button class="del" title="删除该工具" @click="store.deleteItem(it.id)">×</button></div>
                 </div>
               </div>

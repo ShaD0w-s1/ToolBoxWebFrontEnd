@@ -124,6 +124,30 @@ input:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([
 }
 input:where([type="date"]) { min-height: 32px; padding: 0 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-12); }
 
+/* ===== 输入框 T2 表格/网格单元格层（UI_DESIGN_SPEC §7.1）：.cell-inp =====
+   无边框、自适应行高、焦点才浮起。行高由组件 JS autoGrow 驱动（scrollHeight），此处不设 field-sizing 以免双轨冲突。 */
+.cell-inp {
+  width: 100%; box-sizing: border-box;
+  padding: 3px 6px;                    /* 继承单元格内边距观感 */
+  border: 1px solid transparent;        /* 占位边框，避免 focus 时抖动 */
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--n9); font: inherit; font-size: var(--fs-13);
+  resize: none; overflow: hidden;
+  min-height: 26px; line-height: 1.5;
+  transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.cell-inp:hover { background: var(--n1); border-color: var(--n3); }
+.cell-inp:focus {
+  outline: none; background: #fff;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(68, 114, 196, .14);   /* 比 .inp 的 3px 收窄，适应密集表格 */
+}
+.cell-inp::placeholder { color: var(--n6); }
+/* 备注语义：红色（与全局 textarea[placeholder*="备注"] 一致，此处显式化） */
+.cell-inp.is-note { color: var(--danger); }
+.cell-inp.is-note::placeholder { color: var(--n6); }
+
 /* ===== 最小动效（纯 CSS，仅 transform/opacity/color，不触发布局重排） =====
    原则：140–220ms 快速反馈；不做入场 stagger；不引入 JS 动画库。 */
 button, .button, .tab, .project-card, .library-card, .category-card, .sub-card {
@@ -145,6 +169,22 @@ button.ghost, .ghost {
   font-size: var(--fs-13); font-weight: 600; cursor: pointer;
 }
 button.ghost:hover, .ghost:hover { background: var(--blue-light); }
+
+/* ===== 按钮加载态（UI_DESIGN_SPEC §7.3）：is-loading 禁用防重复点击，spinner 占位保持按钮宽度不跳动 ===== */
+button.is-loading, .button.is-loading, label.button.is-loading {
+  position: relative; color: transparent !important;
+  pointer-events: none; opacity: .85;
+}
+button.is-loading::after, label.button.is-loading::after {
+  content: ""; position: absolute; inset: 0; margin: auto;
+  width: 14px; height: 14px;
+  border: 2px solid var(--n4);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: loading-spin .8s linear infinite;
+}
+/* 蓝底主按钮：spinner 用白（默认按钮/ghost 白底则上方蓝 spinner 规则生效） */
+button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); border-top-color: #fff; }
 
 /* 项目类型选择框（A检/零散/换发/换APU/单独项目）：统一白底蓝字 */
 .type-select {

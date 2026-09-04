@@ -270,8 +270,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
       <div class="subpage-actions">
         <button class="ghost" @click="openTplModal('load')">调取模板</button>
         <button class="ghost" @click="openTplModal('save')">保存模板</button>
-        <button class="ghost" @click="exportImage">导出图片</button>
-        <button class="ghost" @click="exportWord" title="按页面格式导出含表格的 Word 文档">导出 Word</button>
+        <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportImage">导出图片</button>
+        <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportWord" title="按页面格式导出含表格的 Word 文档">导出 Word</button>
       </div>
     </div>
 

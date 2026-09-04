@@ -110,6 +110,9 @@ export function useToolbox() {
   const shared = ref(false);
   /** 导出图片时临时强制展开所有部位卡片，保证长图完整。 */
   const forceExpandAll = ref(false);
+  /** 导出图片/导出 Word 进行中（App.vue exportImage / GanttPrep exportAllImage 置位），
+   *  供各页「导出」按钮绑定 is-loading 禁用态，防止重复点击产生双份导出。 */
+  const imageExportBusy = ref(false);
   /** 一级页面公告栏内容（云端共享）。 */
   const announcement = ref("");
   let announcementDirty = false;
@@ -455,13 +458,25 @@ export function useToolbox() {
     nextId = maximum + 1;
   }
 
-  function notify(message: string, level: "info" | "ok" | "err" = "info"): void {
+  // —— toast 语义化分级（UI_DESIGN_SPEC §7.2）：guessLevel 内容推断兜底 ——
+  // 仅作兜底——新代码一律显式传 level，或用 notifyOk / notifyErr。
+  const ERR_HINT = /失败|错误|异常|无法|不能|超时|中断|已存在|不存在|请勿|缺少|无效|拒/;
+  const OK_HINT = /完成|成功|已保存|已复制|已上传|已删除|已同步|已导入|已导出|已添加|已更新/;
+  function guessLevel(msg: string): "info" | "ok" | "err" {
+    if (ERR_HINT.test(msg)) return "err";
+    if (OK_HINT.test(msg)) return "ok";
+    return "info";
+  }
+
+  function notify(message: string, level?: "info" | "ok" | "err"): void {
     toast.message = message;
-    toast.level = level;
+    toast.level = level ?? guessLevel(message);
     toast.visible = true;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { toast.visible = false; }, 2200);
   }
+  const notifyOk = (m: string): void => notify(m, "ok");
+  const notifyErr = (m: string): void => notify(m, "err");
 
   function markProjectField(id: string, field: ProjectField): void {
     let set = dirtyFields.get(id);
@@ -2250,8 +2265,8 @@ export function useToolbox() {
     app, screen, listTab, detailTab, ganttTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
     active, materialActive, materialCategories, standardMaterialCategories, mStandardSubs,
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
-    dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toast, shared,
-    notify, persist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
+    dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toast, shared, imageExportBusy,
+    notify, notifyOk, notifyErr, persist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
     createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
     itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,

@@ -145,7 +145,7 @@ function autoGrow(event: Event): void {
               </template>
               <textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" placeholder="名称" @input="autoGrow"></textarea>
               <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
-              <textarea rows="1" class="itg-note-input" v-model="it.note" v-lock="lock(it, 'note')" placeholder="备注" @input="autoGrow" @blur="commitNote(it)"></textarea>
+              <textarea rows="1" class="cell-inp is-note" v-model="it.note" v-lock="lock(it, 'note')" placeholder="备注" @input="autoGrow" @blur="commitNote(it)"></textarea>
               <div class="itg-ops"><button class="del" title="删除物品" @click="removeItem(it)">×</button></div>
             </div>
           </div>

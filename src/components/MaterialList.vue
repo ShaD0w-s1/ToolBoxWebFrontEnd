@@ -253,7 +253,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
       <h3>{{ title }}</h3>
       <span v-if="!isLibrary && !isStandalone" class="auto-filter-warning">自动模糊筛选，需人工复核</span>
       <div class="subpage-actions">
-        <button class="ghost" @click="exportImage">导出图片</button>
+        <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTableXlsx">导出表格</button>
         <label v-if="isStandalone" class="button ghost" title="导入表格整体替换（类型|件号|名称|数量，可含部位列）">导入表格<input hidden type="file" accept=".xlsx,.xls" @change="onImportFlatFile" /></label>
         <button v-if="isLibrary" class="ghost" @click="finishLibrary">完成</button>

@@ -290,7 +290,7 @@ onBeforeUnmount(() => {
       <h3>工卡分配清单</h3>
       <div class="subpage-actions">
         <button class="ghost" @click="addTempGroup" title="新增一个可命名分组，用于把工卡临时归组（不写入工卡分配标准库）">+ 临时分组</button>
-        <button class="ghost" @click="exportImage">导出图片</button>
+        <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportImage">导出图片</button>
         <button class="ghost" @click="exportTable">导出表格</button>
       </div>
     </div>

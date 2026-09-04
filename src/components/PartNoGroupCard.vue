@@ -39,7 +39,7 @@ function subLabel(it: ToolItem): string {
         <div v-for="it in items" :key="it.id" class="itg-row">
           <span class="itg-tag">{{ subLabel(it) }}</span>
           <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
-          <textarea v-model="it.note" v-lock="lock(it, 'note')" rows="1" class="itg-note-input" placeholder="备注" @input="commitNote(it, $event)" />
+          <textarea v-model="it.note" v-lock="lock(it, 'note')" rows="1" class="cell-inp is-note" placeholder="备注" @input="commitNote(it, $event)" />
           <div class="itg-ops"><button class="del" title="删除" @click="remove(it)">×</button></div>
         </div>
       </div>
