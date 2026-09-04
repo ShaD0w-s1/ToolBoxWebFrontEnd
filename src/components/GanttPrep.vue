@@ -1644,38 +1644,45 @@ async function exportGanttTable(): Promise<void> {
       const dayNo = `DAY ${chart.day}`;
       const date = chart.date || "";
       const resp = (chart.responsibilities || []).map((x) => `${x.label || ""}${x.name ? "：" + x.name : ""}`).filter(Boolean).join("，");
-      // DAY 标题行（A:G 合并，浅蓝底，责任并入）
+      // DAY 标题行（A:G 合并，浅蓝底，对应网页 DAY 卡片头部：日期/DAY/标题 + 顶部责任）
       wsRows.push([`${dayNo}｜${chart.title || ""}｜${date}${resp ? "　责任：" + resp : ""}`]);
       meta.push({ r, kind: "title" }); r++;
-      // 工序卡片（黄底，网页同色）
-      chart.cards.slice().sort((a, b) => (a.startStage - b.startStage) || ((a.order ?? 0) - (b.order ?? 0))).forEach((card) => {
-        wsRows.push([dayNo, date, ganttStageSpanText(chart, card.startStage, card.endStage), card.content || "", card.owner || "", card.participants || "", card.note || ""]);
-        meta.push({ r, kind: "data" }); r++;
+      // 维持线上甘特图结构：工序卡与已分配串件卡同处一网格，按行(row)→列(左→右)交错排布，
+      // 与网页 computeRows 行号一致；工序卡可跨多列（阶段文本用 → 连接），串件卡占单列。
+      const gridRows = computeRows(chart);
+      const items: Array<{ row: number; col: number; card?: GanttCard; sp?: { arr: GanttSpArrangement; row: GanttSpRow; stageIdx: number } }> = [];
+      chart.cards.forEach((card) => items.push({ row: gridRows[card.id] ?? 0, col: card.startStage, card }));
+      spCardsOfChart(chart).forEach((x) => items.push({ row: gridRows["sp:" + x.row.id] ?? 0, col: x.stageIdx, sp: x }));
+      items.sort((a, b) => (a.row - b.row) || (a.col - b.col));
+      items.forEach((it) => {
+        if (it.card) {
+          const card = it.card;
+          wsRows.push([dayNo, date, ganttStageSpanText(chart, card.startStage, card.endStage), card.content || "", card.owner || "", card.participants || "", card.note || ""]);
+          meta.push({ r, kind: "data" }); r++;
+        } else if (it.sp) {
+          const x = it.sp;
+          const typeTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"}`;
+          wsRows.push([dayNo, date, chart.stages[x.stageIdx]?.name || `阶段${x.stageIdx + 1}`, `${typeTxt} ${x.arr.content || ""}`.trim(), x.row.owner || "", x.row.participants || "", x.row.note || ""]);
+          meta.push({ r, kind: "sp" }); r++;
+        }
       });
-      // 已分配串件行（内容橙底，网页串件卡同色）
-      spCardsOfChart(chart).sort((a, b) => a.stageIdx - b.stageIdx).forEach((x) => {
-        const typeTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"}`;
-        wsRows.push([dayNo, date, chart.stages[x.stageIdx]?.name || `阶段${x.stageIdx + 1}`, `${typeTxt} ${x.arr.content || ""}`.trim(), x.row.owner || "", x.row.participants || "", x.row.note || ""]);
-        meta.push({ r, kind: "sp" }); r++;
-      });
+      // 网页每个 DAY 卡片底部都重复「未分配串件」横幅 → 导出同样在每个 DAY 块内重复（N 个 DAY 即 N 次）
+      const un = unassignedSpRows();
+      if (un.length) {
+        wsRows.push([`▲ 未分配串件（${un.length}）——拖拽到本 DAY 的阶段列即可分配`]);
+        meta.push({ r, kind: "ua-title" }); r++;
+        un.forEach((x) => {
+          const typeTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"}`;
+          wsRows.push(["", "", "未分配", `${typeTxt} ${x.arr.content || ""}`.trim(), x.row.owner || "未指派", x.row.participants || "", x.row.note || ""]);
+          meta.push({ r, kind: "ua" }); r++;
+        });
+      }
       // DAY 块之间空 2 行
       if (ci < charts.length - 1) {
         wsRows.push(["", "", "", "", "", "", ""]); r++;
         wsRows.push(["", "", "", "", "", "", ""]); r++;
       }
     });
-    // 未分配串件区（网页横幅在每个 DAY 块内重复展示，导出仅在全部 DAY 之后列一次，避免 N 次重复）
-    const un = unassignedSpRows();
-    if (un.length) {
-      wsRows.push(["", "", "", "", "", "", ""]); r++;
-      wsRows.push([`▲ 未分配串件（${un.length}）——未指派执行阶段，可拖入任意 DAY`]);
-      meta.push({ r, kind: "ua-title" }); r++;
-      un.forEach((x) => {
-        const typeTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"}`;
-        wsRows.push(["", "", "未分配", `${typeTxt} ${x.arr.content || ""}`.trim(), x.row.owner || "未指派", x.row.participants || "", x.row.note || ""]);
-        meta.push({ r, kind: "ua" }); r++;
-      });
-    }
     const ws = XLSX.utils.aoa_to_sheet(wsRows);
     const addr = (row: number, col: number): string => XLSX.utils.encode_cell({ r: row, c: col });
     const solid = (rgb: string): { patternType: "solid"; fgColor: { rgb: string } } => ({ patternType: "solid", fgColor: { rgb } });
@@ -2284,7 +2291,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <div class="subpage-head">
             <div class="subpage-actions">
               <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportAllImage">导出图片</button>
-              <button class="ghost" :class="{ 'is-loading': ganttExportBusy }" :disabled="ganttExportBusy" @click="exportGanttTable" title="全部 DAY 合并同一 sheet 的平铺行表，底色按网页配色，DAY 间空 2 行">导出表格</button>
+              <button class="ghost" :class="{ 'is-loading': ganttExportBusy }" :disabled="ganttExportBusy" @click="exportGanttTable" title="维持线上甘特图结构：DAY 卡片标题 + 工序/串件按网页行序交错，未分配串件横幅每 DAY 重复，底色对齐网页，DAY 间空 2 行">导出表格</button>
             </div>
           </div>
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
