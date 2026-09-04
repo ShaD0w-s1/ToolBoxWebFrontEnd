@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
+// docx 仅做类型引用（运行时保持动态 import 分包）；D* 别名用于类型标注
+import type { Paragraph as DParagraph, Table as DTable, TableRow as DTableRow, TableCell as DTableCell } from "docx";
 import { backend } from "../api";
 import NameSuggest from "./NameSuggest.vue";
 import AttachmentSection from "./AttachmentSection.vue";
@@ -1607,54 +1609,146 @@ async function exportAllXlsx(): Promise<void> {
     props.store.notify(e instanceof Error ? e.message : "xlsx 导出失败", "err");
   }
 }
-// ===== 甘特图子页「导出 Word」：维持页面布局，每个 DAY 卡片各占一页，A4 横向 =====
-// 每个展开的 DAY 卡片用 html2canvas 逐张渲染成图（隐藏编辑控件），再按 DAY 分页嵌入 Word 横向页。
+// ===== 甘特图子页「导出 Word」：原生表格，A4 横向，每个 DAY 卡片各占一页，维持网页甘特图布局 =====
+// 每 DAY 一个表格：DAY 标题行(浅蓝) + 责任行(灰蓝) + 阶段表头行(主蓝白字，横向列) +
+// 卡片行(工序卡按起止阶段横向合并多列/串件卡贴其阶段列，卡内 内容/负责·参与/备注 分行) +
+// 未分配串件横幅每 DAY 重复；表格用 docx 原生单元格（可编辑、可打印），非截图图片。
 const wordExportBusy = ref(false);
 async function exportGanttWord(): Promise<void> {
   const s = state.value; if (!s) return;
   if (!s.charts.length) { props.store.notify("没有数据"); return; }
   if (wordExportBusy.value) return;
-  const target = mainAreaRef.value;
-  if (!target) return;
   wordExportBusy.value = true;
-  const charts = s.charts.slice().sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0));
-  const savedCollapsed = charts.map((c) => c.collapsed);
-  charts.forEach((c) => { c.collapsed = false; }); // 每个 DAY 卡片都展开
   try {
-    await nextTick(); await nextTick(); // 等待展开渲染与布局稳定
-    const h2c = (await import("html2canvas")).default;
     const docx = await import("docx");
-    const { Document, Packer, Paragraph, ImageRun, PageOrientation, AlignmentType } = docx;
-    props.store.notify("正在渲染各 DAY…");
-    const images: Array<{ data: Uint8Array; iw: number; ih: number }> = [];
-    for (const chart of charts) {
-      const el = document.getElementById("day-" + chart.id) as HTMLElement | null;
-      if (!el) continue;
-      const img = await shotDayCard(el, h2c);
-      if (img) images.push(img);
-    }
-    if (!images.length) { props.store.notify("渲染失败：未截到任何 DAY", "err"); return; }
-    // A4 横向，页边距 12mm（可用宽 273mm、高 186mm），每张 DAY 图等比缩放到整页放下
-    const pxPerMm = 96 / 25.4;
-    const pageWpx = (297 - 24) * pxPerMm;
-    const pageHpx = (210 - 24) * pxPerMm;
-    const children = images.map((im, i) => {
-      const scale = Math.min(pageWpx / im.iw, pageHpx / im.ih);
-      const w = Math.max(1, Math.round(im.iw * scale));
-      const h = Math.max(1, Math.round(im.ih * scale));
-      return new Paragraph({
-        pageBreakBefore: i > 0,
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 0, after: 0 },
-        children: [new ImageRun({ type: "jpg", data: im.data, transformation: { width: w, height: h } })],
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, TableLayoutType, WidthType, VerticalAlign, BorderStyle, AlignmentType, PageOrientation } = docx;
+    const mm = docx.convertMillimetersToTwip;
+    const C = { day: "E8F1FC", dayTxt: "2F5597", blue: "4472C4", headSub: "EDF2FC", yellow: "FDCA17", orange: "E8A44D", warnBg: "FFE8C7", warnTxt: "B45309", danger: "C0392B", white: "FFFFFF", ink: "1F1F1F", noteOnOrange: "FFE8C7", line: "C9CFDA" };
+    const charts = s.charts.slice().sort((a, b) => (Number(a.day) || 0) - (Number(b.day) || 0));
+    props.store.notify("正在生成 Word…");
+    const children: Array<DParagraph | DTable> = [];
+    const p = (opts: ConstructorParameters<typeof DParagraph>[0]): DParagraph => new Paragraph(opts);
+    const border = { style: BorderStyle.SINGLE, size: 4, color: C.line };
+    const cardBorders = { top: border, bottom: border, left: border, right: border };
+    const emptyCell = (): DTableCell => new TableCell({ children: [p({ children: [] })] });
+    charts.forEach((chart, ci) => {
+      const S = chart.stages.length;
+      const dayNo = `DAY ${chart.day}`;
+      const date = chart.date || "";
+      const colW = S > 0 ? Math.floor((297 - 24) * 56.7 / S) : 0; // 可用宽度分列（twips）
+      if (ci > 0) children.push(p({ pageBreakBefore: true, spacing: { before: 0, after: 0 }, children: [] })); // 每 DAY 另起一页
+      if (S === 0) {
+        // 无阶段：仅标题/责任段落
+        children.push(p({ spacing: { after: 60 }, children: [new TextRun({ text: `${dayNo}｜${date}${chart.title ? "｜" + chart.title : ""}`, bold: true, color: C.dayTxt, size: 28 })] }));
+        const respTxt0 = (chart.responsibilities || []).filter((x) => x.name).map((x) => `${x.label || ""}：${x.name}`).join("　");
+        if (respTxt0) children.push(p({ children: [new TextRun({ text: `责任　${respTxt0}`, color: C.ink, size: 20 })] }));
+        children.push(p({ children: [new TextRun({ text: "（本 DAY 未设置阶段）", color: C.warnTxt, size: 20 })] }));
+        return;
+      }
+      const rows: DTableRow[] = [];
+      // ① DAY 标题行（合并整行，浅蓝底）
+      const titleTxt = `${dayNo}｜${date}${chart.title ? "｜" + chart.title : ""}`;
+      rows.push(new TableRow({ children: [new TableCell({
+        columnSpan: S, shading: { fill: C.day }, verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 100, bottom: 100, left: 120, right: 120 },
+        borders: cardBorders,
+        children: [p({ spacing: { after: 0 }, children: [new TextRun({ text: titleTxt, bold: true, color: C.dayTxt, size: 24 })] })],
+      })] }));
+      // ② 顶部责任行（灰蓝底，合并整行；仅展示已填姓名项）
+      const respTxt = (chart.responsibilities || []).filter((x) => x.name).map((x) => `${x.label || ""}：${x.name}`).join("　");
+      if (respTxt) {
+        rows.push(new TableRow({ children: [new TableCell({
+          columnSpan: S, shading: { fill: C.headSub }, verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 60, bottom: 60, left: 120, right: 120 },
+          borders: cardBorders,
+          children: [p({ spacing: { after: 0 }, children: [new TextRun({ text: `责任　${respTxt}`, color: C.ink, size: 20 })] })],
+        })] }));
+      }
+      // ③ 阶段表头行（每个阶段一列，主蓝底白字）
+      rows.push(new TableRow({ children: chart.stages.map((st) => new TableCell({
+        shading: { fill: C.blue }, verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 60, bottom: 60, left: 60, right: 60 },
+        borders: cardBorders,
+        children: [p({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [new TextRun({ text: st.name || "阶段", bold: true, color: C.white, size: 22 })] })],
+      })) }));
+      // ④ 卡片行：按网页 computeRows 行→列序；工序卡横跨起止阶段(columnSpan)、串件卡贴其阶段列
+      const gridRows = computeRows(chart);
+      const items: Array<{ row: number; col: number; card?: GanttCard; sp?: { arr: GanttSpArrangement; row: GanttSpRow; stageIdx: number } }> = [];
+      chart.cards.forEach((card) => items.push({ row: gridRows[card.id] ?? 0, col: card.startStage, card }));
+      spCardsOfChart(chart).forEach((x) => items.push({ row: gridRows["sp:" + x.row.id] ?? 0, col: x.stageIdx, sp: x }));
+      items.forEach((it) => { if ((it.col ?? 0) < 0 || (it.col ?? 0) >= S) return; });
+      const groups = new Map<number, typeof items>();
+      items.forEach((it) => { const arr = groups.get(it.row) || []; arr.push(it); groups.set(it.row, arr); });
+      [...groups.keys()].sort((a, b) => a - b).forEach((rowNo) => {
+        const group = groups.get(rowNo)!.slice().sort((a, b) => a.col - b.col);
+        const cells: DTableCell[] = [];
+        let cur = 0;
+        group.forEach((it) => {
+          if (it.col > cur) { for (let k = cur; k < it.col; k++) cells.push(emptyCell()); cur = it.col; }
+          const span = it.card ? Math.max(1, it.card.endStage - it.card.startStage + 1) : 1;
+          if (it.card) {
+            const card = it.card;
+            const cardParas: DParagraph[] = [p({ spacing: { after: 0 }, children: [new TextRun({ text: card.content || "（空）", bold: true, color: C.ink, size: 22 })] })];
+            const metaTxt = `负责：${card.owner || "—"}${card.participants ? "　参与：" + card.participants : ""}`;
+            cardParas.push(p({ spacing: { after: 0 }, children: [new TextRun({ text: metaTxt, color: C.ink, size: 20 })] }));
+            if (card.note) cardParas.push(p({ spacing: { after: 0 }, children: [new TextRun({ text: `备注：${card.note}`, color: C.danger, size: 20 })] }));
+            cells.push(new TableCell({
+              columnSpan: span, shading: { fill: C.yellow }, verticalAlign: VerticalAlign.CENTER,
+              margins: { top: 60, bottom: 60, left: 100, right: 100 },
+              borders: cardBorders,
+              children: cardParas,
+            }));
+          } else if (it.sp) {
+            const x = it.sp;
+            const headTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"} ${x.arr.content || "（空）"}`.trim();
+            const cardParas: DParagraph[] = [p({ spacing: { after: 0 }, children: [new TextRun({ text: headTxt, bold: true, color: C.white, size: 22 })] })];
+            const metaTxt = `负责：${x.row.owner || "—"}${x.row.participants ? "　参与：" + x.row.participants : ""}`;
+            cardParas.push(p({ spacing: { after: 0 }, children: [new TextRun({ text: metaTxt, color: C.white, size: 20 })] }));
+            if (x.row.note) cardParas.push(p({ spacing: { after: 0 }, children: [new TextRun({ text: `备注：${x.row.note}`, color: C.noteOnOrange, size: 20 })] }));
+            cells.push(new TableCell({
+              columnSpan: 1, shading: { fill: C.orange }, verticalAlign: VerticalAlign.CENTER,
+              margins: { top: 60, bottom: 60, left: 100, right: 100 },
+              borders: cardBorders,
+              children: cardParas,
+            }));
+          }
+          cur += span;
+        });
+        for (let k = cur; k < S; k++) cells.push(emptyCell());
+        rows.push(new TableRow({ children: cells }));
       });
+      // ⑤ 未分配串件横幅（网页每个 DAY 卡片底部重复 → 每 DAY 表格内重复）
+      const un = unassignedSpRows();
+      if (un.length) {
+        rows.push(new TableRow({ children: [new TableCell({
+          columnSpan: S, shading: { fill: C.warnBg }, verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 60, bottom: 60, left: 120, right: 120 },
+          borders: cardBorders,
+          children: [p({ spacing: { after: 40 }, children: [new TextRun({ text: `▲ 未分配串件（${un.length}）　拖拽到本 DAY 的阶段列即可分配`, bold: true, color: C.warnTxt, size: 22 })] })],
+        })] }));
+        un.forEach((x) => {
+          const lineTxt = `${x.row.tag ? "（" + x.row.tag + "）" : ""}${x.arr.type || "串件"} · ${x.arr.content || "（空）"}　负责：${x.row.owner || "未指派"}${x.row.participants ? "　参与：" + x.row.participants : ""}${x.row.note ? "　备注：" + x.row.note : ""}`;
+          rows.push(new TableRow({ children: [new TableCell({
+            columnSpan: S, shading: { fill: C.warnBg }, verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 40, bottom: 40, left: 140, right: 120 },
+            borders: cardBorders,
+            children: [p({ spacing: { after: 0 }, children: [new TextRun({ text: lineTxt, color: C.warnTxt, size: 20 })] })],
+          })] }));
+        });
+      }
+      children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        columnWidths: Array.from({ length: S }, () => colW),
+        layout: TableLayoutType.FIXED,
+        rows,
+      }));
     });
     const doc = new Document({
       sections: [{
         properties: {
           page: {
-            size: { orientation: PageOrientation.LANDSCAPE, width: docx.convertMillimetersToTwip(297), height: docx.convertMillimetersToTwip(210) },
-            margin: { top: docx.convertMillimetersToTwip(12), right: docx.convertMillimetersToTwip(12), bottom: docx.convertMillimetersToTwip(12), left: docx.convertMillimetersToTwip(12) },
+            size: { orientation: PageOrientation.LANDSCAPE, width: mm(297), height: mm(210) },
+            margin: { top: mm(12), right: mm(12), bottom: mm(12), left: mm(12) },
           },
         },
         children,
@@ -1666,95 +1760,7 @@ async function exportGanttWord(): Promise<void> {
   } catch (e) {
     props.store.notify(e instanceof Error ? e.message : "Word 导出失败", "err");
   } finally {
-    charts.forEach((c, i) => { c.collapsed = savedCollapsed[i]; });
-    await nextTick();
     wordExportBusy.value = false;
-  }
-}
-/** 单个 DAY 卡片：打印态预处理(固定网格列宽/展开滚动容器/撑高文本/去占位/隐藏控件) → 高清截图 → 恢复页面。 */
-async function shotDayCard(el: HTMLElement, h2c: (el: HTMLElement, opts?: Record<string, unknown>) => Promise<HTMLCanvasElement>): Promise<{ data: Uint8Array; iw: number; ih: number } | null> {
-  // ① 固定该 DAY 内各 .gantt-grid 的列宽为当前实际像素（替代百分比模板），网格横向自然撑开
-  const grids = Array.from(el.querySelectorAll<HTMLElement>(".gantt-grid"));
-  const savedGrids = grids.map((g) => {
-    const computed = window.getComputedStyle(g);
-    const cols = computed.gridTemplateColumns.split(" ").filter(Boolean);
-    const firstCol = cols[0] ? parseFloat(cols[0]) : 0;
-    const stages = g.querySelectorAll<HTMLElement>(".gantt-head").length || 1;
-    return { g, tpl: g.style.gridTemplateColumns, w: g.style.width, mw: g.style.minWidth, colWidth: firstCol, stages };
-  });
-  savedGrids.forEach((x) => {
-    if (x.colWidth > 0) {
-      const total = Math.max(x.g.clientWidth, x.colWidth * x.stages);
-      x.g.style.gridTemplateColumns = `repeat(${x.stages}, ${x.colWidth}px)`;
-      x.g.style.width = `${total}px`;
-      x.g.style.minWidth = `${total}px`;
-    } else {
-      x.g.style.width = "max-content";
-      x.g.style.minWidth = "max-content";
-    }
-  });
-  // ② 横向滚动容器展开为可视
-  const wraps = Array.from(el.querySelectorAll<HTMLElement>(".gantt-wrap"));
-  const savedWraps = wraps.map((w) => ({ w, ov: w.style.overflow, wd: w.style.width, mw: w.style.minWidth }));
-  wraps.forEach((w) => { w.style.overflow = "visible"; w.style.width = "max-content"; w.style.minWidth = "max-content"; });
-  // ③ DAY 卡片本体宽度随内容
-  const savedEl = { wd: el.style.width, mw: el.style.minWidth };
-  el.style.width = "max-content";
-  el.style.minWidth = "max-content";
-  // ④ textarea 撑高到内容实际高度，避免多行文字被裁
-  const textareas = Array.from(el.querySelectorAll<HTMLTextAreaElement>("textarea"));
-  const savedTa = textareas.map((t) => ({ t, h: t.style.height, fs: (t.style as { fieldSizing?: string }).fieldSizing, ov: t.style.overflow, rows: t.getAttribute("rows") }));
-  textareas.forEach((t) => {
-    (t.style as { fieldSizing?: string }).fieldSizing = "content";
-    t.style.overflow = "visible";
-    t.removeAttribute("rows");
-    t.style.height = "auto";
-    void t.offsetHeight;
-    t.style.height = `${t.scrollHeight}px`;
-  });
-  // ⑤ 去掉占位提示文字（空输入框不显示“工作内容/负责人”等字样）
-  const holders = Array.from(el.querySelectorAll<HTMLElement>("[placeholder]"));
-  const savedPh = holders.map((n) => ({ n, v: n.getAttribute("placeholder") }));
-  holders.forEach((n) => n.removeAttribute("placeholder"));
-  // ⑥ 打印态：隐藏编辑控件
-  el.classList.add("gp-print");
-  try {
-    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-    const w = Math.max(el.scrollWidth, 1);
-    const h = Math.max(el.scrollHeight, 1);
-    const scale = Math.max(1, Math.min(2, Math.floor(30000 / w), Math.floor(30000 / h)));
-    const canvas = await h2c(el, {
-      scale,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-      windowWidth: w,
-      windowHeight: h,
-      scrollX: 0,
-      scrollY: 0,
-    });
-    const iw = canvas.width;
-    const ih = canvas.height;
-    const data = await new Promise<Uint8Array | null>((resolve) => {
-      canvas.toBlob(async (blob) => {
-        if (!blob) { resolve(null); return; }
-        resolve(new Uint8Array(await blob.arrayBuffer()));
-      }, "image/jpeg", 0.93);
-    });
-    return data ? { data, iw, ih } : null;
-  } finally {
-    el.classList.remove("gp-print");
-    savedPh.forEach((x) => { if (x.v !== null) x.n.setAttribute("placeholder", x.v); });
-    savedTa.forEach((x) => {
-      x.t.style.height = x.h;
-      x.t.style.overflow = x.ov;
-      if (x.rows !== null) x.t.setAttribute("rows", x.rows);
-      else x.t.removeAttribute("rows");
-      if (x.fs) (x.t.style as { fieldSizing?: string }).fieldSizing = x.fs;
-    });
-    savedWraps.forEach((x) => { x.w.style.overflow = x.ov; x.w.style.width = x.wd; x.w.style.minWidth = x.mw; });
-    savedGrids.forEach((x) => { x.g.style.gridTemplateColumns = x.tpl; x.g.style.width = x.w; x.g.style.minWidth = x.mw; });
-    el.style.width = savedEl.wd;
-    el.style.minWidth = savedEl.mw;
   }
 }
 
@@ -2307,7 +2313,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <div class="subpage-head">
             <div class="subpage-actions">
               <button class="ghost" :class="{ 'is-loading': store.imageExportBusy.value }" :disabled="store.imageExportBusy.value" @click="exportAllImage">导出图片</button>
-              <button class="ghost" :class="{ 'is-loading': wordExportBusy }" :disabled="wordExportBusy" @click="exportGanttWord" title="导出 Word：每个 DAY 卡片各占一页（A4 横向），维持网页甘特图页面布局">导出 Word</button>
+              <button class="ghost" :class="{ 'is-loading': wordExportBusy }" :disabled="wordExportBusy" @click="exportGanttWord" title="导出 Word（A4 横向）：每 DAY 一页 Word 原生表格，阶段为横列表头、工序卡跨起止阶段合并列，维持网页甘特图布局">导出 Word</button>
             </div>
           </div>
           <section v-for="chart in state.charts" :key="chart.id" class="gp-card day-card" :id="'day-' + chart.id">
@@ -3167,26 +3173,4 @@ input.remote-locked:disabled {
 .gp-tpl-search input { flex: 1; height: 32px; padding: 0 10px; border: 1.5px solid var(--line, var(--n4)); border-radius: var(--r-md); font-size: var(--fs-13); font-family: inherit; }
 .gp-tpl-search input:focus { border-color: var(--focus); outline: none; }
 .gp-tpl-search .clear-btn { border: none; background: none; color: var(--n7, #888); font-size: 15px; line-height: 1; cursor: pointer; }
-
-/* ===== 导出 Word（gp-print 挂到 DAY 卡片）：隐藏编辑控件、弱化输入框边框，还原为打印版观感 ===== */
-.gp-print .collapse-btn,
-.gp-print .chart-toolbar,
-.gp-print .resp-add,
-.gp-print .stage-col-drag,
-.gp-print .stage-split,
-.gp-print .stage-split-arrow,
-.gp-print .card-grip,
-.gp-print .card-close,
-.gp-print .resize-l,
-.gp-print .resize-r,
-.gp-print .sp-view-note::before { display: none !important; }
-.gp-print .gantt-card { box-shadow: none !important; }
-.gp-print .day-card .date-input,
-.gp-print .day-card .day-input,
-.gp-print .day-card .chart-title-input,
-.gp-print .resp-label-input,
-.gp-print .ns-input { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }
-.gp-print .resp-label-input { border-bottom: none !important; }
-.gp-print .day-card .stage-name-input { background: transparent !important; }
-.gp-print .day-card textarea { resize: none !important; cursor: default !important; }
 </style>
