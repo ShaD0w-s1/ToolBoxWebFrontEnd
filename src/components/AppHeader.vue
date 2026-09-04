@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import logoUrl from "../assets/toolcart-logo.png";
+
 interface CloudStatus {
   text: string;
   state: "ok" | "warn" | "err";
@@ -11,9 +13,12 @@ defineEmits<{ "switch-identity": [] }>();
 
 <template>
   <header class="top">
-    <div>
-      <h1>工作准备工具站</h1>
-      <p>工作项目准备单与标准库统一管理，数据通过 Django API 同步。</p>
+    <div class="brand">
+      <img class="brand-logo" :src="logoUrl" alt="工作准备工具站" draggable="false" />
+      <div class="brand-text">
+        <h1>工作准备工具站</h1>
+        <p>工作项目准备单与标准库统一管理，数据通过 Django API 同步。</p>
+      </div>
     </div>
     <div class="status-group">
       <button class="identity-badge" :title="identityName ? `当前身份：${identityName}（点击切换）` : '点击设置身份'" @click="$emit('switch-identity')">
