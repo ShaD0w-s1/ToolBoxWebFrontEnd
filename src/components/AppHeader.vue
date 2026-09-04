@@ -12,7 +12,7 @@ defineEmits<{ "switch-identity": [] }>();
 <template>
   <header class="top">
     <div>
-      <h1>吉祥定检工作项目准备单组合</h1>
+      <h1>工作准备工具站</h1>
       <p>工作项目准备单与标准库统一管理，数据通过 Django API 同步。</p>
     </div>
     <div class="status-group">
