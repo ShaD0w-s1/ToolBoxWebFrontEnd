@@ -99,6 +99,8 @@ const allParticipants = computed<string[]>(() => {
   return Array.from(set).sort((a, b) => a.localeCompare(b, "zh-CN"));
 });
 const manualParticipants = computed<string[]>(() => state.value?.manualParticipants || []);
+// 手动名单中未被自动检测（全部 DAY）收录的姓名 → 灰色字体、无胶囊、空格分隔跟随在胶囊后
+const manualExtra = computed<string[]>(() => manualParticipants.value.filter((n) => !allParticipants.value.includes(n)));
 // 姓名联想候选 = 手动名单 ∪ 全部自动检测，去重排序
 const participantSuggestions = computed<string[]>(() => {
   const set = new Set<string>();
@@ -2113,9 +2115,12 @@ async function importAllXlsx(event: Event): Promise<void> {
     <!-- 参与人名单侧边栏 -->
     <aside v-if="state" class="participant-panel">
       <h3>参与人名单</h3>
-      <div class="participant-sec">手动名单（绿底=与检测重合）</div>
-      <div class="participant-grid">
-        <div v-for="n in manualParticipants" :key="n" class="chip manual" :class="{ match: allParticipants.includes(n) }" :title="allParticipants.includes(n) ? '与检测名单重合' : '手动添加(未在检测名单中)'" @click="removeManualParticipant(n)">{{ n }}<span class="chip-x">×</span></div>
+      <div class="participant-sec">手动名单（胶囊=已被工序/责任/串件检测；灰字=仅手动补充，点击可移除）</div>
+      <div class="participant-flow">
+        <template v-for="n in manualParticipants" :key="'c' + n">
+          <div v-if="allParticipants.includes(n)" class="chip manual match" title="与检测名单重合" @click="removeManualParticipant(n)">{{ n }}<span class="chip-x">×</span></div>
+        </template>
+        <template v-for="(n, i) in manualExtra" :key="'x' + n"><span class="manual-extra-name" title="仅手动补充，点击移除" @click="removeManualParticipant(n)">{{ n }}</span><template v-if="i < manualExtra.length - 1"> </template></template>
         <div v-if="!manualParticipants.length" class="participant-empty">未手动输入姓名</div>
       </div>
       <div class="participant-sec">自动检测（按 DAY）</div>
@@ -2713,6 +2718,12 @@ async function importAllXlsx(event: Event): Promise<void> {
 }
 .participant-panel h3 { margin: 0 0 12px; font-size: var(--fs-16); color: var(--muted, var(--n7)); font-weight: 650; }
 .participant-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 4px; }
+/* 手动名单流式容器：胶囊与灰色补充姓名同行排列 */
+.participant-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; margin-bottom: 4px; }
+.participant-flow .chip { max-width: 100%; }
+/* 仅手动补充（未出现在自动检测名单）的姓名：灰色字体、无胶囊 */
+.manual-extra-name { color: var(--n7, #999); font-size: var(--fs-12); cursor: pointer; white-space: nowrap; }
+.manual-extra-name:hover { color: #666; text-decoration: line-through; }
 .participant-sec { font-size: var(--fs-12); color: var(--muted, var(--n7)); font-weight: 700; margin: 10px 0 6px; border-left: 3px solid var(--blue, var(--blue)); padding-left: 6px; }
 .participant-day-label { font-size: var(--fs-12); color: var(--blue-dark, var(--blue-dark)); font-weight: 700; margin: 8px 0 4px; cursor: pointer; user-select: none; }
 .participant-day-label:hover { color: var(--blue, var(--blue)); text-decoration: underline; }
