@@ -159,7 +159,7 @@ async function supplementWork(sub: string): Promise<void> {
               <textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" placeholder="名称" @input="onAutoSize"></textarea>
               <div class="itg-qty">
                 <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
-                <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+                <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.queuePersist" />
                 <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
               </div>
               <textarea rows="1" class="cell-inp is-note" v-model="it.note" v-lock="lock(it, 'note')" placeholder="备注" @input="onAutoSize" @blur="commitNote(it)"></textarea>

@@ -307,7 +307,7 @@ onBeforeUnmount(() => {
           <div class="wa-cell wa-head wa-ops">操作</div>
 
           <template v-for="(card, index) in assignment.unassigned" :key="`u-${card.工卡号}-${index}`">
-            <div class="wa-cell"><input v-model="card.序号" @input="store.persist" /></div>
+            <div class="wa-cell"><input v-model="card.序号" @input="store.queuePersist" /></div>
             <div class="wa-cell wa-wrap"><textarea v-model="card.工卡号" rows="1" @input="onCardInput" /></div>
             <div class="wa-cell wa-wrap"><textarea v-model="card.工卡名称" rows="1" @input="onCardInput" /></div>
             <div class="wa-cell">
@@ -345,19 +345,19 @@ onBeforeUnmount(() => {
         <div class="wa-person-top">
           <label v-for="field in personnelLayout(section).top" :key="field" class="wa-person wa-full">
             <span>{{ field }}</span>
-            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" v-lock="lockKey('personnel', section, field)" />
+            <input v-model="assignment.sections[section].personnel[field]" @input="store.queuePersist" v-lock="lockKey('personnel', section, field)" />
           </label>
         </div>
         <div class="wa-person-second">
           <label v-for="field in personnelLayout(section).second" :key="field" class="wa-person">
             <span>{{ field }}</span>
-            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" v-lock="lockKey('personnel', section, field)" />
+            <input v-model="assignment.sections[section].personnel[field]" @input="store.queuePersist" v-lock="lockKey('personnel', section, field)" />
           </label>
         </div>
         <div v-if="personnelLayout(section).extra.length" class="wa-person-extra">
           <label v-for="field in personnelLayout(section).extra" :key="field" class="wa-person">
             <span>{{ field }}</span>
-            <input v-model="assignment.sections[section].personnel[field]" @input="store.persist" v-lock="lockKey('personnel', section, field)" />
+            <input v-model="assignment.sections[section].personnel[field]" @input="store.queuePersist" v-lock="lockKey('personnel', section, field)" />
           </label>
         </div>
       </div>
@@ -366,8 +366,8 @@ onBeforeUnmount(() => {
       <button class="ghost add-arrange" @click="addArrange(section)">+ 新增安排</button>
       <div class="wa-arrange-list">
         <div v-for="(item, i) in assignment.sections[section].extra" :key="`arr-${i}`" class="wa-arrange-row">
-          <input class="wa-arrange-name" v-model="item.arrange" @input="store.persist" placeholder="安排" />
-          <input class="wa-arrange-person" v-model="item.personnel" @input="store.persist" placeholder="人员" />
+          <input class="wa-arrange-name" v-model="item.arrange" @input="store.queuePersist" placeholder="安排" />
+          <input class="wa-arrange-person" v-model="item.personnel" @input="store.queuePersist" placeholder="人员" />
           <button class="danger wa-arrange-del" @click="deleteArrange(section, i)" title="删除">×</button>
         </div>
       </div>
@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
 
           <!-- 数据行 -->
           <template v-for="(card, index) in assignment.sections[section].cards" :key="index">
-            <div class="wa-cell"><input v-model="card.序号" @input="store.persist" v-lock="lockKey('card', rowKeyOf(section, card, index), '序号')" /></div>
+            <div class="wa-cell"><input v-model="card.序号" @input="store.queuePersist" v-lock="lockKey('card', rowKeyOf(section, card, index), '序号')" /></div>
             <div class="wa-cell wa-wrap"><textarea v-model="card.工卡号" rows="1" @input="onCardInput" v-lock="lockKey('card', rowKeyOf(section, card, index), '工卡号')" /></div>
             <div class="wa-cell wa-wrap"><textarea v-model="card.工卡名称" rows="1" @input="onCardInput" v-lock="lockKey('card', rowKeyOf(section, card, index), '工卡名称')" /></div>
             <!-- 需求 1：工卡分级改为下拉（一类/二类/三类）；空值显示「无」并红色高亮 -->
@@ -447,7 +447,7 @@ onBeforeUnmount(() => {
             <div class="wa-cell wa-wrap"><textarea v-model="card.工作签卡者" rows="1" @input="onCardInput" v-lock="lockKey('card', rowKeyOf(section, card, index), '工作签卡者')" /></div>
             <!-- 需求 3：非“三类”行必检默认 N/A 且不可编辑 -->
             <div class="wa-cell">
-              <input v-model="card.必检" :disabled="card.工卡分级 !== '三类'" :placeholder="card.工卡分级 !== '三类' ? 'N/A' : ''" @input="store.persist" v-lock="lockKey('card', rowKeyOf(section, card, index), '必检')" />
+              <input v-model="card.必检" :disabled="card.工卡分级 !== '三类'" :placeholder="card.工卡分级 !== '三类' ? 'N/A' : ''" @input="store.queuePersist" v-lock="lockKey('card', rowKeyOf(section, card, index), '必检')" />
             </div>
             <template v-if="showMove[section]">
               <div class="wa-cell">

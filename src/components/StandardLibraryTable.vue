@@ -112,7 +112,7 @@ async function finishStdLib(): Promise<void> {
           <tr v-for="(row, index) in rows" :key="index">
             <td class="idx">{{ index + 1 }}</td>
             <td v-for="col in meta.rowKeys" :key="col">
-              <input v-model="row[col]" @input="store.persist" />
+              <input v-model="row[col]" @input="store.queuePersist" />
             </td>
             <td class="ops"><button class="danger" @click="deleteRow(index)">删除</button></td>
           </tr>

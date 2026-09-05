@@ -323,8 +323,8 @@ export function useToolbox() {
     }, 3000);
     // 3) 他人编辑态拉取：独立 1s 前台定时器（黄锁实时性；后台标签页已 endAllEditing，跳过省流量）。
     setInterval(() => { void fetchEditingOthers(); }, 1000);
-    document.addEventListener("visibilitychange", () => { if (document.hidden) endAllEditing(); });
-    window.addEventListener("beforeunload", () => { endAllEditing(); });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) { endAllEditing(); flushPersist(); } });
+    window.addEventListener("beforeunload", () => { endAllEditing(); flushPersist(); });
     if (!pidWatchStopper) {
       pidWatchStopper = watch(currentProjectId, (next, prev) => {
         if (prev && next !== prev && editingLocal.size) {
@@ -527,19 +527,40 @@ export function useToolbox() {
     return dirtyProjects.size > 0 || dirtyTemplates.size > 0 || dirtyMaterialTemplates.size > 0 || dirtyToolCart || dirtyStdLibs.size > 0;
   }
 
-  function persist(): void {
+  // —— 本地落盘策略：结构性操作（增删行/导入/导出/保存按钮等）走 persist() 立即落盘；
+  //    输入格每键走 queuePersist()：只标脏 + 调度远程保存，localStorage 的全量序列化延迟到
+  //    250ms 停顿时才执行一次——打字过程不再每键同步 JSON.stringify(app)+setItem
+  //   （app 含全部标准库与项目，MB 级，移动端每键阻塞几十~上百 ms，是机号格等输入卡顿的根源）。
+  //   页面 hidden/beforeunload 时 flushPersist() 兜底，保证最后输入的 250ms 内内容不丢。
+  let persistTimer: ReturnType<typeof setTimeout> | undefined;
+  function persistNow(): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
-    markCurrentDirty();
+  }
+  function flushPersist(): void {
+    if (persistTimer) { clearTimeout(persistTimer); persistTimer = undefined; persistNow(); }
+  }
+  function scheduleRemoteSave(): void {
     clearTimeout(saveTimer);
-    if (cloud.available) saveTimer = setTimeout(saveRemote, 450);
+    if (cloud.available) saveTimer = setTimeout(() => { void saveRemote(); }, 450);
+  }
+  function persist(): void {
+    persistNow();
+    markCurrentDirty();
+    scheduleRemoteSave();
+  }
+  /** 输入格防抖落盘：立即标脏/调度远程；localStorage 合并到 250ms 停顿后一次写入。 */
+  function queuePersist(): void {
+    markCurrentDirty();
+    scheduleRemoteSave();
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => { persistNow(); }, 250);
   }
 
   /** 显式以指定字段标记当前项目为脏并落盘（用于 meta 等非子页字段的变更）。 */
   function persistField(field: ProjectField): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+    persistNow();
     markCurrentDirty(field);
-    clearTimeout(saveTimer);
-    if (cloud.available) saveTimer = setTimeout(saveRemote, 450);
+    scheduleRemoteSave();
   }
 
   /** 保存单个项目：字段级部分 PATCH + 乐观锁（version）。成功则递增本地版本；409 冲突则采纳远端版本并保留本地编辑稍后重试。 */
@@ -1606,26 +1627,46 @@ export function useToolbox() {
   /** 按机号查询飞机信息（FSN/MSN/机型/发动机/ETOPS/ELT-DT），供机号回填展示。
    *  优先查本地标准库；本地未解锁（无 AIRNAV token）导致查不到时，改走公开单机信息接口
    *  （/api/aircraft-info/，无需 AIRNAV 授权），并把结果合并进本地缓存（只读展示，不标脏）。 */
+  /** 机号信息查询去重：同机号 60s TTL 结果缓存（含“查无”）+ in-flight 合并，
+   *  消除同一机号重复失焦/重复 change 导致的重复 /api/aircraft-info/ 请求。 */
+  const aircraftInfoCache = new Map<string, { at: number; row: StandardLibRow | null }>();
+  const aircraftInfoInflight = new Map<string, Promise<StandardLibRow | null>>();
+  const AIRCRAFT_INFO_CACHE_TTL = 60_000;
   async function fetchAircraftInfo(regNo: string): Promise<StandardLibRow | null> {
     const target = (regNo || "").trim();
     if (!target) return null;
     const local = lookupAircraftRow(target);
     if (local) return local;
+    const hit = aircraftInfoCache.get(target);
+    if (hit && Date.now() - hit.at < AIRCRAFT_INFO_CACHE_TTL) return hit.row;
     if (!cloud.available) return null;
-    try {
-      const res = await backend.getAircraftInfo(target);
-      const row = res?.data as StandardLibRow | null | undefined;
-      if (row && String(row["飞机号"] || "").trim() === target) {
-        const rows = app.value.standardLibraries.aircraft_info?.rows;
-        if (rows && !rows.some((r) => String(r["飞机号"] || "").trim() === target)) {
-          rows.push({ ...row });
+    const inflight = aircraftInfoInflight.get(target);
+    if (inflight) return inflight;
+    const task = (async (): Promise<StandardLibRow | null> => {
+      try {
+        const res = await backend.getAircraftInfo(target);
+        const row = res?.data as StandardLibRow | null | undefined;
+        if (row && String(row["飞机号"] || "").trim() === target) {
+          const rows = app.value.standardLibraries.aircraft_info?.rows;
+          if (rows && !rows.some((r) => String(r["飞机号"] || "").trim() === target)) {
+            rows.push({ ...row });
+          }
+          aircraftInfoCache.set(target, { at: Date.now(), row });
+          return row;
         }
-        return row;
+        aircraftInfoCache.set(target, { at: Date.now(), row: null });
+      } catch {
+        // 忽略网络/接口错误，回退到"新增空行"逻辑；缓存 60s 防连点重复请求
+        aircraftInfoCache.set(target, { at: Date.now(), row: null });
       }
-    } catch {
-      // 忽略网络/接口错误，回退到"新增空行"逻辑
+      return null;
+    })();
+    aircraftInfoInflight.set(target, task);
+    try {
+      return await task;
+    } finally {
+      aircraftInfoInflight.delete(target);
     }
-    return null;
   }
 
   /** 机号规范化：支持 B-XXXX（6 字符）或 XXXX（4 字符，自动补 B- 前缀）。非法返回空串。 */
@@ -2153,6 +2194,11 @@ export function useToolbox() {
     markField("ganttPrep");
     persist();
   }
+  /** GanttPrep 输入格的防抖落盘版（saveGantt 语义，localStorage 250ms 合并）。 */
+  function queueSaveGantt(): void {
+    markField("ganttPrep");
+    queuePersist();
+  }
 
   /** 把模板 state 灌入当前项目的 ganttPrep（深拷贝，避免与模板库共享引用）。
    *  name 为模板名，灌入后作为「当前模板名称」显示在标题行（可编辑）。 */
@@ -2266,7 +2312,7 @@ export function useToolbox() {
     active, materialActive, materialCategories, standardMaterialCategories, mStandardSubs,
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
     dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toast, shared, imageExportBusy,
-    notify, notifyOk, notifyErr, persist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
+    notify, notifyOk, notifyErr, persist, queuePersist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
     createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
     itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
@@ -2289,7 +2335,7 @@ export function useToolbox() {
     identityName, identityReady, setIdentity, unlockSiteAdmin, onlineCount, startOnlinePing,
     syncSettings, persistSettings, sessionId, beginEdit, touchEdit, endEdit, endAllEditing, startEditingSync,
     isLockedByOther, lockOwnerOf, isEditingHere, editingLocal, editingByOthers, lockVersion,
-    saveGantt, applyGanttTemplate, openEngTemplateForEdit,
+    saveGantt, queueSaveGantt, applyGanttTemplate, openEngTemplateForEdit,
     saveStandaloneTemplate, applyStandaloneTemplate, openStandaloneTemplateForEdit,
   };
 }

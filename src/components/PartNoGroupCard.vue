@@ -45,7 +45,7 @@ function subLabel(it: ToolItem): string {
           <span class="itg-tag">{{ subLabel(it) }}</span>
           <div class="itg-qty">
             <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
-            <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+            <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.queuePersist" />
             <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
           </div>
           <textarea v-model="it.note" v-lock="lock(it, 'note')" rows="1" class="cell-inp is-note" placeholder="备注" @input="commitNote(it, $event)" />

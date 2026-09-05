@@ -46,6 +46,11 @@ function save(): void {
   props.store.saveGantt();
 }
 
+/** 输入格专用防抖保存（同 save 的字段语义，但 localStorage 落盘合并到 250ms 停顿，避免每键全量序列化卡顿）。 */
+function queueSave(): void {
+  props.store.queueSaveGantt();
+}
+
 // —— meta 结构（确保存在）——
 interface MetaAircraft { id: string; reg: string; fsn: string; msn: string; engine: string; type: string; etops: string; eltDt: string }
 interface MetaComponent { id: string; name: string; offPn: string; offSn: string; onPn: string; onSn: string }
@@ -2143,7 +2148,7 @@ async function importAllXlsx(event: Event): Promise<void> {
     <!-- 主区 -->
     <div class="main-area" id="gp-main-area" ref="mainAreaRef">
       <div class="subpage-head">
-        <input class="gp-title-input" v-model="templateName" placeholder="工作准备单（甘特）" @change="save" @input="save" v-lock="lockKey('title', 'main', 'templateName')" />
+        <input class="gp-title-input" v-model="templateName" placeholder="工作准备单（甘特）" @change="save" @input="queueSave" v-lock="lockKey('title', 'main', 'templateName')" />
         <button class="ghost" @click="openTplModal('load')">调取模板</button>
         <button class="ghost" @click="openTplModal('save')">保存模板</button>
         <span class="toolbar-sep" />
@@ -2190,15 +2195,15 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="gp-sec-title">飞机信息</div>
             <div v-for="(a, i) in aircrafts" :key="a.id" class="meta-group">
               <div class="meta-grid meta-grid-4">
-                <label class="gpf"><span class="gpf-label">机号</span><input v-model="a.reg" list="gp-aircraft-numbers" @change="onAircraftRegChange(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'reg')" /></label>
-                <label class="gpf"><span class="gpf-label">FSN</span><input v-model="a.fsn" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'fsn')" /></label>
-                <label class="gpf"><span class="gpf-label">MSN</span><input v-model="a.msn" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'msn')" /></label>
-                <label class="gpf"><span class="gpf-label">发动机</span><input v-model="a.engine" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'engine')" /></label>
-                <label class="gpf"><span class="gpf-label">机型</span><input v-model="a.type" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'type')" /></label>
-                <label class="gpf"><span class="gpf-label">ETOPS</span><input v-model="a.etops" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'etops')" /></label>
+                <label class="gpf"><span class="gpf-label">机号</span><input v-model="a.reg" list="gp-aircraft-numbers" @change="onAircraftRegChange(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'reg')" /></label>
+                <label class="gpf"><span class="gpf-label">FSN</span><input v-model="a.fsn" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'fsn')" /></label>
+                <label class="gpf"><span class="gpf-label">MSN</span><input v-model="a.msn" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'msn')" /></label>
+                <label class="gpf"><span class="gpf-label">发动机</span><input v-model="a.engine" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'engine')" /></label>
+                <label class="gpf"><span class="gpf-label">机型</span><input v-model="a.type" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'type')" /></label>
+                <label class="gpf"><span class="gpf-label">ETOPS</span><input v-model="a.etops" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'etops')" /></label>
                 <label class="gpf"><span class="gpf-label">ELT-DT</span>
                   <div class="meta-type-row">
-                    <input v-model="a.eltDt" @change="onAircraftFieldEdited(a)" @input="save" v-lock="lockKey('aircraft', a.id, 'eltDt')" />
+                    <input v-model="a.eltDt" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'eltDt')" />
                     <button class="icon-btn meta-x" title="删除该飞机" @click="removeAircraft(a.id)">×</button>
                   </div>
                 </label>
@@ -2211,9 +2216,9 @@ async function importAllXlsx(event: Event): Promise<void> {
           <section class="gp-section">
             <div class="gp-sec-title">项目安排</div>
             <div class="arrange-row arrange-row-3">
-              <label class="gpf"><span class="gpf-label">项目经理</span><textarea class="textwrap" rows="1" v-model="arrangement.manager" @input="save" v-lock="lockKey('arrangement', 'single', 'manager')"></textarea></label>
-              <label class="gpf"><span class="gpf-label">值班组</span><textarea class="textwrap" rows="1" v-model="arrangement.dutyGroup" @input="save" v-lock="lockKey('arrangement', 'single', 'dutyGroup')"></textarea></label>
-              <label class="gpf"><span class="gpf-label">执行地点</span><textarea class="textwrap" rows="1" v-model="arrangement.location" @input="save" v-lock="lockKey('arrangement', 'single', 'location')"></textarea></label>
+              <label class="gpf"><span class="gpf-label">项目经理</span><textarea class="textwrap" rows="1" v-model="arrangement.manager" @input="queueSave" v-lock="lockKey('arrangement', 'single', 'manager')"></textarea></label>
+              <label class="gpf"><span class="gpf-label">值班组</span><textarea class="textwrap" rows="1" v-model="arrangement.dutyGroup" @input="queueSave" v-lock="lockKey('arrangement', 'single', 'dutyGroup')"></textarea></label>
+              <label class="gpf"><span class="gpf-label">执行地点</span><textarea class="textwrap" rows="1" v-model="arrangement.location" @input="queueSave" v-lock="lockKey('arrangement', 'single', 'location')"></textarea></label>
             </div>
             <div class="arrange-divider" />
             <div class="arrange-row arrange-participants-row">
@@ -2221,13 +2226,13 @@ async function importAllXlsx(event: Event): Promise<void> {
             </div>
             <div class="arrange-divider" />
             <div class="arrange-row arrange-row-2">
-              <label class="gpf"><span class="gpf-label">指令号</span><textarea class="textwrap" rows="1" v-model="arrangement.orderNo" @input="save" v-lock="lockKey('arrangement', 'single', 'orderNo')"></textarea></label>
-              <label class="gpf"><span class="gpf-label">指令名称</span><textarea class="textwrap" rows="1" v-model="arrangement.orderName" @input="save" v-lock="lockKey('arrangement', 'single', 'orderName')"></textarea></label>
+              <label class="gpf"><span class="gpf-label">指令号</span><textarea class="textwrap" rows="1" v-model="arrangement.orderNo" @input="queueSave" v-lock="lockKey('arrangement', 'single', 'orderNo')"></textarea></label>
+              <label class="gpf"><span class="gpf-label">指令名称</span><textarea class="textwrap" rows="1" v-model="arrangement.orderName" @input="queueSave" v-lock="lockKey('arrangement', 'single', 'orderName')"></textarea></label>
             </div>
             <div class="arrange-items">
               <div v-for="it in arrangementItems" :key="it.id" class="arrange-item">
-                <label class="gpf"><span class="gpf-label">内容</span><textarea class="textwrap" rows="1" v-model="it.content" @input="save" v-lock="lockKey('arrangeitem', it.id, 'content')"></textarea></label>
-                <label class="gpf"><span class="gpf-label">安排</span><textarea class="textwrap" rows="1" v-model="it.assign" @input="save" v-lock="lockKey('arrangeitem', it.id, 'assign')"></textarea></label>
+                <label class="gpf"><span class="gpf-label">内容</span><textarea class="textwrap" rows="1" v-model="it.content" @input="queueSave" v-lock="lockKey('arrangeitem', it.id, 'content')"></textarea></label>
+                <label class="gpf"><span class="gpf-label">安排</span><textarea class="textwrap" rows="1" v-model="it.assign" @input="queueSave" v-lock="lockKey('arrangeitem', it.id, 'assign')"></textarea></label>
                 <button class="icon-btn" @click="removeArrangementItem(it.id)">×</button>
               </div>
             </div>
@@ -2238,19 +2243,19 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="gp-sec-title">部件卡片</div>
             <div v-for="(c, i) in components" :key="c.id" class="component-card">
               <div class="meta-group-head">
-                <label class="gpf component-name-wrap"><input v-model="c.name" class="component-name-input" :placeholder="`部件卡片 ${i + 1} 名称`" @input="save" v-lock="lockKey('component', c.id, 'name')" /></label>
+                <label class="gpf component-name-wrap"><input v-model="c.name" class="component-name-input" :placeholder="`部件卡片 ${i + 1} 名称`" @input="queueSave" v-lock="lockKey('component', c.id, 'name')" /></label>
                 <button class="icon-btn" @click="removeComponent(c.id)">×</button>
               </div>
               <div class="component-cols">
                 <div class="component-col">
                   <div class="component-tag off">拆下件</div>
-                  <label class="gpf"><span class="gpf-label">件号</span><textarea class="textwrap" rows="1" v-model="c.offPn" @input="save" v-lock="lockKey('component', c.id, 'offPn')"></textarea></label>
-                  <label class="gpf"><span class="gpf-label">序号</span><textarea class="textwrap" rows="1" v-model="c.offSn" @input="save" v-lock="lockKey('component', c.id, 'offSn')"></textarea></label>
+                  <label class="gpf"><span class="gpf-label">件号</span><textarea class="textwrap" rows="1" v-model="c.offPn" @input="queueSave" v-lock="lockKey('component', c.id, 'offPn')"></textarea></label>
+                  <label class="gpf"><span class="gpf-label">序号</span><textarea class="textwrap" rows="1" v-model="c.offSn" @input="queueSave" v-lock="lockKey('component', c.id, 'offSn')"></textarea></label>
                 </div>
                 <div class="component-col">
                   <div class="component-tag on">装上件</div>
-                  <label class="gpf"><span class="gpf-label">件号</span><textarea class="textwrap" rows="1" v-model="c.onPn" @input="save" v-lock="lockKey('component', c.id, 'onPn')"></textarea></label>
-                  <label class="gpf"><span class="gpf-label">序号</span><textarea class="textwrap" rows="1" v-model="c.onSn" @input="save" v-lock="lockKey('component', c.id, 'onSn')"></textarea></label>
+                  <label class="gpf"><span class="gpf-label">件号</span><textarea class="textwrap" rows="1" v-model="c.onPn" @input="queueSave" v-lock="lockKey('component', c.id, 'onPn')"></textarea></label>
+                  <label class="gpf"><span class="gpf-label">序号</span><textarea class="textwrap" rows="1" v-model="c.onSn" @input="queueSave" v-lock="lockKey('component', c.id, 'onSn')"></textarea></label>
                 </div>
               </div>
             </div>
@@ -2271,10 +2276,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                         <option v-if="a.type && !DEFAULT_PARTS_TYPES.includes(a.type)" :value="a.type">{{ a.type }}</option>
                       </select>
                     </td>
-                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save" :class="{ 'sp-empty': !a.content.trim() }" v-lock="lockKey('spa', a.id, 'content')"></textarea></td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="queueSave" :class="{ 'sp-empty': !a.content.trim() }" v-lock="lockKey('spa', a.id, 'content')"></textarea></td>
                     <td :class="{ 'sp-empty-cell': !r.owner.trim() }"><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><NameSuggest :model-value="r.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="r.owner = $event; save()" v-lock="lockKey('sprow', r.id, 'owner')" /></td>
                     <td :class="{ 'sp-empty-cell': !r.participants.trim() }"><NameSuggest :model-value="r.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="r.participants = $event; save()" v-lock="lockKey('sprow', r.id, 'participants')" /></td>
-                    <td><textarea class="textwrap" rows="1" v-model="r.note" placeholder="备注" @input="save" v-lock="lockKey('sprow', r.id, 'note')"></textarea></td>
+                    <td><textarea class="textwrap" rows="1" v-model="r.note" placeholder="备注" @input="queueSave" v-lock="lockKey('sprow', r.id, 'note')"></textarea></td>
                     <td>
                       <select :value="r.executeStage ? r.executeStage.chartId + '::' + r.executeStage.stageIdx : ''" @change="setSpRowStage(r, ($event.target as HTMLSelectElement).value)">
                         <option value="">未选择</option>
@@ -2310,7 +2315,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <div class="gp-sec-title">顶部责任 (各项负责)</div>
               <div class="resp-banner">
                 <div v-for="r in chart.responsibilities" :key="r.id" class="resp-cell">
-                  <input v-model="r.label" class="resp-label-input" title="负责内容" @input="save" v-lock="lockKey('resp', r.id, 'label')" />
+                  <input v-model="r.label" class="resp-label-input" title="负责内容" @input="queueSave" v-lock="lockKey('resp', r.id, 'label')" />
                   <span class="resp-colon">:</span>
                   <NameSuggest :model-value="r.name" :suggestions="participantSuggestions" placeholder="姓名" @update:model-value="r.name = $event; save()" v-lock="lockKey('resp', r.id, 'name')" />
                   <button class="icon-btn resp-del" @click="removeResp(chart.id, r.id)">×</button>
@@ -2323,7 +2328,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <div v-for="(st, si) in chart.stages" :key="st.id" class="form-stage-card">
                   <div class="form-stage-head">
                     <div class="form-stage-drag" title="拖动调整阶段顺序" @pointerdown="startFormStageDrag($event, chart.id, si)">⠿</div>
-                    <input v-model="st.name" @input="save" v-lock="lockKey('stage', st.id, 'name')" />
+                    <input v-model="st.name" @input="queueSave" v-lock="lockKey('stage', st.id, 'name')" />
                     <select v-if="dayOptionsExcluding(chart.id).length" class="day-move-select form" :value="''" title="迁移整个阶段到其它 DAY" @change="moveStageToChart(chart.id, si, ($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''">
                       <option value="" disabled>⇄ 移 DAY</option>
                       <option v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" :value="c.id">{{ c.label }}</option>
@@ -2335,11 +2340,11 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <div v-for="card in cardsOfStage(chart, si)" :key="card.id" class="form-card-row">
                       <div class="form-card-title">
                         <div class="form-card-drag" title="拖动调行序" @pointerdown="startFormCardDrag($event, chart.id, card.id)">⠿</div>
-                        <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="save" v-lock="lockKey('card', card.id, 'content')"></textarea>
+                        <textarea class="textwrap" rows="1" v-model="card.content" placeholder="工作内容" @input="queueSave" v-lock="lockKey('card', card.id, 'content')"></textarea>
                       </div>
                       <NameSuggest class="ns-owner" :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" v-lock="lockKey('card', card.id, 'owner')" />
                       <NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" v-lock="lockKey('card', card.id, 'participants')" />
-                      <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="save" v-lock="lockKey('card', card.id, 'note')"></textarea>
+                      <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="queueSave" v-lock="lockKey('card', card.id, 'note')"></textarea>
                       <span v-if="card.endStage > card.startStage" class="fc-span">持续至「{{ chart.stages[card.endStage]?.name }}」</span>
                       <button class="icon-btn" @click="deleteCard(chart.id, card.id)">×</button>
                     </div>
@@ -2348,7 +2353,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <span class="sp-view-content" :title="x.arr.content">{{ x.arr.content }}</span>
                       <NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" v-lock="lockKey('sprow', x.row.id, 'owner')" />
                       <NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" v-lock="lockKey('sprow', x.row.id, 'participants')" />
-                      <textarea class="textwrap" rows="1" v-model="x.row.note" placeholder="备注" @input="save" v-lock="lockKey('sprow', x.row.id, 'note')"></textarea>
+                      <textarea class="textwrap" rows="1" v-model="x.row.note" placeholder="备注" @input="queueSave" v-lock="lockKey('sprow', x.row.id, 'note')"></textarea>
                       <button class="icon-btn" title="删除原分配的阶段（串件仍在串件安排中）" @click="clearSpStage(x.arr.id, x.row.id)">×</button>
                     </div>
                     <div v-if="!cardsOfStage(chart, si).length && !spRowsOfStage(chart.id, si).length" class="stage-empty">无工序</div>
@@ -2392,7 +2397,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             <template v-if="!chart.collapsed">
               <div class="resp-banner">
                 <div v-for="r in chart.responsibilities" :key="r.id" class="resp-cell">
-                  <input v-model="r.label" class="resp-label-input" @input="save" v-lock="lockKey('resp', r.id, 'label')" /><span class="resp-colon">:</span>
+                  <input v-model="r.label" class="resp-label-input" @input="queueSave" v-lock="lockKey('resp', r.id, 'label')" /><span class="resp-colon">:</span>
                   <NameSuggest :model-value="r.name" :suggestions="participantSuggestions" placeholder="姓名" @update:model-value="r.name = $event; save()" v-lock="lockKey('resp', r.id, 'name')" />
                   <button class="icon-btn resp-del" @click="removeResp(chart.id, r.id)">×</button>
                 </div>
@@ -2402,7 +2407,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <div class="gantt-grid" :style="{ gridTemplateColumns: `repeat(${chart.stages.length}, var(--gp-col, 320px))`, gridTemplateRows: `44px repeat(${rowCountOf(chart)}, auto)` }">
                   <div v-for="(st, si) in chart.stages" :key="st.id" class="gantt-head" :style="{ gridColumn: si + 1, gridRow: 1 }">
                     <div class="stage-col-drag" title="拖动调整列位置" @pointerdown="startStageColDrag($event, chart.id, si)">⠿</div>
-                    <input v-model="st.name" class="stage-name-input" @input="save" v-lock="lockKey('stage', st.id, 'name')" />
+                    <input v-model="st.name" class="stage-name-input" @input="queueSave" v-lock="lockKey('stage', st.id, 'name')" />
                     <span class="stage-split" @click.stop>
                       <button class="add-card-btn stage-split-main" title="本列添加工序" @click="addCard(chart.id, si)">+工序</button>
                       <button class="stage-split-arrow" title="更多操作" @click="toggleStageMenu(chart.id, si)">▾</button>
@@ -2423,10 +2428,10 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="resize-r" title="拖右边缘改结束阶段" @pointerdown="startCardDrag($event, 'resize-right', chart.id, card.id)"></div>
                       <button class="card-close" title="删除工序" @click="deleteCard(chart.id, card.id)">✕</button>
                       <div class="card-body">
-                        <textarea class="f-content" v-model="card.content" placeholder="工作内容" @input="save" rows="1" v-lock="lockKey('card', card.id, 'content')"></textarea>
+                        <textarea class="f-content" v-model="card.content" placeholder="工作内容" @input="queueSave" rows="1" v-lock="lockKey('card', card.id, 'content')"></textarea>
                         <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="card.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="card.owner = $event; save()" v-lock="lockKey('card', card.id, 'owner')" /></div>
                         <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" v-lock="lockKey('card', card.id, 'participants')" /></div>
-                        <textarea class="f-note" v-model="card.note" placeholder="备注(红色提示)" @input="save" rows="1" v-lock="lockKey('card', card.id, 'note')"></textarea>
+                        <textarea class="f-note" v-model="card.note" placeholder="备注(红色提示)" @input="queueSave" rows="1" v-lock="lockKey('card', card.id, 'note')"></textarea>
                       </div>
                     </div>
                   </div>
@@ -2437,11 +2442,11 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="card-body">
                         <div class="sp-title-row">
                           <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
-                          <textarea class="f-content sp-view-content" rows="1" v-model="x.arr.content" placeholder="（空）" @input="save" v-lock="lockKey('spa', x.arr.id, 'content')"></textarea>
+                          <textarea class="f-content sp-view-content" rows="1" v-model="x.arr.content" placeholder="（空）" @input="queueSave" v-lock="lockKey('spa', x.arr.id, 'content')"></textarea>
                         </div>
                         <div class="people-row"><span class="pl">负责</span><NameSuggest :model-value="x.row.owner" :suggestions="participantSuggestions" placeholder="负责人" @update:model-value="x.row.owner = $event; save()" v-lock="lockKey('sprow', x.row.id, 'owner')" /></div>
                         <div class="people-row"><span class="pl">参与</span><NameSuggest :model-value="x.row.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="x.row.participants = $event; save()" v-lock="lockKey('sprow', x.row.id, 'participants')" /></div>
-                        <textarea class="f-note" v-model="x.row.note" placeholder="备注" @input="save" rows="1" v-lock="lockKey('sprow', x.row.id, 'note')"></textarea>
+                        <textarea class="f-note" v-model="x.row.note" placeholder="备注" @input="queueSave" rows="1" v-lock="lockKey('sprow', x.row.id, 'note')"></textarea>
                       </div>
                     </div>
                   </div>
@@ -2460,7 +2465,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                     <div class="card-body">
                       <div class="sp-title-row">
                         <span class="part-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
-                        <textarea class="f-content sp-view-content" rows="1" v-model="x.arr.content" placeholder="（空）" @input="save"></textarea>
+                        <textarea class="f-content sp-view-content" rows="1" v-model="x.arr.content" placeholder="（空）" @input="queueSave"></textarea>
                       </div>
                       <div class="people-row"><span class="pl">负责</span><span>{{ x.row.owner || '未指派' }}</span></div>
                       <div class="people-row"><span class="pl">参与</span><span>{{ x.row.participants }}</span></div>
@@ -2490,8 +2495,8 @@ async function importAllXlsx(event: Event): Promise<void> {
               <thead><tr><th>工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
               <tbody>
                 <tr v-for="(x, i) in state.docs.wp" :key="'wp' + i">
-                  <td><input v-model="(x as any).jc" placeholder="工卡号" @input="save" v-lock="lockKey('docwp', 'row' + i, 'jc')" /></td>
-                  <td><input v-model="(x as any).name" placeholder="工卡名称" @input="save" v-lock="lockKey('docwp', 'row' + i, 'name')" /></td>
+                  <td><input v-model="(x as any).jc" placeholder="工卡号" @input="queueSave" v-lock="lockKey('docwp', 'row' + i, 'jc')" /></td>
+                  <td><input v-model="(x as any).name" placeholder="工卡名称" @input="queueSave" v-lock="lockKey('docwp', 'row' + i, 'name')" /></td>
                   <td><button class="icon-btn" @click="removeDoc('wp', i)">×</button></td>
                 </tr>
               </tbody>
@@ -2513,8 +2518,8 @@ async function importAllXlsx(event: Event): Promise<void> {
               <thead><tr><th>工卡号</th><th>工卡名称</th><th class="col-act">×</th></tr></thead>
               <tbody>
                 <tr v-for="(x, i) in state.docs.eng" :key="'eng' + i">
-                  <td><input v-model="(x as any).jc" placeholder="工卡号" @input="save" v-lock="lockKey('doceng', 'row' + i, 'jc')" /></td>
-                  <td><input v-model="(x as any).name" placeholder="工卡名称" @input="save" v-lock="lockKey('doceng', 'row' + i, 'name')" /></td>
+                  <td><input v-model="(x as any).jc" placeholder="工卡号" @input="queueSave" v-lock="lockKey('doceng', 'row' + i, 'jc')" /></td>
+                  <td><input v-model="(x as any).name" placeholder="工卡名称" @input="queueSave" v-lock="lockKey('doceng', 'row' + i, 'name')" /></td>
                   <td><button class="icon-btn" @click="removeDoc('eng', i)">×</button></td>
                 </tr>
               </tbody>
@@ -2544,7 +2549,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                         <option v-if="a.type && !DEFAULT_PARTS_TYPES.includes(a.type)" :value="a.type">{{ a.type }}</option>
                       </select>
                     </td>
-                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="save"></textarea></td>
+                    <td v-if="ri === 0" :rowspan="a.rows.length"><textarea class="textwrap" rows="1" v-model="a.content" placeholder="串件内容" @input="queueSave"></textarea></td>
                     <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><input :value="r.jc" placeholder="工卡号" @input="r.jc = ($event.target as HTMLInputElement).value; save()" v-lock="lockKey('sprow', r.id, 'jc')" /></td>
                     <td><span class="sp-tag" v-if="r.tag">（{{ r.tag }}）</span><textarea class="sp-name" rows="1" :value="r.name" placeholder="工卡名称" @input="r.name = ($event.target as HTMLTextAreaElement).value; onPartAutoSize($event)" v-lock="lockKey('sprow', r.id, 'name')"></textarea></td>
                     <td v-if="ri === 0" :rowspan="a.rows.length"><button class="icon-btn" title="删除整条串件安排" @click="removeSpArrangement(a.id)">×</button></td>
@@ -2613,7 +2618,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                         <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
                         <div class="itg-qty">
                           <button type="button" class="qty-step" title="减 1" @click="stepQty(row.item, -1)">−</button>
-                          <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
+                          <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="queueSave" v-lock="lockKey('partitem', row.item.id, 'qty')" />
                           <button type="button" class="qty-step" title="加 1" @click="stepQty(row.item, 1)">+</button>
                         </div>
                         <textarea rows="1" class="cell-inp is-note" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
@@ -2641,7 +2646,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                         <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
                         <div class="itg-qty">
                           <button type="button" class="qty-step" title="减 1" @click="stepQty(row.item, -1)">−</button>
-                          <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
+                          <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="queueSave" v-lock="lockKey('partitem', row.item.id, 'qty')" />
                           <button type="button" class="qty-step" title="加 1" @click="stepQty(row.item, 1)">+</button>
                         </div>
                         <textarea rows="1" class="cell-inp is-note" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
@@ -2658,7 +2663,7 @@ async function importAllXlsx(event: Event): Promise<void> {
           <section v-for="card in visiblePartCards" :key="card.id" class="gp-card pt-card" :style="{ borderLeft: '6px solid ' + partCardColorOf(card), background: partCardBgOf(card) }">
             <div class="pt-card-head" :style="{ background: partCardHeadOf(card) }">
               <button class="pt-collapse" :title="collapsedCards.has(card.id) ? '展开卡片' : '折叠卡片'" @click="toggleCardCollapse(card.id)">{{ collapsedCards.has(card.id) ? '▸' : '▾' }}</button>
-              <input v-model="card.name" class="pt-card-name" placeholder="卡片名称(可输入或搜索串件内容)" list="gp-part-contents" @input="save" v-lock="lockKey('partcard', card.id, 'name')" />
+              <input v-model="card.name" class="pt-card-name" placeholder="卡片名称(可输入或搜索串件内容)" list="gp-part-contents" @input="queueSave" v-lock="lockKey('partcard', card.id, 'name')" />
               <span class="pt-count">{{ card.items.length }} 项</span>
               <button class="icon-btn" @click="removePartList(partKind, card.id)">×</button>
             </div>
@@ -2675,7 +2680,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <textarea rows="1" v-model="it.name" placeholder="名称" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'name')"></textarea>
                 <div class="itg-qty">
                   <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
-                  <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', it.id, 'qty')" />
+                  <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="queueSave" v-lock="lockKey('partitem', it.id, 'qty')" />
                   <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
                 </div>
                 <textarea rows="1" class="cell-inp is-note" v-model="it.note" placeholder="备注" @input="onPartAutoSize" @blur="save" v-lock="lockKey('partitem', it.id, 'note')"></textarea>

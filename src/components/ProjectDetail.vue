@@ -492,7 +492,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
                   <div class="itg-qty">
                     <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
-                    <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
+                    <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.queuePersist" />
                     <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
                   </div>
                   <textarea v-model="it.note" rows="1" class="cell-inp is-note" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
@@ -515,7 +515,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
                   <div class="itg-qty">
                     <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
-                    <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
+                    <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.queuePersist" />
                     <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
                   </div>
                   <textarea v-model="it.note" rows="1" class="cell-inp is-note" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>

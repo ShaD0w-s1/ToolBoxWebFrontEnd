@@ -53,8 +53,8 @@ async function finishCart(): Promise<void> {
         <thead><tr><th>物品</th><th>数量</th><th>操作</th></tr></thead>
         <tbody>
           <tr v-for="(item, index) in store.app.value.toolCart" :key="index">
-            <td><input v-model="item.name" @input="store.persist" /></td>
-            <td><input v-model.number="item.qty" type="number" min="0" @input="store.persist" /></td>
+            <td><input v-model="item.name" @input="store.queuePersist" /></td>
+            <td><input v-model.number="item.qty" type="number" min="0" @input="store.queuePersist" /></td>
             <td><button class="danger" @click="remove(index)">删除</button></td>
           </tr>
         </tbody>
