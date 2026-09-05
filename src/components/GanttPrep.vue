@@ -497,7 +497,7 @@ async function onAircraftRegChange(a: MetaAircraft): Promise<void> {
     a.type = String(match["机型"] || "");
     a.etops = String(match["ETOPS"] || "");
     a.eltDt = String(match["ELT-DT"] || "");
-    save();
+    queueSave();
   } else {
     props.store.openAircraftUpdate({ 机号: reg, FSN: a.fsn, MSN: a.msn, 机型: a.type, 发动机: a.engine, ETOPS: a.etops, "ELT-DT": a.eltDt });
   }
@@ -631,7 +631,7 @@ function removePartItem(kind: "airParts" | "toolParts", listId: string, itemId: 
 /** 数量步进：−/+ 增减 1，下限 0（部位行表/重复梳理行表共用）。 */
 function stepQty(item: { qty?: number }, d: number): void {
   item.qty = Math.max(0, (Number(item.qty) || 0) + d);
-  save();
+  queueSave();
 }
 // 航材/工具「+ 新增卡片」splitbutton：下拉含「清空清单(danger)」（对齐 A检 清空清单）
 const partClearOpen = ref(false);

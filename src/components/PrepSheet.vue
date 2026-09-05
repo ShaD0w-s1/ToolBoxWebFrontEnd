@@ -45,7 +45,7 @@ async function onAircraftChange(): Promise<void> {
   const raw = prep.value.base.机号.trim();
   if (!raw) return;
   const target = props.store.normalizeAircraftReg(raw);
-  if (!target) { props.store.persist(); return; }
+  if (!target) { props.store.queuePersist(); return; }
   prep.value.base.机号 = target;
   const match = await props.store.fetchAircraftInfo(target);
   if (match) {
@@ -57,7 +57,7 @@ async function onAircraftChange(): Promise<void> {
     prep.value.base["ELT-DT"] = String(match["ELT-DT"] || "");
   }
   props.store.maybePromptAircraftUpdate(prep.value.base);
-  props.store.persist();
+  props.store.queuePersist();
 }
 
 /** 机型字段（FSN/MSN/机型/发动机/ETOPS/ELT-DT）编辑后：检测与库中差异 → 弹「更新机型标准库」（更新场景，不再标脏走需授权的 autoSync）。 */

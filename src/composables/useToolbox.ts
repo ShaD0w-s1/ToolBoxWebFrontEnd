@@ -548,12 +548,15 @@ export function useToolbox() {
     markCurrentDirty();
     scheduleRemoteSave();
   }
-  /** 输入格防抖落盘：立即标脏/调度远程；localStorage 合并到 250ms 停顿后一次写入。 */
+  /** 高频编辑路径（输入格/数量步进/拖拽/机号回填）防抖落盘：立即标脏 + 调度远程保存；
+   *  localStorage 全量写入（app 为 MB 级，同步 setItem 单次数百 ms~1s）改为【空闲 8s】才写一次，
+   *  切后台/关页/刷新由 flushPersist()（visibilitychange hidden / beforeunload）兜底——
+   *  编辑与增减数值过程主线程不再被大块同步写阻塞（2026-09-06 二次修复：250ms 停笔后全量写仍会造成 >1s 卡）。 */
   function queuePersist(): void {
     markCurrentDirty();
     scheduleRemoteSave();
     clearTimeout(persistTimer);
-    persistTimer = setTimeout(() => { persistNow(); }, 250);
+    persistTimer = setTimeout(() => { persistNow(); }, 8000);
   }
 
   /** 显式以指定字段标记当前项目为脏并落盘（用于 meta 等非子页字段的变更）。 */
@@ -1515,7 +1518,7 @@ export function useToolbox() {
       b.发动机 = String(match["发动机"] || ""); b.ETOPS = String(match["ETOPS"] || ""); b["ELT-DT"] = String(match["ELT-DT"] || "");
     }
     maybePromptAircraftUpdate(b);
-    persist();
+    queuePersist();
   }
 
   /** 把工卡分级/部位变更同步回「工卡分配标准库」（按工卡号 upsert）。 */
@@ -1531,7 +1534,7 @@ export function useToolbox() {
     if (idx >= 0) rows[idx] = row;
     else rows.push(row);
     dirtyStdLibs.add("workcard_320");
-    persist();
+    queuePersist();
   }
 
   /** 把已分配工卡在分组之间移动。目标为标准部位 → 同步标准库部位；目标为临时分组 → 仅存本项目不写库。 */
@@ -1550,7 +1553,7 @@ export function useToolbox() {
       card.部位 = to;
     }
     a.sections[to].cards.push(card);
-    persist();
+    queuePersist();
   }
 
   /** 把「未分配部位」工卡指定分组后插入。目标为标准部位 → 写入工卡分配标准库；临时分组 → 不写库。 */
@@ -1567,7 +1570,7 @@ export function useToolbox() {
       card.部位 = to;
     }
     a.sections[to].cards.push(card);
-    persist();
+    queuePersist();
   }
 
   /** 删除「未分配部位」中的某条工卡。 */
@@ -1575,7 +1578,7 @@ export function useToolbox() {
     const a = currentProject.value?.workcardAssignment;
     if (!a) return;
     a.unassigned.splice(index, 1);
-    persist();
+    queuePersist();
   }
 
   /** 把「AV CB」分组的工卡按子部位（AV/CB）排序，AV 在前、CB 在后、未知最后。 */

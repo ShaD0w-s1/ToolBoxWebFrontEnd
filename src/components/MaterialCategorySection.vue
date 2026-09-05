@@ -68,7 +68,7 @@ function commitNote(it: ToolItem): void {
 /** 数量步进：−/+ 增减 1，下限 0。 */
 function stepQty(it: ToolItem, d: number): void {
   it.qty = Math.max(0, (Number(it.qty) || 0) + d);
-  props.store.persist();
+  props.store.queuePersist();
 }
 
 const catNote = computed({
