@@ -69,7 +69,7 @@ function renameSub(side: "mat" | "tool", cat: string, oldSub: string, newSub: st
 /** 新增类型（航材）或工作（工具）：在对应标准库同步新增空白卡片 + 名称。 */
 function addSub(side: "mat" | "tool", cat: string): void {
   const lib = side === "mat" ? matLib.value : toolLib.value;
-  const label = side === "mat" ? "类型" : "工作";
+  const label = "工作"; // sub 层术语统一（原航材侧称“类型”）
   const name = window.prompt(`请输入新${label}名称：`);
   if (!name || !name.trim()) return;
   const sub = name.trim();

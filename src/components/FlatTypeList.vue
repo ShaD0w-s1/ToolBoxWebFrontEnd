@@ -78,7 +78,7 @@ function renameType(card: { sub: string }, event: Event): void {
   props.store.persist();
 }
 function deleteType(sub: string): void {
-  if (!window.confirm(`删除类型“${sub}”及其全部物品？\n（仅影响当前清单）`)) return;
+  if (!window.confirm(`删除工作“${sub}”及其全部物品？\n（仅影响当前清单）`)) return;
   const arr = items.value;
   for (let i = arr.length - 1; i >= 0; i--) if (arr[i].sub === sub) arr.splice(i, 1);
   const s = new Set(collapsedSubs.value);
@@ -123,14 +123,14 @@ function autoGrow(event: Event): void {
           <input
             class="pt-card-name ft-card-name"
             :value="card.sub"
-            aria-label="类型名称"
+            aria-label="工作名称"
             :class="{ dim: q && !card.sub.toLowerCase().includes(q) }"
-            placeholder="类型名称（改名后同名类型自动合并）"
-            title="改类型名"
+            placeholder="工作名称（改名后同名工作自动合并）"
+            title="改工作名"
             @change="renameType(card, $event)"
           />
           <span class="pt-count">{{ card.its.length }} 项 · {{ sumQty(card.its) }}</span>
-          <button class="icon-btn" :title="'删除类型：' + card.sub" @click="deleteType(card.sub)">×</button>
+          <button class="icon-btn" :title="'删除工作：' + card.sub" @click="deleteType(card.sub)">×</button>
         </div>
         <template v-if="isOpen(card.sub)">
           <!-- 物品表：行间水平实线、列间垂直虚线；字段名以 placeholder 呈现（维持卡片框架与配色） -->
@@ -154,7 +154,7 @@ function autoGrow(event: Event): void {
         </template>
       </section>
     </template>
-    <div v-else class="pt-empty-all">暂无类型 — 点上方「+ 添加类型」开始录入。</div>
+    <div v-else class="pt-empty-all">暂无工作 — 点上方「+ 添加工作」开始录入。</div>
   </div>
 </template>
 
@@ -171,26 +171,8 @@ function autoGrow(event: Event): void {
 .pt-collapse:hover { border-color: var(--blue); color: var(--blue-dark); }
 .pt-count { font-size: var(--fs-12); color: var(--n7); flex-shrink: 0; }
 .icon-btn { border: none; background: transparent; color: var(--danger); font-size: var(--fs-16); cursor: pointer; flex-shrink: 0; }
-/* 物品双列网格（对齐换发 .pt-items） */
-.pt-items { padding: 4px 0 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.pt-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: stretch; border: 1px solid var(--n3); border-radius: var(--r-md); padding: 6px 8px; background: var(--n0); word-break: break-word; }
-.pt-item:hover { border-color: var(--blue); }
-.pt-item-tool { grid-template-columns: 2fr 0.6fr auto; }
-.m-field { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-12); color: var(--n7); min-width: 0; }
-.m-field input, .m-name { padding: 5px 7px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0; width: 100%; box-sizing: border-box; }
-.m-name { padding: 5px 7px; font-size: var(--fs-12); line-height: 1.4; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; font-family: inherit; min-height: 30px; }
-.m-ops { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
-.m-op { flex: 1; min-width: 26px; min-height: 22px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--n0); color: var(--n7); font-size: var(--fs-14); line-height: 1; cursor: pointer; }
-.m-op:hover { background: var(--blue-light); }
-.m-op-del { border-color: #f2cdcd; background: #fdecec; color: #b53a3a; }
-.m-op-del:hover { background: #f9dcdc; }
-.pt-note-row { grid-column: 1 / -1; display: flex; gap: 6px; align-items: flex-end; }
-.pt-note { min-height: 28px; font-size: var(--fs-12); color: var(--danger); outline: none; background: var(--blue-bg); border: 1px dashed var(--line); border-radius: var(--r-sm); padding: 4px 8px; resize: none; width: 100%; font-family: inherit; }
-.ft-note-del { flex: 0 0 auto; min-height: 28px; }
 .pt-empty { color: var(--n7); font-size: var(--fs-12); text-align: center; padding: 10px 0; }
 .pt-empty-all { text-align: center; color: var(--n7); padding: 40px 0; font-size: var(--fs-13); }
 .gp-add { margin-top: 8px; }
-@media (max-width: 768px) {
-  .pt-items { grid-template-columns: 1fr; }
-}
+
 </style>

@@ -54,10 +54,4 @@ function subLabel(it: ToolItem): string {
 .pnc-name { font-size: var(--fs-13); color: #4a5160; }
 .pnc-count { margin-left: auto; font-size: var(--fs-12); color: #98a2b3; }
 .pnc-body { padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
-.pnc-item { display: grid; grid-template-columns: 1.2fr 0.5fr auto 2fr; gap: 6px; align-items: center; }
-.pnc-type { font-size: var(--fs-13); color: #4a5160; padding: 4px 8px; background: #f4f6fb; border-radius: var(--r-sm); min-height: 24px; }
-.pnc-qty { width: 100%; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); box-sizing: border-box; }
-.pnc-del { width: 26px; height: 26px; padding: 0; border: 1px solid #f2cdcd; border-radius: var(--r-sm); background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1; cursor: pointer; }
-.pnc-del:hover { background: #f9dcdc; }
-.pnc-note { min-height: 30px; padding: 4px 7px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-12); resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; }
 </style>

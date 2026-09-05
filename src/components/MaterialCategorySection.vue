@@ -110,15 +110,14 @@ function renameSub(oldName: string, event: Event): void {
   props.store.mRenameSub(props.category, oldName, (event.target as HTMLInputElement).value.trim());
 }
 function deleteSub(sub: string): void {
-  if (window.confirm(`确认删除类型“${sub}”？`)) props.store.mDeleteSub(props.category, sub);
+  if (window.confirm(`确认删除工作“${sub}”？`)) props.store.mDeleteSub(props.category, sub);
 }
-/** 部位卡片"补充标准库"：把该部位下所有类型整体同步到对应机型航材标准库。 */
-async function supplementPart(): Promise<void> {
-  if (!window.confirm(`确认将部位“${props.category}”的全部航材补充/删减到对应航材标准库？`)) return;
+/** “工作”卡片“补充标准库”：确认后将本工作卡片航材补充/删减到对应机型航材标准库，并立即推送云端。 */
+async function supplementWork(sub: string): Promise<void> {
+  if (!window.confirm(`确认将“${props.category} / ${sub}”工作卡片的航材补充/删减到对应机型航材标准库？`)) return;
   try {
-    let type: string | null = null;
-    for (const sub of subNames.value) type = await props.store.mSyncSubToMaterialLib(props.category, sub);
-    props.store.notify(type ? `已补充「${props.category}」到 ${type} 航材标准库` : "航材标准库未找到，补充失败");
+    const type = await props.store.mSyncSubToMaterialLib(props.category, sub);
+    props.store.notify(type ? `已补充「${sub}」到 ${type} 航材标准库` : "航材标准库未找到，补充失败");
   } catch { props.store.notify("补充标准库失败，请重试"); }
 }
 </script>
@@ -131,8 +130,7 @@ async function supplementPart(): Promise<void> {
       <datalist id="mcat-std-list"><option v-for="c in stdCats" :key="c" :value="c" /></datalist>
       <span>合计 {{ store.mCatTotal(category) }}</span>
       <div class="spacer" />
-      <button @click="store.mAddSub(category)">+ 类型</button>
-      <button v-if="!isLibrary" class="ghost" @click="supplementPart">补充标准库</button>
+      <button @click="store.mAddSub(category)">+ 工作</button>
       <button class="danger" title="删除部位引用（仅当前清单，标准库与他项目不受影响）" @click="deleteCategory">删除</button>
     </header>
     <div v-if="showBody" class="category-body">
@@ -142,8 +140,9 @@ async function supplementPart(): Promise<void> {
           <header class="sub-head">
             <button class="collapse sub-collapse" :aria-label="collapsedSubs.has(sub) ? '展开' : '收起'" @click="toggleSub(sub)">{{ collapsedSubs.has(sub) ? '›' : '⌄' }}</button>
             <StandardPicker v-if="!isLibrary && !isStandalone" :options="matStdSubs" :category="category" :sub="sub" :store="store" :material="true" />
-            <input v-else class="type-name" :value="sub" aria-label="类型名称" @change="renameSub(sub, $event)" />
+            <input v-else class="type-name" :value="sub" aria-label="工作名称" @change="renameSub(sub, $event)" />
             <div class="spacer" />
+            <button v-if="!isLibrary" class="ghost" @click="supplementWork(sub)">补充标准库</button>
             <button @click="store.mAddItem(category, sub)">+ 物品</button>
             <button class="danger" @click="deleteSub(sub)">删除</button>
           </header>
@@ -185,27 +184,7 @@ async function supplementPart(): Promise<void> {
 }
 .sub-head :deep(.standard-input:hover),
 .sub-head :deep(.standard-input:focus) { border-color: var(--focus); background: var(--n0); }
-.item-grid { display: grid; gap: 8px; }
-.m-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: stretch; border: 1px solid var(--n3); border-radius: var(--r-md); padding: 6px 8px; background: var(--n0); word-break: break-word; }
-.m-field { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-12); color: var(--n7); min-width: 0; }
-.m-field input, .m-name { padding: 5px 7px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0; width: 100%; box-sizing: border-box; }
-/* 件号/名称/备注 textarea：与数量栏等高（默认单行），字体保持 12px，自动换行并随内容撑高 */
-.m-name { padding: 5px 7px; font-size: var(--fs-12); line-height: 1.4; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; font-family: inherit; min-height: 30px; }
-/* 操作按钮组：删除(x)+备注(+) 上下排列，占满卡片高度 */
-.m-ops { display: flex; flex-direction: column; gap: 4px; }
-.m-op { flex: 1; min-width: 26px; min-height: 22px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--n0); color: var(--n7); font-size: var(--fs-14); line-height: 1; cursor: pointer; }
-.m-op:hover { background: var(--blue-light); }
-.m-op-del { border-color: #f2cdcd; background: #fdecec; color: #b53a3a; }
-.m-op-del:hover { background: #f9dcdc; }
-/* 备注行：横跨整行，含删除按钮 */
-.m-note-row { grid-column: 1 / -1; display: flex; gap: 6px; align-items: flex-end; }
-.m-note-row .m-field { flex: 1; }
-.m-note-row .m-op { flex: 0 0 auto; min-height: 30px; }
 @media (max-width: 768px) {
   .sub-grid { grid-template-columns: 1fr !important; }
-  .item-grid { grid-template-columns: 1fr !important; }
-  .m-item { grid-template-columns: 1fr 1fr auto; }
-  .m-field-name { grid-column: span 2; }
-  .m-note-row { grid-column: 1 / -1; }
 }
 </style>

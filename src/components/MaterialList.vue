@@ -124,8 +124,8 @@ function exportImage(): void { emit("export-image", captureRef.value); }
 function addMaterialFlatType(): void {
   const active = props.store.materialActive.value;
   const used = new Set((active?.items || []).map((it) => (it.sub || "").trim()).filter(Boolean));
-  let name = "新类型";
-  for (let k = 2; used.has(name); k++) name = `新类型${k}`;
+  let name = "新工作";
+  for (let k = 2; used.has(name); k++) name = `新工作${k}`;
   props.store.mAddItem(FLAT_MATERIAL_CAT, name, true);
 }
 function exportTableXlsx(): void {
@@ -267,7 +267,7 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
         <option value="__NEW__">新部位</option>
         <option v-for="o in addOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
       </select>
-      <button v-else class="primary" @click="addMaterialFlatType" title="新增类型（默认名“新类型”，新类型卡片将显示在清单顶端）">+ 添加类型</button>
+      <button v-else class="primary" @click="addMaterialFlatType" title="新增工作（默认名“新工作”，新工作卡片将显示在清单顶端）">+ 添加工作</button>
       <label v-if="!isLibrary && !isStandalone" class="field">机型
         <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
       </label>
@@ -275,8 +275,8 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
       <label v-if="isLibrary" class="button">导入部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="onImportNewSections" /></label>
       <label v-if="!isLibrary" class="button">导入补充表格<input hidden type="file" accept=".xlsx,.xls" @change="onImportSupplement" /></label>
       <button v-if="!isLibrary && store.currentProject.value?.type === 'A检'" class="button primary" @click="runMaterialFilterByWorkcard">按卡筛选</button>
-      <label class="field">类型查询
-        <input list="m-types" v-model="typeQuery" placeholder="输入/选择类型" />
+      <label class="field">工作查询
+        <input list="m-types" v-model="typeQuery" placeholder="输入/选择工作" />
         <datalist id="m-types"><option v-for="t in allTypes" :key="t" :value="t" /></datalist>
         <button v-if="typeQuery" class="clear-btn" type="button" @click="typeQuery = ''" aria-label="清空">×</button>
       </label>

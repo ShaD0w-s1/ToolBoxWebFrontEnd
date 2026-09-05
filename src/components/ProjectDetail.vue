@@ -197,8 +197,8 @@ function onAddCategory(event: Event): void {
 function addFlatToolType(): void {
   const active = props.store.active.value;
   const used = new Set((active?.items || []).map((it) => (it.sub || "").trim()).filter(Boolean));
-  let name = "新类型";
-  for (let k = 2; used.has(name); k++) name = `新类型${k}`;
+  let name = "新工作";
+  for (let k = 2; used.has(name); k++) name = `新工作${k}`;
   props.store.addItem(FLAT_TOOL_CAT, name, true);
 }
 
@@ -450,15 +450,15 @@ async function runToolFilterByWorkcard(): Promise<void> {
               <option v-for="opt in projectAddOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </template>
           </select>
-          <button v-else class="primary" @click="addFlatToolType" title="新增类型（默认名“新类型”，新类型卡片将显示在清单顶端）">+ 添加类型</button>
+          <button v-else class="primary" @click="addFlatToolType" title="新增工作（默认名“新工作”，新工作卡片将显示在清单顶端）">+ 添加工作</button>
           <label v-if="store.currentProject.value && !isStandalone" class="field">机型
             <select :value="store.effectiveAircraftType.value ?? ''" :disabled="!canEditAircraft" @change="onAircraftChange" :aria-label="canEditAircraft ? '机型（可手动选择）' : '机型（由工作准备单推断）'"><option value="">无</option><option v-for="type in AIRCRAFT_TYPES" :key="type" :value="type">{{ type }}</option></select>
           </label>
           <label v-if="store.editingLibrary.value" class="button">导入 xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importFile" /></label>
           <label v-if="store.editingLibrary.value" class="button">导入新部位.xlsx<input hidden type="file" accept=".xlsx,.xls" @change="importNewSectionsFile" /></label>
           <button v-if="isAcheck && !isLibrary" class="button primary" @click="runToolFilterByWorkcard">按卡筛选</button>
-          <label v-if="!isLibrary" class="field">{{ isStandalone ? '类型查询' : '工作查询' }}
-            <input list="tool-works" v-model="workQuery" :placeholder="isStandalone ? '输入/选择类型' : '输入/选择工作'" />
+          <label v-if="!isLibrary" class="field">工作查询
+            <input list="tool-works" v-model="workQuery" placeholder="输入/选择工作" />
             <datalist id="tool-works"><option v-for="w in allWorks" :key="w" :value="w" /></datalist>
             <button v-if="workQuery" class="clear-btn" type="button" @click="workQuery = ''" aria-label="清空">×</button>
           </label>
@@ -482,7 +482,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <span class="tool-dedupe-count">× {{ g.items.length }}</span>
               </header>
               <div class="itg" style="grid-template-columns: 1.4fr 0.6fr 2.2fr auto">
-                <div class="itg-head"><span>类型</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
+                <div class="itg-head"><span>工作</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
                 <div v-for="it in g.items" :key="it.id" class="itg-row">
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
                   <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
@@ -501,7 +501,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <span class="tool-dedupe-count">× 1</span>
               </header>
               <div class="itg" style="grid-template-columns: 1.4fr 0.6fr 2.2fr auto">
-                <div class="itg-head"><span>类型</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
+                <div class="itg-head"><span>工作</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
                 <div v-for="it in g.items" :key="it.id" class="itg-row">
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
                   <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />

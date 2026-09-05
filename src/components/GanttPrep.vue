@@ -3079,7 +3079,6 @@ textarea.textwrap {
 .pt-card-name { flex: 1; min-width: 120px; height: 32px; padding: 0 8px; border: 1.5px solid var(--blue, var(--blue)); border-radius: var(--r-sm); font-size: var(--fs-14); font-weight: 700; color: var(--blue-dark, var(--blue-dark)); }
 .pt-card-name:focus { outline: none; border-color: var(--focus); }
 .pt-count { font-size: var(--fs-12); color: var(--muted, var(--n7)); flex-shrink: 0; }
-.pt-items { padding: 4px 0 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .pt-empty { color: var(--muted, var(--n7)); font-size: var(--fs-12); text-align: center; padding: 10px 0; }
 .pt-empty-all { text-align: center; color: var(--muted, var(--n7)); padding: 40px 0; font-size: var(--fs-13); }
 /* 卡片搜索栏：AutoComplete 输入 + 下拉候选 */
@@ -3098,21 +3097,6 @@ textarea.textwrap {
 /* 卡片折叠按钮 */
 .pt-collapse { flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); background: rgba(255, 255, 255, .8); color: var(--muted, var(--n7)); font-size: var(--fs-13); line-height: 1; cursor: pointer; }
 .pt-collapse:hover { border-color: var(--blue, var(--blue)); color: var(--blue-dark, var(--blue-dark)); }
-/* 物品卡片：参考 A检 航材清单 m-item 样式（件号/名称/数量带字段标签 + 自动换行） */
-.pt-item { display: grid; grid-template-columns: 1.1fr 2fr 0.6fr auto; gap: 6px; align-items: stretch; border: 1px solid var(--n3); border-radius: var(--r-md); padding: 6px 8px; background: var(--n0); word-break: break-word; }
-.pt-item-tool { grid-template-columns: 2fr 0.6fr auto; }
-.pt-item:hover { border-color: var(--blue, var(--blue)); }
-.m-field { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-12); color: var(--n7); min-width: 0; }
-.m-field input, .m-name { padding: 5px 7px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0; width: 100%; box-sizing: border-box; }
-.m-name { padding: 5px 7px; font-size: var(--fs-12); line-height: 1.4; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; font-family: inherit; min-height: 30px; }
-.m-ops { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
-.pt-note-row { grid-column: 1 / -1; display: flex; align-items: flex-end; }
-.pt-note { min-height: 28px; font-size: var(--fs-12); color: var(--danger, var(--danger)); outline: none; background: var(--blue-bg); border: 1px dashed var(--line, var(--n4)); border-radius: var(--r-sm); padding: 4px 8px; resize: none; width: 100%; font-family: inherit; }
-/* 物品操作按钮：×（删除）在上、+（备注）在下，两按钮平分卡片高度（参考 A检 m-item） */
-.m-op { flex: 1; min-width: 26px; min-height: 22px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--n0); color: var(--n7); font-size: var(--fs-14); line-height: 1; cursor: pointer; }
-.m-op:hover { background: var(--blue-light); }
-.m-op-del { border-color: #f2cdcd; background: #fdecec; color: #b53a3a; }
-.m-op-del:hover { background: #f9dcdc; }
 .danger-text { color: var(--danger, var(--danger)); }
 
 /* ===== 重复梳理（航材按件号 / 工具按名称 卡片聚拢）——UI 对齐 A检 PartNoGroupCard ===== */
@@ -3126,12 +3110,6 @@ textarea.textwrap {
 .pnc-name { font-size: var(--fs-13); color: #4a5160; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pnc-count { margin-left: auto; font-size: var(--fs-12); color: #98a2b3; flex: 0 0 auto; }
 .pnc-body { padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
-.pnc-item { display: grid; grid-template-columns: 1.2fr 0.5fr auto 2fr; gap: 6px; align-items: center; }
-.pnc-type { font-size: var(--fs-13); color: #4a5160; padding: 4px 8px; background: #f4f6fb; border-radius: var(--r-sm); min-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pnc-qty { width: 100%; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); box-sizing: border-box; }
-.pnc-del { width: 26px; height: 26px; padding: 0; border: 1px solid #f2cdcd; border-radius: var(--r-sm); background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1; cursor: pointer; }
-.pnc-del:hover { background: #f9dcdc; }
-.pnc-note { min-height: 30px; padding: 4px 7px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-12); resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; }
 
 /* ===== 增加一天 ===== */
 .add-day-card {
@@ -3189,9 +3167,6 @@ textarea.textwrap {
   .arrange-item { grid-template-columns: 1fr; }
   .resp-banner { grid-template-columns: 1fr; }
   .component-cols { grid-template-columns: 1fr; }
-  .pt-items { grid-template-columns: 1fr; }
-  .pt-item { grid-template-columns: 1fr 1fr auto; }
-  .pt-item .m-field-name { grid-column: span 2; }
   .subpage-actions { gap: 6px; }
   .form-card-row { align-items: stretch; }
   .form-card-row textarea { min-width: 100%; }
