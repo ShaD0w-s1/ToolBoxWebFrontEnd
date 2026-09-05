@@ -146,7 +146,7 @@ async function supplementWork(sub: string): Promise<void> {
             <button @click="store.mAddItem(category, sub)">+ 物品</button>
             <button class="danger" @click="deleteSub(sub)">删除</button>
           </header>
-          <div v-if="!collapsedSubs.has(sub)" class="itg" style="grid-template-columns: 1.1fr 2fr 0.6fr 2.2fr auto">
+          <div v-if="!collapsedSubs.has(sub)" class="itg" style="grid-template-columns: 1.55fr 1.55fr 0.6fr 2.2fr auto">
             <div class="itg-head"><span>件号</span><span>名称</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
             <div v-for="it in store.mItemsOf(category, sub)" :key="it.id" class="itg-row" :class="{ 'flash-update': store.isFlashing(it) }">
               <textarea rows="1" v-model="it.partNo" v-lock="lock(it, 'partNo')" placeholder="件号" @input="onAutoSize"></textarea>

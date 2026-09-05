@@ -2650,7 +2650,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <button class="icon-btn" @click="removePartList(partKind, card.id)">×</button>
             </div>
             <template v-if="!collapsedCards.has(card.id)">
-            <div v-if="card.items.length" class="itg" :style="{ gridTemplateColumns: tab === 'airparts' ? '1.2fr 2fr 0.6fr 2.2fr auto' : '2fr 0.6fr 2.2fr auto' }">
+            <div v-if="card.items.length" class="itg" :style="{ gridTemplateColumns: tab === 'airparts' ? '1.55fr 1.55fr 0.6fr 2.2fr auto' : '2fr 0.6fr 2.2fr auto' }">
               <div class="itg-head">
                 <template v-if="tab === 'airparts'"><span>件号</span></template>
                 <span>名称</span><span>数量</span><span class="itg-note-cell">备注</span><span></span>

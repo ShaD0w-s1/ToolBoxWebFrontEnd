@@ -394,11 +394,16 @@ input.remote-locked {
 .itg input, .itg textarea {
   width: 100%; border: 1px solid transparent; background: transparent;
   font: inherit; font-size: var(--fs-13, 13px); line-height: 1.4; color: inherit;
-  padding: 5px 2px; border-radius: 0; outline: none; resize: none; font-family: inherit; min-height: 30px;
-  vertical-align: middle;
+  padding: 5px 0; border-radius: 0; outline: none; resize: none; font-family: inherit;
+  vertical-align: middle; box-sizing: border-box;
 }
-.itg textarea { overflow: hidden; }
-.itg input[type="number"] { text-align: center; }
+.itg textarea { overflow: hidden; min-height: 30px; }
+/* 数量列 input 行高与 textarea 对齐：单行固定高（Chrome 对 input[type=number] 的固有高度
+ * 比 textarea/单行 input 高约 2px，会把整行撑高导致各列观感不一致），并隐藏原生步进箭头。 */
+.itg input { height: 30px; min-height: 30px; }
+.itg input[type="number"] { text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.itg input[type="number"]::-webkit-outer-spin-button,
+.itg input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .itg input:focus, .itg textarea:focus {
   background: var(--n0); border: 1px solid var(--focus); border-radius: 4px;
   box-shadow: 0 0 0 2px rgba(91, 141, 217, .16);

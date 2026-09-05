@@ -134,7 +134,7 @@ function autoGrow(event: Event): void {
         </div>
         <template v-if="isOpen(card.sub)">
           <!-- 物品表：行间水平实线、列间垂直虚线；字段名以 placeholder 呈现（维持卡片框架与配色） -->
-          <div v-if="card.its.length" class="itg" :style="{ gridTemplateColumns: isTool ? '2fr 0.6fr 2.2fr auto' : '1.1fr 2fr 0.6fr 2.2fr auto' }">
+          <div v-if="card.its.length" class="itg" :style="{ gridTemplateColumns: isTool ? '2fr 0.6fr 2.2fr auto' : '1.55fr 1.55fr 0.6fr 2.2fr auto' }">
             <div class="itg-head">
               <template v-if="!isTool"><span>件号</span></template>
               <span>名称</span><span>数量</span><span class="itg-note-cell">备注</span><span></span>
