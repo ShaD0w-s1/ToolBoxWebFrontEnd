@@ -11,6 +11,7 @@ import { exportFileName } from "../utils/format";
 import { growTextarea, growAllTextareas } from "../utils/dom";
 import AttachmentSection from "./AttachmentSection.vue";
 import NameSuggest from "./NameSuggest.vue";
+import AircraftRegSuggest from "./AircraftRegSuggest.vue";
 import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
@@ -279,7 +280,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
     <section class="prep-block">
       <h4>基础信息</h4>
       <div class="prep-grid">
-        <label class="prep-field"><span class="field-label">机号</span><input v-model="sheet.base.机号" list="sp-aircraft" @change="onAircraftChange" @input="store.queuePersist" v-lock="lockKey('base', 'single', '机号')" /></label>
+        <label class="prep-field"><span class="field-label">机号</span><AircraftRegSuggest v-model="sheet.base.机号" :suggestions="store.aircraftNumbers.value" @change="onAircraftChange" @input="store.queuePersist" v-lock="lockKey('base', 'single', '机号')" /></label>
         <label class="prep-field"><span class="field-label">FSN</span><input v-model="sheet.base.FSN" @change="onAircraftFieldEdited" @input="store.queuePersist" v-lock="lockKey('base', 'single', 'FSN')" /></label>
         <label class="prep-field"><span class="field-label">MSN</span><input v-model="sheet.base.MSN" @change="onAircraftFieldEdited" @input="store.queuePersist" v-lock="lockKey('base', 'single', 'MSN')" /></label>
         <label class="prep-field"><span class="field-label">发动机</span><input v-model="sheet.base.发动机" @change="onAircraftFieldEdited" @input="store.queuePersist" v-lock="lockKey('base', 'single', '发动机')" /></label>
@@ -291,7 +292,6 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
         <label class="prep-field"><span class="field-label">落地时间</span><input v-model="sheet.base.落地时间" @input="store.queuePersist" v-lock="lockKey('base', 'single', '落地时间')" /></label>
         <label class="prep-field"><span class="field-label">起飞时间</span><input v-model="sheet.base.起飞时间" @input="store.queuePersist" v-lock="lockKey('base', 'single', '起飞时间')" /></label>
       </div>
-      <datalist id="sp-aircraft"><option v-for="num in store.aircraftNumbers.value" :key="num" :value="num" /></datalist>
       <!-- 工作列表：指令号 + 工作内容 -->
       <div class="sp-works">
         <div v-for="(w, idx) in sheet.works" :key="w.id" class="sp-work-row">

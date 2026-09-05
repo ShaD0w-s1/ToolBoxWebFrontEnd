@@ -9,6 +9,7 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import { exportPrepSheetSingle } from "../services/spreadsheet";
 import { exportFileName } from "../utils/format";
 import { createEditLockDirective } from "../utils/editLock";
+import AircraftRegSuggest from "./AircraftRegSuggest.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ "export-image": [element: HTMLElement | null] }>();
@@ -125,7 +126,7 @@ function exportTableXlsx(): void {
       <div class="prep-grid">
         <label v-for="field in baseFields1" :key="field.key" class="prep-field">
           <span class="field-label">{{ field.label }}</span>
-          <input v-if="field.key === '机号'" v-model="prep.base.机号" list="aircraft-numbers" :placeholder="`输入或选择（共 ${store.aircraftNumbers.value.length} 架）`" @change="onAircraftChange" @input="store.queuePersist" v-lock="lockKey('base', 'single', '机号')" />
+          <AircraftRegSuggest v-if="field.key === '机号'" v-model="prep.base.机号" :suggestions="store.aircraftNumbers.value" :placeholder="`输入或选择（共 ${store.aircraftNumbers.value.length} 架）`" @change="onAircraftChange" @input="store.queuePersist" v-lock="lockKey('base', 'single', '机号')" />
           <input v-else v-model="prep.base[field.key]" @change="onAircraftFieldEdited" @input="store.queuePersist" v-lock="lockKey('base', 'single', String(field.key))" />
         </label>
         <!-- ETOPS / ELT-DT：有非 N/A 数据时红色加粗 -->
@@ -138,9 +139,6 @@ function exportTableXlsx(): void {
           <input v-model="prep.base['ELT-DT']" :class="{ 'special-config': hasSpecialConfig(prep.base['ELT-DT']) }" @change="onAircraftFieldEdited" @input="store.queuePersist" v-lock="lockKey('base', 'single', 'ELT-DT')" />
         </label>
       </div>
-      <datalist id="aircraft-numbers">
-        <option v-for="num in store.aircraftNumbers.value" :key="num" :value="num" />
-      </datalist>
       <div class="prep-divider" aria-hidden="true"></div>
       <!-- 第二组：指令号/工作内容/地点 -->
       <div class="prep-grid">

@@ -4,6 +4,7 @@ import type { ToolboxStore } from "../composables/useToolbox";
 import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartListItem, GanttSpArrangement, GanttSpRow } from "../domain/toolbox";
 import { backend } from "../api";
 import NameSuggest from "./NameSuggest.vue";
+import AircraftRegSuggest from "./AircraftRegSuggest.vue";
 import AttachmentSection from "./AttachmentSection.vue";
 import { createEditLockDirective } from "../utils/editLock";
 
@@ -2175,9 +2176,6 @@ async function importAllXlsx(event: Event): Promise<void> {
       <datalist id="gp-part-contents">
         <option v-for="n in partContentSuggestions" :key="n" :value="n" />
       </datalist>
-      <datalist id="gp-aircraft-numbers">
-        <option v-for="n in store.aircraftNumbers.value" :key="n" :value="n" />
-      </datalist>
 
       <template v-if="state">
         <!-- 表单录入 -->
@@ -2195,7 +2193,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div class="gp-sec-title">飞机信息</div>
             <div v-for="(a, i) in aircrafts" :key="a.id" class="meta-group">
               <div class="meta-grid meta-grid-4">
-                <label class="gpf"><span class="gpf-label">机号</span><input v-model="a.reg" list="gp-aircraft-numbers" @change="onAircraftRegChange(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'reg')" /></label>
+                <label class="gpf"><span class="gpf-label">机号</span><AircraftRegSuggest v-model="a.reg" :suggestions="store.aircraftNumbers.value" @change="onAircraftRegChange(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'reg')" /></label>
                 <label class="gpf"><span class="gpf-label">FSN</span><input v-model="a.fsn" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'fsn')" /></label>
                 <label class="gpf"><span class="gpf-label">MSN</span><input v-model="a.msn" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'msn')" /></label>
                 <label class="gpf"><span class="gpf-label">发动机</span><input v-model="a.engine" @change="onAircraftFieldEdited(a)" @input="queueSave" v-lock="lockKey('aircraft', a.id, 'engine')" /></label>
