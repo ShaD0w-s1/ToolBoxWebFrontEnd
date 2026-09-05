@@ -399,19 +399,34 @@ input.remote-locked {
 }
 .itg textarea { overflow: hidden; min-height: 30px; }
 .itg input { height: 30px; min-height: 30px; }
-/* 数量列增减控件：.itg-qty 外壳作为网格单元（默认 stretch 铺满行高，白底/框线由 .itg-row > * 提供），
- * 内部 − / 输入框 / + 三段。input 不再直接充当网格单元——固定高度的 input 作单元时不会拉伸，
- * 行高被其他列（如多行备注）撑高后底部会露出容器底色（7abf998 上线后「数量列色带」的根因）。 */
-.itg .itg-qty { display: flex; align-items: center; gap: 4px; }
-.itg .itg-qty input { flex: 1 1 0; min-width: 0; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+/* 数量列增减控件：.itg-qty 外壳作为网格单元（默认 stretch 铺满行高，白底/框线由 .itg-row > * 提供）。
+ * 布局 = 输入框居左（占 1 列跨 2 行）+ +/− 上下两段叠于输入框右侧（上 + 下 −）。
+ * 行高被其他列（如多行备注）撑高时，行轨 1fr/1fr 令上下按钮随行高同步伸缩，
+ * 且整壳 stretch 不再有「固定高 input 直作网格单元露底色」问题（7abf998 色带根因）。 */
+.itg .itg-qty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+.itg .itg-qty input {
+  grid-column: 1; grid-row: 1 / -1;
+  width: 100%; min-width: 0; height: auto; min-height: 0;
+  text-align: center; appearance: textfield; -moz-appearance: textfield;
+  border-right: 1px solid var(--line);
+}
 .itg .itg-qty input::-webkit-outer-spin-button,
 .itg .itg-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .itg .qty-step {
-  flex: 0 0 auto; width: 20px; height: 20px; padding: 0; line-height: 1;
-  border: 1px solid var(--line); border-radius: 4px; background: var(--n0);
-  color: var(--n7); font-size: 13px; cursor: pointer; user-select: none;
+  grid-column: 2; width: auto; height: auto; min-height: 0; padding: 0;
+  border: 0; border-radius: 0; background: transparent;
+  color: var(--n7); font-size: 12px; line-height: 1;
+  cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: center;
 }
-.itg .qty-step:hover { border-color: var(--blue); color: var(--blue-dark); background: var(--blue-light, #eaf1fa); }
+.itg .qty-step:first-child { grid-row: 2; } /* − 下 */
+.itg .qty-step:last-child { grid-row: 1; border-bottom: 1px solid var(--line); } /* + 上（与 − 分界） */
+.itg .qty-step:hover { background: var(--blue-light, #eaf1fa); color: var(--blue-dark); }
 .itg input:focus, .itg textarea:focus {
   background: var(--n0); border: 1px solid var(--focus); border-radius: 4px;
   box-shadow: 0 0 0 2px rgba(91, 141, 217, .16);
