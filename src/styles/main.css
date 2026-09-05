@@ -448,28 +448,30 @@ input.remote-locked {
   /* —— 工具/航材行表移动端重排（A检工具 item-grid 卡式除外，其余 .itg 行表共用） ——
    * 取消「备注」列：表头整行隐藏（字段名由输入框 placeholder 承担），
    * 行内元素改 flex 换行 → 第一行 = 件号/名称/数量(主字段 + 数量 ± + 删除 ×)，
-   * 备注 textarea 整行下沉到第二行，行间以虚线分割。
-   * 底色一体：背景统一画在 .itg-row（整行白底=一张卡，主行与备注同卡），
-   * 单元格背景透明 → 虚线/实线两侧都是卡片底色，不露出外层卡片彩色底。 */
+   * 备注 textarea 整行下沉到第二行，主行/备注行间以虚线分割（虚线两侧同为行卡白底）。
+   * 每个「主行+备注行」为一张独立白底圆角行卡；行卡之间不再画实线分割，
+   * 改为行卡间留出缝隙（露出外层卡片底色）——即把原「实线分割线」让位给缝隙。 */
   .itg .itg-head { display: none; }
   .itg .itg-row {
     display: flex; flex-wrap: wrap; align-items: stretch;
     grid-column: 1 / -1; /* 从父网格单列还原为整行 */
-    background: var(--n0); /* 整行白底卡片（行内各行分割线都画在这张卡上） */
+    background: var(--n0); /* 行卡白底（主行+备注同一张卡） */
+    border-radius: var(--r-md); overflow: hidden;
+    margin: 0 0 8px; /* 行卡间缝隙（替代原实线 border-bottom，露出外层卡底色） */
   }
+  .itg .itg-row:last-child { margin-bottom: 0; }
   .itg .itg-row > * { padding-left: 4px; padding-right: 4px; border-bottom: none; background: transparent; }
   /* 主字段（件号/名称/工作 等 textarea 或只读标签）：均分第一行剩余宽度 */
   .itg .itg-row > textarea, .itg .itg-row > .itg-tag { flex: 1 1 0; min-width: 44px; }
   .itg .itg-row > .itg-qty { flex: 0 1 100px; min-width: 88px; }
   /* ×删除：order 1 使它与主字段/数量同处第一行（主字段 grow 将其自然推到行尾），先于 order 2 的备注换行 */
   .itg .itg-row > .itg-ops { flex: 0 0 auto; order: 1; }
-  /* 备注：独占第二行整宽，上缘虚线分隔（与主行同一张卡内，无外边距外露底色），下缘实线分隔下一行 */
+  /* 备注：独占第二行整宽，上缘虚线分隔主行（同一张行卡内，无外边距外露底色） */
   .itg .itg-row > textarea.is-note, .itg .itg-row > .is-note {
     flex: 1 1 100%; order: 2; min-width: 0;
     border-top: 1px dashed var(--n4); border-left: none;
-    border-bottom: 1px solid var(--n4); padding-top: 4px;
+    border-bottom: none; padding-top: 4px;
   }
-  .itg .itg-row:last-child > .is-note { border-bottom: none; }
 }
 
 /* ===== 共享卡壳基元（批次二统一：pt/pnc/ft 卡壳收敛到全局，组件内不再各留一份） ===== */
