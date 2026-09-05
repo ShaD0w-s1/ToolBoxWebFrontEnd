@@ -3180,8 +3180,11 @@ textarea.textwrap {
    * flex-order 会让 ns-wrap（basis:0/min-width:0）挤上行，导致「标题与人员未分开」只剩 2 行）——
    * 工序行：行1 = 标题(黄块 grow) + 持续至(如有) + ×；行2 = 负责人 + 参与人；行3 = 备注整行。
    * 串件行：行1 = 类型标签 + 串件内容 + ×；行2 = 负责人 + 参与人；行3 = 备注整行。
-   * 列模板：col1 auto(给 owner/类型标签) | col2 1fr(标题/内容 grow) | col3 max-content(fc-span) | col4 24px(×)。 */
-  .form-card-row {
+   * 列模板：col1 auto(给 owner/类型标签) | col2 1fr(标题/内容 grow) | col3 max-content(fc-span) | col4 24px(×)。*/
+  /* cache-bust:v2-2026-09-05a 冗余选择器变体 强制重拉 */
+  .form-card-row,
+  .form-card-row:not(.part-form-row),
+  .form-card-row.part-form-row {
     display: grid !important;
     align-items: stretch; row-gap: 5px;
     grid-template-columns: minmax(0,auto) minmax(0,1fr) minmax(0,max-content) 24px;
