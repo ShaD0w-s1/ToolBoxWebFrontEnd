@@ -930,7 +930,7 @@ function startCardDrag(e: PointerEvent, mode: "move" | "resize-left" | "resize-r
   const el = (e.currentTarget as HTMLElement).closest(".gantt-card") as HTMLElement;
   const n = chart.stages.length;
   const grid = el.closest(".gantt-grid") as HTMLElement | null;
-  const colW = grid ? (parseFloat(getComputedStyle(grid).gridTemplateColumns.split(" ")[0] || "170") || 170) : 170;
+  const colW = grid ? (parseFloat(getComputedStyle(grid).gridTemplateColumns.split(" ")[0] || "320") || 320) : 320;
   const rowH = el.offsetHeight || 88;
   const headEl = grid?.querySelector(".gantt-head") as HTMLElement | null;
   const headerH = headEl ? headEl.offsetHeight + 6 : 50;
@@ -983,7 +983,7 @@ function startPartDrag(e: PointerEvent, chartId: string, arrId: string, rowId: s
   const el = (e.currentTarget as HTMLElement).closest(".gantt-card") as HTMLElement;
   const n = chart.stages.length;
   const grid = el.closest(".gantt-grid") as HTMLElement | null;
-  const colW = grid ? (parseFloat(getComputedStyle(grid).gridTemplateColumns.split(" ")[0] || "170") || 170) : 170;
+  const colW = grid ? (parseFloat(getComputedStyle(grid).gridTemplateColumns.split(" ")[0] || "320") || 320) : 320;
   const origStage = row.executeStage.stageIdx;
   partDrag = { chartId, arrId, rowId, el, startX: e.clientX, n, colW, origStage, curStage: origStage };
   document.body.style.userSelect = "none";
@@ -1000,7 +1000,7 @@ function onUnassignedDragMove(e: PointerEvent): void {
   const d = unassignedDrag;
   if (!d.grid) return;
   const rect = d.grid.getBoundingClientRect();
-  const colW = parseFloat(getComputedStyle(d.grid).gridTemplateColumns.split(" ")[0] || "170") || 170;
+  const colW = parseFloat(getComputedStyle(d.grid).gridTemplateColumns.split(" ")[0] || "320") || 320;
   // 横向允许到最后一列右缘（列溢出网格框时仍在滚动内容内，按标准列宽逐列命中）
   const left = rect.left, right = rect.left + d.n * colW;
   const over = e.clientX >= left && e.clientX < right && e.clientY >= rect.top && e.clientY <= rect.bottom;
@@ -1071,7 +1071,7 @@ function startStageColDrag(e: PointerEvent, chartId: string, idx: number): void 
   const el = (e.currentTarget as HTMLElement).closest(".gantt-head") as HTMLElement;
   const grid = el.closest(".gantt-grid") as HTMLElement | null;
   // 拖拽按实际阶段列宽（标准 var(--gp-col) 解析后的首列 px）计算，避免用网格容器宽/列数（多列溢出时失真）
-  const colW = grid ? parseFloat(getComputedStyle(grid).gridTemplateColumns.split(" ")[0] || "170") || 170 : 170;
+  const colW = grid ? parseFloat(getComputedStyle(grid).gridTemplateColumns.split(" ")[0] || "320") || 320 : 320;
   stageColDrag = { chartId, idx, el, startX: e.clientX, colW, n: chart.stages.length, target: idx, gridEl: grid };
   document.body.style.userSelect = "none";
   el.style.opacity = "0.85";
@@ -1213,7 +1213,7 @@ function startStageDrag(e: PointerEvent, chartId: string): void {
   const grid = el.closest(".gantt-grid") as HTMLElement | null;
   const n = chart.stages.length;
   // 阶段数增减按实际阶段列宽（标准 var(--gp-col) 解析后的首列 px）计算
-  const stageWidth = grid ? parseFloat(getComputedStyle(grid).gridTemplateColumns.split(" ")[0] || "170") || 170 : 170;
+  const stageWidth = grid ? parseFloat(getComputedStyle(grid).gridTemplateColumns.split(" ")[0] || "320") || 320 : 320;
   stageDrag = { chartId, el, startX: e.clientX, stageWidth, origN: n, newN: n };
   document.body.style.userSelect = "none";
   window.addEventListener("pointermove", onStageDragMove);
@@ -2399,7 +2399,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <div class="resp-cell resp-add"><button @click="addResp(chart.id)">+ 添加安排</button></div>
               </div>
               <div class="gantt-wrap">
-                <div class="gantt-grid" :style="{ gridTemplateColumns: `repeat(${chart.stages.length}, var(--gp-col, 170px))`, gridTemplateRows: `44px repeat(${rowCountOf(chart)}, auto)` }">
+                <div class="gantt-grid" :style="{ gridTemplateColumns: `repeat(${chart.stages.length}, var(--gp-col, 320px))`, gridTemplateRows: `44px repeat(${rowCountOf(chart)}, auto)` }">
                   <div v-for="(st, si) in chart.stages" :key="st.id" class="gantt-head" :style="{ gridColumn: si + 1, gridRow: 1 }">
                     <div class="stage-col-drag" title="拖动调整列位置" @pointerdown="startStageColDrag($event, chart.id, si)">⠿</div>
                     <input v-model="st.name" class="stage-name-input" @input="save" v-lock="lockKey('stage', st.id, 'name')" />
@@ -2834,7 +2834,7 @@ async function importAllXlsx(event: Event): Promise<void> {
 /* ===== 甘特网格 ===== */
 .gantt-wrap { overflow-x: auto; margin: 0 -6px; padding: 0 6px 6px; display: flex; align-items: stretch; }
 .gantt-grid {
-  --gp-col: 170px; /* 阶段列标准宽：桌面端完整页宽均分 8 列的单列宽（固定值，移动/桌面一致；
+  --gp-col: 320px; /* 阶段列标准宽：桌面端完整页宽均分 8 列的单列宽（固定值，移动/桌面一致；
                       少于 8 列右侧留空，多于 8 列或窄屏时由 .gantt-wrap 横向滑块滑动查看） */
   display: grid; min-width: 0; width: 100%; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-lg);
   background: #eaf1fa; position: relative; flex: 1;
@@ -3176,32 +3176,46 @@ textarea.textwrap {
   .resp-banner { grid-template-columns: 1fr; }
   .component-cols { grid-template-columns: 1fr; }
   .subpage-actions { gap: 6px; }
-  /* —— 表单子页工序行移动端三段布局（换发二级页表单录入子页）——
-   * 工序行：行1 = 标题(黄块 flex-grow) + 持续至(如有) + ×；行2 = 负责人 + 参与人；行3 = 备注整行。
-   * 串件行：行1 = 类型标签 + 串件内容 + ×；行2 = 负责人 + 参与人；行3 = 备注整行。 */
-  .form-card-row { align-items: stretch; row-gap: 5px; }
+  /* —— 表单子页工序行移动端三段布局（grid 显式三行 替代 flex-order；
+   * flex-order 会让 ns-wrap（basis:0/min-width:0）挤上行，导致「标题与人员未分开」只剩 2 行）——
+   * 工序行：行1 = 标题(黄块 grow) + 持续至(如有) + ×；行2 = 负责人 + 参与人；行3 = 备注整行。
+   * 串件行：行1 = 类型标签 + 串件内容 + ×；行2 = 负责人 + 参与人；行3 = 备注整行。
+   * 列模板：col1 auto(给 owner/类型标签) | col2 1fr(标题/内容 grow) | col3 max-content(fc-span) | col4 24px(×)。 */
+  .form-card-row {
+    display: grid !important;
+    align-items: stretch; row-gap: 5px;
+    grid-template-columns: minmax(0,auto) minmax(0,1fr) minmax(0,max-content) 24px;
+    grid-template-areas:
+      "t t s x"
+      "o p p ."
+      "n n n n";
+    max-width: 100%; min-width: 0; box-sizing: border-box;
+  }
+  .form-card-row > * { min-width: 0; min-height: 0; box-sizing: border-box; }
+  .form-card-row > textarea { min-width: 0; }
+  .form-card-row > .icon-btn { width: 24px; min-width: 24px; padding: 0; text-align: center; }
+  .form-card-row .fc-span { white-space: nowrap; }
   /* —— 工序行 —— */
-  .form-card-row:not(.part-form-row) .form-card-title {
-    order: 0; flex: 1 1 auto; width: auto; max-width: none; align-self: center;
-  }
-  .form-card-row:not(.part-form-row) .form-card-title textarea {
-    flex: 1 1 auto; width: auto; min-width: 60px; max-width: 100%;
-  }
-  .form-card-row:not(.part-form-row) .fc-span { order: 1; flex: 0 0 auto; align-self: center; }
-  .form-card-row:not(.part-form-row) .icon-btn { order: 2; flex: 0 0 auto; align-self: center; }
-  .form-card-row:not(.part-form-row) .ns-wrap { order: 3; flex: 1 1 0; min-width: 0; width: auto; }
-  .form-card-row:not(.part-form-row) > textarea:last-of-type {
-    order: 4; flex: 1 1 100%; width: 100%; min-width: 100%; min-height: 30px;
-  }
+  .form-card-row:not(.part-form-row) .form-card-title { grid-area: t; }
+  .form-card-row:not(.part-form-row) .fc-span { grid-area: s; }
+  .form-card-row:not(.part-form-row) > .icon-btn { grid-area: x; }
+  /* NameSuggest 是子组件，用 :deep 穿透 scope 把 ns-wrap 钉到网格区域 */
+  .form-card-row:not(.part-form-row) :deep(.ns-wrap.ns-owner) { grid-area: o; justify-self: stretch; }
+  .form-card-row:not(.part-form-row) :deep(.ns-wrap:not(.ns-owner)) { grid-area: p; }
+  .form-card-row:not(.part-form-row) > textarea:last-of-type { grid-area: n; }
   /* —— 串件行 —— */
-  .form-card-row.part-form-row .part-form-tag,
-  .form-card-row.part-form-row .sp-view-content { order: 0; align-self: center; }
-  .form-card-row.part-form-row .sp-view-content { flex: 1 1 auto; min-width: 0; }
-  .form-card-row.part-form-row .icon-btn { order: 1; flex: 0 0 auto; align-self: center; }
-  .form-card-row.part-form-row .ns-wrap { order: 2; flex: 1 1 0; min-width: 0; width: auto; }
-  .form-card-row.part-form-row > textarea:last-of-type {
-    order: 3; flex: 1 1 100%; width: 100%; min-width: 100%; min-height: 30px;
+  .form-card-row.part-form-row {
+    grid-template-areas:
+      "tag cnt cnt x"
+      "o p p ."
+      "n n n n";
   }
+  .form-card-row.part-form-row .part-form-tag { grid-area: tag; }
+  .form-card-row.part-form-row .sp-view-content { grid-area: cnt; }
+  .form-card-row.part-form-row > .icon-btn { grid-area: x; }
+  .form-card-row.part-form-row :deep(.ns-wrap.ns-owner) { grid-area: o; justify-self: stretch; }
+  .form-card-row.part-form-row :deep(.ns-wrap:not(.ns-owner)) { grid-area: p; }
+  .form-card-row.part-form-row > textarea:last-of-type { grid-area: n; }
 }
 
 /* ===== 他人正在编辑：输入框亮黄底 + 锁定 ===== */
