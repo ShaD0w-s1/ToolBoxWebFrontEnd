@@ -554,6 +554,23 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   .prep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .prep-personnel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .sp-part-body { grid-template-columns: 1fr; }
+  /* —— 工序卡移动端：黄底标题行独占首行；第二行 = 人员安排 + 检测&必检 + ×；
+   * 备注整行下沉到第三行（用户需求：备注在负责人+检测&必检+X 按钮下一行） */
+  .sp-process-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "title title title"
+      "assign check del"
+      "note note note";
+    align-items: center; column-gap: 6px; row-gap: 4px;
+  }
+  .sp-process-card .sp-card-title { grid-area: title; flex: none; width: 100%; max-width: none; }
+  .sp-process-card .sp-card-title textarea { min-width: 0; max-width: none; }
+  .sp-process-card .sp-assign { grid-area: assign; flex: none; width: 100%; min-width: 0; }
+  .sp-process-card .sp-check { grid-area: check; flex: none; max-width: 8em; min-width: 0; }
+  .sp-process-card .sp-note { grid-area: note; flex: none; width: 100%; min-width: 0; }
+  .sp-process-card .sp-del-x { grid-area: del; }
 }
 
 /* 模板弹窗模糊搜索行 */
