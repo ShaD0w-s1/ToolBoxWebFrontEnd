@@ -623,6 +623,11 @@ function removePartItem(kind: "airParts" | "toolParts", listId: string, itemId: 
   list.items = list.items.filter((x) => x.id !== itemId);
   save();
 }
+/** 数量步进：−/+ 增减 1，下限 0（部位行表/重复梳理行表共用）。 */
+function stepQty(item: { qty?: number }, d: number): void {
+  item.qty = Math.max(0, (Number(item.qty) || 0) + d);
+  save();
+}
 // 航材/工具「+ 新增卡片」splitbutton：下拉含「清空清单(danger)」（对齐 A检 清空清单）
 const partClearOpen = ref(false);
 // 手册清单 换发/串件工卡 splitbutton 下拉状态
@@ -2606,7 +2611,11 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="itg-head"><span>卡片</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
                       <div v-for="row in g.rows" :key="row.item.id" class="itg-row">
                         <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
-                        <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
+                        <div class="itg-qty">
+                          <button type="button" class="qty-step" title="减 1" @click="stepQty(row.item, -1)">−</button>
+                          <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
+                          <button type="button" class="qty-step" title="加 1" @click="stepQty(row.item, 1)">+</button>
+                        </div>
                         <textarea rows="1" class="cell-inp is-note" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
                         <div class="itg-ops"><button class="del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button></div>
                       </div>
@@ -2630,7 +2639,11 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <div class="itg-head"><span>卡片</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
                       <div v-for="row in g.rows" :key="row.item.id" class="itg-row">
                         <span class="itg-tag" :title="row.card.name">{{ row.card.name || '未命名卡片' }}</span>
-                        <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
+                        <div class="itg-qty">
+                          <button type="button" class="qty-step" title="减 1" @click="stepQty(row.item, -1)">−</button>
+                          <input v-model.number="row.item.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', row.item.id, 'qty')" />
+                          <button type="button" class="qty-step" title="加 1" @click="stepQty(row.item, 1)">+</button>
+                        </div>
                         <textarea rows="1" class="cell-inp is-note" v-model="row.item.note" placeholder="备注" @input="onPartAutoSize" v-lock="lockKey('partitem', row.item.id, 'note')"></textarea>
                         <div class="itg-ops"><button class="del" title="删除该物品" @click="removePartItem(partKind, row.card.id, row.item.id)">×</button></div>
                       </div>
@@ -2660,7 +2673,11 @@ async function importAllXlsx(event: Event): Promise<void> {
                   <textarea rows="1" v-model="it.pn" placeholder="件号" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'pn')"></textarea>
                 </template>
                 <textarea rows="1" v-model="it.name" placeholder="名称" @input="onPartAutoSize" v-lock="lockKey('partitem', it.id, 'name')"></textarea>
-                <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', it.id, 'qty')" />
+                <div class="itg-qty">
+                  <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
+                  <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="save" v-lock="lockKey('partitem', it.id, 'qty')" />
+                  <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
+                </div>
                 <textarea rows="1" class="cell-inp is-note" v-model="it.note" placeholder="备注" @input="onPartAutoSize" @blur="save" v-lock="lockKey('partitem', it.id, 'note')"></textarea>
                 <div class="itg-ops"><button class="del" title="删除物品" @click="removePartItem(partKind, card.id, it.id)">×</button></div>
               </div>
@@ -2782,7 +2799,7 @@ async function importAllXlsx(event: Event): Promise<void> {
 .gp-card.day-card .day-input { background: var(--n0); color: #222; }
 .gp-sec-title { font-size: var(--fs-14); font-weight: 700; color: var(--blue-dark, var(--blue-dark)); margin: 10px 0 8px; border-left: 3px solid var(--blue, var(--blue)); padding-left: 8px; }
 .gp-add { margin-top: 10px; }
-.icon-btn { border: none; background: transparent; color: var(--danger, var(--danger)); font-size: var(--fs-14); cursor: pointer; }
+/* .icon-btn 已上移 main.css 共享卡壳基元（fs-16 统一版） */
 
 /* ===== chart 头部 ===== */
 .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 12px; flex-wrap: wrap; }
@@ -3075,12 +3092,8 @@ textarea.textwrap {
 .sp-arr-table td.sp-empty-cell .ns-input { background: #fdeaea; border-color: #f0b9b9; }
 
 /* ===== 串件航材/工具清单（pt-card） ===== */
-.pt-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: linear-gradient(90deg, #edf2fc, var(--n0)); border-radius: 11px 11px 0 0; border-bottom: 1px solid var(--line, var(--n4)); margin: -14px -16px 6px; }
-.pt-card-name { flex: 1; min-width: 120px; height: 32px; padding: 0 8px; border: 1.5px solid var(--blue, var(--blue)); border-radius: var(--r-sm); font-size: var(--fs-14); font-weight: 700; color: var(--blue-dark, var(--blue-dark)); }
-.pt-card-name:focus { outline: none; border-color: var(--focus); }
-.pt-count { font-size: var(--fs-12); color: var(--muted, var(--n7)); flex-shrink: 0; }
-.pt-empty { color: var(--muted, var(--n7)); font-size: var(--fs-12); text-align: center; padding: 10px 0; }
-.pt-empty-all { text-align: center; color: var(--muted, var(--n7)); padding: 40px 0; font-size: var(--fs-13); }
+/* .pt-card-head/.pt-card-name/.pt-collapse/.pt-count/.pt-empty*/ /* 已上移 main.css 共享卡壳基元；此处保留 GanttPrep 特有的卡头负外边距变体 */
+.pt-card-head { padding: 10px 14px; background: linear-gradient(90deg, #edf2fc, var(--n0)); border-radius: 11px 11px 0 0; border-bottom: 1px solid var(--line, var(--n4)); margin: -14px -16px 6px; }
 /* 卡片搜索栏：AutoComplete 输入 + 下拉候选 */
 .part-search-bar { margin: 0 0 12px; padding: 10px 12px; background: var(--n0); border: 1px solid var(--line, var(--n4)); border-radius: var(--r-lg); }
 .part-search-wrap { position: relative; }
@@ -3094,9 +3107,7 @@ textarea.textwrap {
 .psi-kind.card { background: #e3edfb; color: var(--blue-dark); }
 .psi-kind.pn { background: #fdecec; color: #b53a3a; }
 .psi-kind.name { background: #e8f5e9; color: #2e7d32; }
-/* 卡片折叠按钮 */
-.pt-collapse { flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); background: rgba(255, 255, 255, .8); color: var(--muted, var(--n7)); font-size: var(--fs-13); line-height: 1; cursor: pointer; }
-.pt-collapse:hover { border-color: var(--blue, var(--blue)); color: var(--blue-dark, var(--blue-dark)); }
+/* 卡片折叠按钮（.pt-collapse 已上移 main.css 共享卡壳基元） */
 .danger-text { color: var(--danger, var(--danger)); }
 
 /* ===== 重复梳理（航材按件号 / 工具按名称 卡片聚拢）——UI 对齐 A检 PartNoGroupCard ===== */
@@ -3104,12 +3115,7 @@ textarea.textwrap {
 .dedupe-toggle input { width: 15px; height: 15px; accent-color: var(--blue, var(--blue)); }
 .pnc-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .pnc-title { margin: 0; font-size: var(--fs-14); color: var(--n8); }
-.pnc-card { border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); margin-bottom: 10px; overflow: hidden; }
-.pnc-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #edf2fc; }
-.pnc-partno { font-size: var(--fs-14); color: var(--blue-dark); font-weight: 700; }
-.pnc-name { font-size: var(--fs-13); color: #4a5160; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pnc-count { margin-left: auto; font-size: var(--fs-12); color: #98a2b3; flex: 0 0 auto; }
-.pnc-body { padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
+/* .pnc-card/.pnc-head/.pnc-partno/.pnc-name/.pnc-count/.pnc-body 已上移 main.css 共享卡壳基元 */
 
 /* ===== 增加一天 ===== */
 .add-day-card {

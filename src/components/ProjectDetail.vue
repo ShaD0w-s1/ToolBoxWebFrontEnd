@@ -82,6 +82,11 @@ function onToolDedupeNote(it: ToolItem, event: Event): void {
   props.store.markNoteDirty(it);
   props.store.persist();
 }
+/** 数量步进：−/+ 增减 1，下限 0（重复工具梳理行表共用）。 */
+function stepQty(it: ToolItem, d: number): void {
+  it.qty = Math.max(0, (Number(it.qty) || 0) + d);
+  props.store.persist();
+}
 watch([subPage, isAcheck, isStandalone, isEngApu], () => props.store.setEditingField(fieldForSubPage()), { immediate: true });
 
 // 修复 2：工作准备单机号/机型变化 → 自动切换工具清单机型并覆盖数据（无需弹窗确认）。
@@ -485,7 +490,11 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <div class="itg-head"><span>工作</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
                 <div v-for="it in g.items" :key="it.id" class="itg-row">
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
-                  <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
+                  <div class="itg-qty">
+                    <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
+                    <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
+                    <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
+                  </div>
                   <textarea v-model="it.note" rows="1" class="cell-inp is-note" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
                   <div class="itg-ops"><button class="del" title="删除该工具" @click="store.deleteItem(it.id)">×</button></div>
                 </div>
@@ -504,7 +513,11 @@ async function runToolFilterByWorkcard(): Promise<void> {
                 <div class="itg-head"><span>工作</span><span>数量</span><span class="itg-note-cell">备注</span><span></span></div>
                 <div v-for="it in g.items" :key="it.id" class="itg-row">
                   <span class="itg-tag" :title="it.cat">{{ it.sub || "固定" }}</span>
-                  <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
+                  <div class="itg-qty">
+                    <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
+                    <input v-model.number="it.qty" type="number" min="0" placeholder="数量" @input="store.persist" />
+                    <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
+                  </div>
                   <textarea v-model="it.note" rows="1" class="cell-inp is-note" placeholder="备注" @input="onToolDedupeNote(it, $event)"></textarea>
                   <div class="itg-ops"><button class="del" title="删除该工具" @click="store.deleteItem(it.id)">×</button></div>
                 </div>

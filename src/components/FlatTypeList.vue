@@ -95,6 +95,12 @@ function removeItem(it: ToolItem): void {
   else props.store.mDeleteItem(it.id);
 }
 
+/** 数量步进：−/+ 增减 1，下限 0。 */
+function stepQty(it: ToolItem, d: number): void {
+  it.qty = Math.max(0, (Number(it.qty) || 0) + d);
+  props.store.persist();
+}
+
 // —— 备注列失焦提交（标记字段级脏，参与合并）——
 function commitNote(it: ToolItem): void {
   props.store.markNoteDirty(it);
@@ -144,7 +150,11 @@ function autoGrow(event: Event): void {
                 <textarea rows="1" v-model="it.partNo" v-lock="lock(it, 'partNo')" placeholder="件号" @input="autoGrow"></textarea>
               </template>
               <textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" placeholder="名称" @input="autoGrow"></textarea>
-              <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+              <div class="itg-qty">
+                <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
+                <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+                <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
+              </div>
               <textarea rows="1" class="cell-inp is-note" v-model="it.note" v-lock="lock(it, 'note')" placeholder="备注" @input="autoGrow" @blur="commitNote(it)"></textarea>
               <div class="itg-ops"><button class="del" title="删除物品" @click="removeItem(it)">×</button></div>
             </div>
@@ -167,12 +177,7 @@ function autoGrow(event: Event): void {
 .ft-card-name { flex: 1; min-width: 120px; height: 32px; padding: 0 8px; border: 1.5px solid var(--blue); border-radius: var(--r-sm); font-size: var(--fs-14); font-weight: 700; color: var(--blue-dark); background: var(--n0); }
 .ft-card-name:focus { outline: none; border-color: var(--focus); }
 .ft-card-name.dim { font-weight: 400; color: var(--n6); }
-.pt-collapse { flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: rgba(255,255,255,.8); color: var(--n7); font-size: var(--fs-13); line-height: 1; cursor: pointer; }
-.pt-collapse:hover { border-color: var(--blue); color: var(--blue-dark); }
-.pt-count { font-size: var(--fs-12); color: var(--n7); flex-shrink: 0; }
-.icon-btn { border: none; background: transparent; color: var(--danger); font-size: var(--fs-16); cursor: pointer; flex-shrink: 0; }
-.pt-empty { color: var(--n7); font-size: var(--fs-12); text-align: center; padding: 10px 0; }
-.pt-empty-all { text-align: center; color: var(--n7); padding: 40px 0; font-size: var(--fs-13); }
+/* 折叠按钮/计数/删除图标/空态样式已上移 main.css 共享卡壳基元（.pt-collapse/.pt-count/.icon-btn/.pt-empty*） */
 .gp-add { margin-top: 8px; }
 
 </style>

@@ -65,6 +65,12 @@ function commitNote(it: ToolItem): void {
   props.store.persist();
 }
 
+/** 数量步进：−/+ 增减 1，下限 0。 */
+function stepQty(it: ToolItem, d: number): void {
+  it.qty = Math.max(0, (Number(it.qty) || 0) + d);
+  props.store.persist();
+}
+
 const catNote = computed({
   get: () => props.store.materialActive.value?.notes[props.category] || "",
   set: (value: string) => { if (props.store.materialActive.value) props.store.materialActive.value.notes[props.category] = value; },
@@ -151,7 +157,11 @@ async function supplementWork(sub: string): Promise<void> {
             <div v-for="it in store.mItemsOf(category, sub)" :key="it.id" class="itg-row" :class="{ 'flash-update': store.isFlashing(it) }">
               <textarea rows="1" v-model="it.partNo" v-lock="lock(it, 'partNo')" placeholder="件号" @input="onAutoSize"></textarea>
               <textarea rows="1" v-model="it.name" v-lock="lock(it, 'name')" placeholder="名称" @input="onAutoSize"></textarea>
-              <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+              <div class="itg-qty">
+                <button type="button" class="qty-step" title="减 1" @click="stepQty(it, -1)">−</button>
+                <input v-model.number="it.qty" v-lock="lock(it, 'qty')" type="number" min="0" placeholder="数量" @input="store.persist" />
+                <button type="button" class="qty-step" title="加 1" @click="stepQty(it, 1)">+</button>
+              </div>
               <textarea rows="1" class="cell-inp is-note" v-model="it.note" v-lock="lock(it, 'note')" placeholder="备注" @input="onAutoSize" @blur="commitNote(it)"></textarea>
               <div class="itg-ops"><button class="del" title="删除物品" @click="store.mDeleteItem(it.id)">×</button></div>
             </div>
@@ -163,27 +173,12 @@ async function supplementWork(sub: string): Promise<void> {
 </template>
 
 <style scoped>
-.category-card { background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg); margin-bottom: 14px; overflow: hidden; }
-.category-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: var(--fs-14); }
-.collapse { background: transparent; border: none; cursor: pointer; font-size: var(--fs-14); color: #4a5160; }
-.category-head strong { font-size: var(--fs-16); }
-.cat-name { flex: 0 1 auto; min-width: 90px; max-width: 220px; padding: 4px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-16); color: inherit; }
-.cat-name:hover, .cat-name:focus { border-color: var(--focus); background: var(--n0); }
-.category-body { padding: 10px 12px; }
-.notes { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); margin-bottom: 10px; resize: vertical; }
-.sub-grid { display: grid; gap: 10px; }
-.sub-card { border: 1.5px solid var(--focus); border-radius: var(--r-md); padding: 8px 10px; background: var(--n0); }
-.sub-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+/* 卡壳（.category-card/.category-head/.category-body/.cat-name/.collapse/.notes/.sub-grid/
+ * .sub-card/.sub-head 及 StandardPicker 外观）已上移 main.css 全局共享，与工具清单部位卡共用一套；
+ * 此处仅保留航材子卡特有：子卡折叠按钮与「工作名」输入框。 */
 .sub-collapse { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: var(--fs-16); line-height: 1; color: #4a5160; flex: 0 0 auto; }
 .type-name { flex: 1 1 0; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-14); }
 .type-name:hover, .type-name:focus { border-color: var(--focus); background: var(--n0); }
-/* 合并后：StandardPicker 在 sub-head 内作为类型名输入框，占满可用宽度、外观与 .type-name 一致 */
-.sub-head :deep(.standard-combo) { flex: 1 1 0; min-width: 0; margin: 0; }
-.sub-head :deep(.standard-input) {
-  width: 100%; margin: 0; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-14); color: inherit;
-}
-.sub-head :deep(.standard-input:hover),
-.sub-head :deep(.standard-input:focus) { border-color: var(--focus); background: var(--n0); }
 @media (max-width: 768px) {
   .sub-grid { grid-template-columns: 1fr !important; }
 }

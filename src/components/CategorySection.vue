@@ -187,32 +187,8 @@ async function supplementStdLib(sub: string): Promise<void> {
 </template>
 
 <style scoped>
-/* 部位名行内输入框（与“工作”名输入栏一致：透明底、悬停/聚焦显边框、加粗） */
-.cat-name { flex: 0 1 auto; min-width: 90px; max-width: 220px; padding: 4px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-16); color: inherit; }
-.cat-name:hover, .cat-name:focus { border-color: var(--focus); background: var(--n0); }
-/* 合并后：StandardPicker 在 sub-head 内作为工作名输入框，占满可用宽度 */
-.sub-head :deep(.standard-combo) {
-  flex: 1 1 140px;
-  width: auto;
-  min-width: 0;
-  margin: 0;
-}
-.sub-head :deep(.standard-input) {
-  width: 100%;
-  margin: 0;
-  padding: 5px 7px;
-  border: 1px solid transparent;
-  border-radius: var(--r-sm);
-  background: transparent;
-  font-weight: 700;
-  font-size: var(--fs-14);
-  color: inherit;
-}
-.sub-head :deep(.standard-input:hover),
-.sub-head :deep(.standard-input:focus) {
-  border-color: var(--focus);
-  background: var(--n0);
-}
+/* 部位名行内输入（.cat-name）与 StandardPicker 外观（.standard-combo/.standard-input）
+ * 已上移 main.css 全局共享，与航材清单部位卡共用一套。 */
 
 textarea.notes { resize: none; overflow: hidden; min-height: 40px; width: 100%; box-sizing: border-box; }
 </style>

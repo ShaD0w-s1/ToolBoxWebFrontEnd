@@ -264,7 +264,7 @@ button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); borde
 .category-head button { min-height: 30px; padding: 4px 9px; font-size: var(--fs-12); }
 .category-head .collapse { width: 30px; border: 0; background: transparent; font-size: var(--fs-21); }
 .category-body { padding: 0 14px 15px; }
-.notes { width: 100%; margin: 10px 0; border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 10px; resize: vertical; }
+.notes { width: 100%; margin: 10px 0; border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 10px; resize: vertical; box-sizing: border-box; }
 .sub-grid { display: grid; gap: 11px; grid-auto-flow: dense; }
 .sub-card { min-width: 0; padding: 10px; border: 1.5px solid #8eaadb; border-radius: var(--r-lg); background: #fff; }
 .sub-head { display: flex; align-items: center; gap: 7px; }
@@ -398,12 +398,20 @@ input.remote-locked {
   vertical-align: middle; box-sizing: border-box;
 }
 .itg textarea { overflow: hidden; min-height: 30px; }
-/* 数量列 input 行高与 textarea 对齐：单行固定高（Chrome 对 input[type=number] 的固有高度
- * 比 textarea/单行 input 高约 2px，会把整行撑高导致各列观感不一致），并隐藏原生步进箭头。 */
 .itg input { height: 30px; min-height: 30px; }
-.itg input[type="number"] { text-align: center; appearance: textfield; -moz-appearance: textfield; }
-.itg input[type="number"]::-webkit-outer-spin-button,
-.itg input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* 数量列增减控件：.itg-qty 外壳作为网格单元（默认 stretch 铺满行高，白底/框线由 .itg-row > * 提供），
+ * 内部 − / 输入框 / + 三段。input 不再直接充当网格单元——固定高度的 input 作单元时不会拉伸，
+ * 行高被其他列（如多行备注）撑高后底部会露出容器底色（7abf998 上线后「数量列色带」的根因）。 */
+.itg .itg-qty { display: flex; align-items: center; gap: 4px; }
+.itg .itg-qty input { flex: 1 1 0; min-width: 0; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.itg .itg-qty input::-webkit-outer-spin-button,
+.itg .itg-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.itg .qty-step {
+  flex: 0 0 auto; width: 20px; height: 20px; padding: 0; line-height: 1;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--n0);
+  color: var(--n7); font-size: 13px; cursor: pointer; user-select: none;
+}
+.itg .qty-step:hover { border-color: var(--blue); color: var(--blue-dark); background: var(--blue-light, #eaf1fa); }
 .itg input:focus, .itg textarea:focus {
   background: var(--n0); border: 1px solid var(--focus); border-radius: 4px;
   box-shadow: 0 0 0 2px rgba(91, 141, 217, .16);
@@ -424,3 +432,31 @@ input.remote-locked {
 @media (max-width: 768px) {
   .itg .itg-head > *, .itg .itg-row > * { padding-left: 4px; padding-right: 4px; }
 }
+
+/* ===== 共享卡壳基元（批次二统一：pt/pnc/ft 卡壳收敛到全局，组件内不再各留一份） ===== */
+/* 卡头：flex 骨架（渐变底/负外边距等变体由组件按各自卡壳内边距覆盖） */
+.pt-card-head { display: flex; align-items: center; gap: 10px; }
+/* 卡名：蓝色描边可编辑名（换发串件卡 / 单独项目类型卡共用；ft-card-name 在组件内做底色等微调） */
+.pt-card-name { flex: 1; min-width: 120px; height: 32px; padding: 0 8px; border: 1.5px solid var(--blue); border-radius: var(--r-sm); font-size: var(--fs-14); font-weight: 700; color: var(--blue-dark); }
+.pt-card-name:focus { outline: none; border-color: var(--focus); }
+/* 卡头折叠按钮 / 计数 / 删除图标按钮 / 空态 */
+.pt-collapse { flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: rgba(255,255,255,.8); color: var(--n7); font-size: var(--fs-13); line-height: 1; cursor: pointer; }
+.pt-collapse:hover { border-color: var(--blue); color: var(--blue-dark); }
+.pt-count { font-size: var(--fs-12); color: var(--n7); flex-shrink: 0; }
+.icon-btn { border: none; background: transparent; color: var(--danger); font-size: var(--fs-16); cursor: pointer; flex-shrink: 0; }
+.pt-empty { color: var(--n7); font-size: var(--fs-12); text-align: center; padding: 10px 0; }
+.pt-empty-all { text-align: center; color: var(--n7); padding: 40px 0; font-size: var(--fs-13); }
+/* 件号重复/单件卡（pnc）：GanttPrep 重复梳理与航材清单重复梳理共用 */
+.pnc-card { border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); margin-bottom: 10px; overflow: hidden; }
+.pnc-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #edf2fc; }
+.pnc-partno { font-size: var(--fs-14); color: var(--blue-dark); font-weight: 700; }
+.pnc-name { font-size: var(--fs-13); color: #4a5160; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pnc-count { margin-left: auto; font-size: var(--fs-12); color: #98a2b3; flex: 0 0 auto; }
+.pnc-body { padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
+/* 部位卡头「部位名」行内输入（CategorySection / MaterialCategorySection 共用） */
+.cat-name { flex: 0 1 auto; min-width: 90px; max-width: 220px; padding: 4px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-16); color: inherit; }
+.cat-name:hover, .cat-name:focus { border-color: var(--focus); background: var(--n0); }
+/* StandardPicker 在 .sub-head 内作为工作名输入框：占满可用宽度、外观与 .type-name 一致 */
+.sub-head .standard-combo { flex: 1 1 140px; width: auto; min-width: 0; margin: 0; }
+.sub-head .standard-input { width: 100%; margin: 0; padding: 5px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-14); color: inherit; }
+.sub-head .standard-input:hover, .sub-head .standard-input:focus { border-color: var(--focus); background: var(--n0); }
