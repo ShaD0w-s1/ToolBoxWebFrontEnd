@@ -1628,8 +1628,9 @@ export function useToolbox() {
   }
 
   /** 按机号查询飞机信息（FSN/MSN/机型/发动机/ETOPS/ELT-DT），供机号回填展示。
-   *  优先查本地标准库；本地未解锁（无 AIRNAV token）导致查不到时，改走公开单机信息接口
-   *  （/api/aircraft-info/，无需 AIRNAV 授权），并把结果合并进本地缓存（只读展示，不标脏）。 */
+   *  优先查本地标准库（已随 loadRemote 全量公开拉取常驻，2026-09-06 放开读取）；
+   *  本地查不到时走公开单机信息接口（/api/aircraft-info/，免授权）兜底，
+   *  并把结果合并进本地缓存（只读展示，不标脏）。 */
   /** 机号信息查询去重：同机号 60s TTL 结果缓存（含“查无”）+ in-flight 合并，
    *  消除同一机号重复失焦/重复 change 导致的重复 /api/aircraft-info/ 请求。 */
   const aircraftInfoCache = new Map<string, { at: number; row: StandardLibRow | null }>();
@@ -1971,8 +1972,9 @@ export function useToolbox() {
         backend.getMaterialTemplate("A320").catch(() => null),
         backend.getMaterialTemplate("B787").catch(() => null),
         backend.getToolCart().catch(() => null),
-        // 飞机信息读取受 AIRNAV 授权保护：无 token 时跳过（保留本地缓存），避免 403 刷屏。
-        airnavToken ? backend.getStandardLibrary("aircraft_info", airnavToken).catch(() => null) : Promise.resolve(null),
+        // 飞机信息读取已放开为公开（2026-09-06，后端 GET 不再要求 AIRNAV token）：
+        // 无条件全量拉取到本地，机号回填/下拉全部本地命中，输入框不依赖逐机号网络单查。
+        backend.getStandardLibrary("aircraft_info").catch(() => null),
         backend.getStandardLibrary("workcard_320").catch(() => null),
         backend.getAnnouncement().catch(() => null),
         backend.getConfig().catch(() => null),
@@ -2005,8 +2007,8 @@ export function useToolbox() {
       const wc320Doc = unwrapDocument(wc320?.data);
       if (aiDoc && Array.isArray(aiDoc.rows)) {
         stdLibs.aircraft_info = normalizeStdLib({ rows: aiDoc.rows as StandardLibRow[] });
-      } else if (!airnavToken) {
-        // 无授权 token 时读取被跳过：保留本地已有的飞机信息（不因无权限而清空）。
+      } else {
+        // 拉取失败/为空时保留本地已有的飞机信息（不因单次网络失败而清空）。
         stdLibs.aircraft_info = app.value.standardLibraries.aircraft_info || stdLibs.aircraft_info;
       }
       if (wc320Doc && Array.isArray(wc320Doc.rows)) stdLibs.workcard_320 = normalizeStdLib({ rows: wc320Doc.rows as StandardLibRow[] });
