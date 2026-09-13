@@ -84,9 +84,10 @@ font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
 - 表格：`--n3` 边框、圆角 `--r-md`、表头 `--n1` 底 + `--n8` 字、行分割 `--n3`
 
 ### 2.4.1 项目列表子页左侧「飞机查询」卡片 `.aq-*`（✅ 已落地 2026-09-13）
-只读查询卡，位于「新建工作项目」按钮之下、筛选条件之上（`ProjectList.vue` → `list-side`）。组件 `AircraftQueryCard.vue`，样式全 scoped，**仅用令牌、无硬编码色值**。
+只读查询卡，位于「筛选条件」卡片**正下方，作为独立卡片**（左侧列 `.list-side-col` 内，两卡 12px 间距、各自白底/边框/圆角）。组件 `AircraftQueryCard.vue`，样式全 scoped，**仅用令牌、无硬编码色值**。
 
-- 外壳 `.aq-card`：`--n1` 底 + `--line` 边框 + `--r-lg`，内边距 12px，纵向 10px 间距。用 `--n1`（次级底）与侧栏 `--n0` 白底形成层次，避免与侧栏融为一体。
+- **容器结构**：`.list-side-col`（左列，`flex:0 0 33.3333%` + `position:sticky;top:8px` + `gap:12px`）→ 内含 `.list-side`（筛选条件卡）与 `AircraftQueryCard`（查询卡）两张同级卡片。**sticky 在列容器上，不在卡片上**。
+- 外壳 `.aq-card`：`--n0` 白底（与筛选卡一致）+ `--line` 边框 + `--r-lg`，内边距 14px，纵向 10px 间距。
 - 卡头 `.aq-head`：标题 14px/700 + 右侧 `.aq-tag`「只读」胶囊（`--n3` 底 `--n7` 字 10px/700，`margin-left:auto`）。
 - 机号行 `.aq-search`：`position:relative` 包裹 `AircraftRegSuggest`；`.aq-clear`（20px 圆 · `--danger-bg`/`--danger`）绝对定位右侧 6px 垂直居中，`z-index:2`；`:deep(.ars-input)` 补 `padding-right:30px` 让位。**输入框即机号显示行（2026-09-13 用户定稿合并，不再单列「机号」展示行）。**
 - 字段格 `.aq-cell` / `.aq-block`：`--n0` 底 + `--line` 边框 + `--r-sm`，padding 6px 8px；`dt` 10px/700 `--n7`；`dd` 14px/600 `--n10` + `overflow-wrap:anywhere`。
