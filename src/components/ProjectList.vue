@@ -642,7 +642,7 @@ async function batchDeleteNoDate(): Promise<void> {
           </label>
         </div>
         <p v-if="engTemplatesLoading" class="loading-state">加载中…</p>
-        <template v-else-if="filteredEngTemplates.length">
+        <div v-else-if="filteredEngTemplates.length" class="eng-tpl-list">
           <div v-for="t in filteredEngTemplates" :key="t._id" class="eng-tpl-row">
             <div class="eng-tpl-info">
               <strong>{{ t.name }}</strong>
@@ -655,7 +655,7 @@ async function batchDeleteNoDate(): Promise<void> {
               <button class="danger" @click="deleteEngTemplate(t)">删除</button>
             </div>
           </div>
-        </template>
+        </div>
         <p v-else-if="engTemplates.length" class="site-admin-empty">未找到匹配“{{ engTplQuery }}”的模板。</p>
         <p v-else class="site-admin-empty">暂无模板，点击「+ 新增模板」开始创建。</p>
       </div>
@@ -675,7 +675,7 @@ async function batchDeleteNoDate(): Promise<void> {
           </label>
         </div>
         <p v-if="standaloneTemplatesLoading" class="loading-state">加载中…</p>
-        <template v-else-if="filteredStandaloneTemplates.length">
+        <div v-else-if="filteredStandaloneTemplates.length" class="eng-tpl-list">
           <div v-for="t in filteredStandaloneTemplates" :key="t._id" class="eng-tpl-row">
             <div class="eng-tpl-info">
               <strong>{{ t.name }}</strong>
@@ -688,7 +688,7 @@ async function batchDeleteNoDate(): Promise<void> {
               <button class="danger" @click="deleteStandaloneTemplate(t)">删除</button>
             </div>
           </div>
-        </template>
+        </div>
         <p v-else-if="standaloneTemplates.length" class="site-admin-empty">未找到匹配“{{ standaloneTplQuery }}”的模板。</p>
         <p v-else class="site-admin-empty">暂无模板，点击「+ 新增模板」开始创建。</p>
       </div>
@@ -758,7 +758,15 @@ async function batchDeleteNoDate(): Promise<void> {
 .site-admin-table th, .site-admin-table td { padding: 7px 10px; border-bottom: 1px solid #eef1f5; text-align: left; }
 .site-admin-table th { color: #5f6b7a; font-weight: 600; background: #f6f8fb; }
 .site-admin-empty { color: #8a94a3; text-align: center; padding: 20px 0; margin: 0; }
-.eng-tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #eef1f5; border-radius: var(--r-md); margin-bottom: 8px; }
+/* 模板列表滚动区（换发/APU 模板库 + 单项工作模板库共用）：最多显示 8 条模板，超出纵向滚动下移。
+   --tpl-row-h = 内容两行 33px + 上下 padding 20px + 边框 2px，与真实行高对齐。 */
+.eng-tpl-list {
+  --tpl-row-h: 56px;
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: calc(var(--tpl-row-h) * 8 + 7 * 8px);
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.eng-tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--tpl-row-h); padding: 10px 12px; border: 1px solid #eef1f5; border-radius: var(--r-md); }
 .eng-tpl-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .eng-tpl-info strong { font-size: var(--fs-14); color: var(--n8); }
 .eng-tpl-info span { font-size: var(--fs-12); color: #8a94a3; }

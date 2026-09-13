@@ -2707,7 +2707,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             <button v-if="tplQuery" class="clear-btn" type="button" title="清空搜索" @click="tplQuery = ''">×</button>
           </div>
           <p v-if="templatesLoading" class="loading-state">加载中…</p>
-          <template v-else-if="filteredTemplates.length">
+          <div v-else-if="filteredTemplates.length" class="gp-tpl-list">
             <div v-for="t in filteredTemplates" :key="t._id" class="gp-tpl-row">
               <div class="gp-tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>{{ t.state.charts.length }} DAY · {{ t.state.charts.reduce((n, c) => n + c.cards.length, 0) }} 工序</span></div>
               <div class="gp-tpl-actions">
@@ -2719,7 +2719,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 </template>
               </div>
             </div>
-          </template>
+          </div>
           <p v-else-if="templates.length" class="gp-empty">未找到匹配“{{ tplQuery }}”的模板。</p>
           <p v-else class="gp-empty">暂无模板。</p>
         </div>
@@ -3163,7 +3163,15 @@ textarea.textwrap {
 .gp-save-tpl-row { display: flex; gap: 8px; padding: 12px 18px; border-bottom: 1px solid var(--line, var(--n4)); }
 .gp-save-tpl-row input { flex: 1; height: 34px; padding: 0 10px; border: 1.5px solid var(--line, var(--n4)); border-radius: var(--r-md); font-size: var(--fs-13); }
 .gp-save-tpl-row input:focus { border-color: var(--focus); outline: none; }
-.gp-tpl-row { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line, var(--n4)); cursor: pointer; }
+/* 模板列表滚动区：最多显示 8 条模板，超出纵向滚动下移。
+   --tpl-row-h 与实际行高（padding 12+12 + 内容 33 + 底边 1）对齐，保证正好露出 8 条。 */
+.gp-tpl-list {
+  --tpl-row-h: 58px;
+  flex: 0 1 auto; min-height: 0;
+  max-height: calc(var(--tpl-row-h) * 8);
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.gp-tpl-row { display: flex; align-items: center; gap: 10px; min-height: var(--tpl-row-h); padding: 12px 18px; border-bottom: 1px solid var(--line, var(--n4)); cursor: pointer; }
 .gp-tpl-row:hover { background: #f5f9ff; }
 .gp-tpl-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .gp-tpl-info.clickable { cursor: pointer; }

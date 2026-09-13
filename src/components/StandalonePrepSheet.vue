@@ -427,7 +427,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
           <button v-if="tplQuery" class="clear-btn" type="button" title="清空搜索" @click="tplQuery = ''">×</button>
         </div>
         <p v-if="templatesLoading" class="loading-state">加载中…</p>
-        <template v-else-if="filteredTemplates.length">
+        <div v-else-if="filteredTemplates.length" class="tpl-list">
           <div v-for="t in filteredTemplates" :key="t._id" class="tpl-row">
             <div class="tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>工序 {{ (t.state.prep.processGroups || []).length }} 组 · 签署 {{ (t.state.prep.signingRows || []).length }} 行{{ t.state.material || t.state.tools ? ' · 带清单' : '' }}</span></div>
             <div class="tpl-actions">
@@ -439,7 +439,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
               </template>
             </div>
           </div>
-        </template>
+        </div>
         <p v-else-if="templates.length" class="tpl-empty">未找到匹配“{{ tplQuery }}”的模板。</p>
         <p v-else class="tpl-empty">暂无模板。</p>
       </div>
@@ -543,7 +543,15 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .tpl-save-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .tpl-save-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); }
 .tpl-empty { color: var(--n7); font-size: var(--fs-13); text-align: center; padding: 14px 0; }
-.tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--n3); border-radius: var(--r-md); margin-bottom: 8px; }
+/* 模板列表滚动区：最多显示 8 条模板，超出纵向滚动下移。
+   --tpl-row-h = 操作按钮 36px + 上下 padding 16px + 边框 2px，与真实行高对齐。 */
+.tpl-list {
+  --tpl-row-h: 54px;
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: calc(var(--tpl-row-h) * 8 + 7 * 8px);
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.tpl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: var(--tpl-row-h); padding: 8px 10px; border: 1px solid var(--n3); border-radius: var(--r-md); }
 .tpl-info { flex: 1; min-width: 0; }
 .tpl-info.clickable { cursor: pointer; }
 .tpl-info.clickable:hover strong { color: var(--blue); }
