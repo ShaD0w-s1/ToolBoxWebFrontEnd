@@ -146,10 +146,11 @@ function hasSpecialConfig(value: string): boolean {
 </template>
 
 <style scoped>
+/* 与筛选条件卡片同级：白底 + 同款边框/圆角/内边距，独立成一卡。 */
 .aq-card {
   display: flex; flex-direction: column; gap: 10px;
-  padding: 12px; border: 1px solid var(--line); border-radius: var(--r-lg);
-  background: var(--n1);
+  padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--n0);
 }
 .aq-head { display: flex; align-items: center; gap: 8px; }
 .aq-title { margin: 0; font-size: var(--fs-14); font-weight: 700; color: var(--n9); }

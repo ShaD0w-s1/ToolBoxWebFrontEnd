@@ -398,41 +398,43 @@ async function batchDeleteNoDate(): Promise<void> {
     <template v-if="store.listTab.value === 'tools'">
       <!-- 项目列表子页：现有宽度内左右分栏（左 1/3 功能区，右 2/3 列表） -->
       <div class="list-split">
-        <!-- 左侧 1/3：功能按钮区 -->
-        <aside class="list-side">
-          <button class="primary side-new" @click="startNew">+ 新建工作项目</button>
-          <div class="side-row">
-            <button title="复制本页链接，对方打开后自动定位" @click="emit('share')">分享本页</button>
-            <button title="强制同步数据" @click="store.refresh()">刷新</button>
-          </div>
-          <!-- 飞机查询卡片：复用二级页「飞机信息」字段的只读查询，数据取本地常驻的飞机信息标准库 -->
-          <AircraftQueryCard :store="store" />
-          <div class="side-divider" />
-          <div class="side-title">筛选条件</div>
-
-          <div class="side-field">
-            <span class="side-label">执行日期（时段，最多 30 天）</span>
-            <DateRangePicker :from="store.dateFrom.value" :to="store.dateTo.value" @update:from="store.dateFrom.value = $event" @update:to="store.dateTo.value = $event" />
-          </div>
-
-          <div class="side-field">
-            <span class="side-label">项目名称（模糊搜索）</span>
-            <div class="side-search-wrap">
-              <input v-model="store.nameQuery.value" class="inp" placeholder="搜索项目名称" aria-label="按项目名称搜索" />
-              <button v-if="store.nameQuery.value" class="side-clear-x" title="清空搜索" @click="store.nameQuery.value = ''">×</button>
+        <!-- 左侧 1/3：功能区（上下两张独立卡片：筛选条件卡 + 飞机查询卡） -->
+        <div class="list-side-col">
+          <aside class="list-side">
+            <button class="primary side-new" @click="startNew">+ 新建工作项目</button>
+            <div class="side-row">
+              <button title="复制本页链接，对方打开后自动定位" @click="emit('share')">分享本页</button>
+              <button title="强制同步数据" @click="store.refresh()">刷新</button>
             </div>
-          </div>
+            <div class="side-divider" />
+            <div class="side-title">筛选条件</div>
 
-          <div class="side-field">
-            <span class="side-label">项目类型</span>
-            <MultiSelect :options="[...PROJECT_TYPES]" v-model="store.typeFilter.value" placeholder="类型：全部" />
-          </div>
+            <div class="side-field">
+              <span class="side-label">执行日期（时段，最多 30 天）</span>
+              <DateRangePicker :from="store.dateFrom.value" :to="store.dateTo.value" @update:from="store.dateFrom.value = $event" @update:to="store.dateTo.value = $event" />
+            </div>
 
-          <div class="side-field">
-            <span class="side-label">执行班组</span>
-            <MultiSelect :options="[...TEAMS]" v-model="store.teamFilters.value" placeholder="班组：全部" />
-          </div>
-        </aside>
+            <div class="side-field">
+              <span class="side-label">项目名称（模糊搜索）</span>
+              <div class="side-search-wrap">
+                <input v-model="store.nameQuery.value" class="inp" placeholder="搜索项目名称" aria-label="按项目名称搜索" />
+                <button v-if="store.nameQuery.value" class="side-clear-x" title="清空搜索" @click="store.nameQuery.value = ''">×</button>
+              </div>
+            </div>
+
+            <div class="side-field">
+              <span class="side-label">项目类型</span>
+              <MultiSelect :options="[...PROJECT_TYPES]" v-model="store.typeFilter.value" placeholder="类型：全部" />
+            </div>
+
+            <div class="side-field">
+              <span class="side-label">执行班组</span>
+              <MultiSelect :options="[...TEAMS]" v-model="store.teamFilters.value" placeholder="班组：全部" />
+            </div>
+          </aside>
+          <!-- 飞机查询卡片：筛选条件卡片下方独立卡片，复用二级页「飞机信息」字段的只读查询，数据取本地常驻的飞机信息标准库 -->
+          <AircraftQueryCard :store="store" />
+        </div>
 
         <!-- 右侧 2/3：项目列表 -->
         <div class="list-main">
@@ -765,11 +767,17 @@ async function batchDeleteNoDate(): Promise<void> {
 
 /* ===== 项目列表子页：左 1/3 功能区 + 右 2/3 列表 ===== */
 .list-split { display: flex; gap: 16px; align-items: flex-start; }
-.list-side {
+/* 左侧列：筛选条件卡 + 飞机查询卡 上下两张独立卡片（各自白底/边框/圆角，12px 间距） */
+.list-side-col {
   flex: 0 0 33.3333%; min-width: 0;
   display: flex; flex-direction: column; gap: 12px;
+  position: sticky; top: 8px;
+}
+.list-side {
+  min-width: 0;
+  display: flex; flex-direction: column; gap: 12px;
   background: var(--n0); border: 1px solid var(--line); border-radius: var(--r-lg);
-  padding: 14px; position: sticky; top: 8px;
+  padding: 14px;
 }
 .list-main { flex: 1 1 66.6667%; min-width: 0; }
 .side-new {
@@ -829,7 +837,8 @@ async function batchDeleteNoDate(): Promise<void> {
 /* 移动端：分栏改为上下堆叠 */
 @media (max-width: 860px) {
   .list-split { flex-direction: column; }
-  .list-side { flex: none; width: 100%; position: static; }
+  .list-side-col { flex: none; width: 100%; position: static; }
+  .list-side { width: 100%; }
   .list-main { flex: none; width: 100%; }
 }
 
