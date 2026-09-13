@@ -83,6 +83,17 @@ font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
 - 卡片：白底、`--n4` 边框、`--r-lg`、`--sh-1`；卡头 12-16px 内边距 + 底部 `--n3` 分隔线
 - 表格：`--n3` 边框、圆角 `--r-md`、表头 `--n1` 底 + `--n8` 字、行分割 `--n3`
 
+### 2.4.1 项目列表子页左侧「飞机查询」卡片 `.aq-*`（✅ 已落地 2026-09-13）
+只读查询卡，位于「新建工作项目」按钮之下、筛选条件之上（`ProjectList.vue` → `list-side`）。组件 `AircraftQueryCard.vue`，样式全 scoped，**仅用令牌、无硬编码色值**。
+
+- 外壳 `.aq-card`：`--n1` 底 + `--line` 边框 + `--r-lg`，内边距 12px，纵向 10px 间距。用 `--n1`（次级底）与侧栏 `--n0` 白底形成层次，避免与侧栏融为一体。
+- 卡头 `.aq-head`：标题 14px/700 + 右侧 `.aq-tag`「只读」胶囊（`--n3` 底 `--n7` 字 10px/700，`margin-left:auto`）。
+- 机号行 `.aq-search`：`position:relative` 包裹 `AircraftRegSuggest`；`.aq-clear`（20px 圆 · `--danger-bg`/`--danger`）绝对定位右侧 6px 垂直居中，`z-index:2`；`:deep(.ars-input)` 补 `padding-right:30px` 让位。**输入框即机号显示行（2026-09-13 用户定稿合并，不再单列「机号」展示行）。**
+- 字段格 `.aq-cell` / `.aq-block`：`--n0` 底 + `--line` 边框 + `--r-sm`，padding 6px 8px；`dt` 10px/700 `--n7`；`dd` 14px/600 `--n10` + `overflow-wrap:anywhere`。
+- 字段排布：FSN+MSN、ETOPS+ELT-DT 用 `.aq-pair`（`grid-template-columns:1fr 1fr`）；发动机、机型各占整行。
+- 特殊构型：ETOPS / ELT-DT 非 `N/A` → `.aq-special`（`--danger` 700），与准备单 `special-config` 语义一致。
+- 空/错误态：未输入不渲染提示块；完整机号查无 → `.aq-hint.aq-miss`（`--danger` 600）显示「库中无此机号：B-XXXX」。
+
 ### 2.5 移动端适配（≤768px）与物品行表 / 工序卡 / 甘特列宽（✅ 已落地 2026-09-05）
 **断点**：全站响应式断点统一 `@media (max-width: 768px)`；移动端视觉验证默认用 375px 视口（本机 Edge headless 截图，样本见 `output/mobcheck/`）。
 
