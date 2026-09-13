@@ -88,6 +88,28 @@
 - 配套：`.side-search-wrap .inp` 的 `padding-right` 由 34px 调至 40px（给方形按钮让位），`.aq-search :deep(.ars-input)` 由 30px 调至 34px。
 - 新增内嵌「×」按钮必须套用上述模板，**不得**再写 `border-radius: 50%` + 固定 `width/height`。
 
+### 2.3.2 弹窗列表滚动区（最多 8 条，✅ 已落地 2026-09-13）
+
+弹窗内的**同构行列表**（模板列表等）必须包一层滚动容器，按「最多 N 条」封顶高度，禁止让弹窗随条目数无限增高。当前约定 **N = 8**。
+
+```css
+.xxx-list {
+  --tpl-row-h: 56px;                                 /* 与真实行高对齐 */
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: calc(var(--tpl-row-h) * 8 + 7 * 8px);  /* 8 条 + 7 个间隙 */
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;                      /* 滚到底不带动外层弹窗 */
+}
+.xxx-row { min-height: var(--tpl-row-h); }           /* 行高显式，保证 8 条精确 */
+```
+
+要点：
+- **行高用 `min-height` 显式声明**并在容器内用 `--tpl-row-h` 复用；靠 padding + 内容自然撑出的行高会随字体度量漂移，导致「8 条」失准。
+- **行间隔用容器 `gap`，不用行内 `margin-bottom`** —— 间隙数量是 `N-1`，用 margin 会让 max-height 多算一份。
+- 弹窗卡片本身若是 flex 列布局（如 `.gp-modal-card`），滚动区再加 `flex: 0 1 auto; min-height: 0` 以便在 `max-height: 80vh` 内正确收缩。
+- 已落地 3 个容器：`.gp-tpl-list`（换发/APU 调取·保存模板）、`.tpl-list`（单项 调取·保存模板）、`.eng-tpl-list`（模板库 ×2 共用）。
+- 新增类名而非改共享卡片类，避免波及同类弹窗（如「网站管理」）。
+
 ### 2.4 字体规范（✅ 已落地 2026-08-23，组件非令牌字号已清理 225 处）
 **字体族**（main.css `:root`，全局继承 `font: inherit`）：
 ```css
