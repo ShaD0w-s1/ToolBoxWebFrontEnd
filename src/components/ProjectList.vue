@@ -22,6 +22,7 @@ import ControlDocMaintain from "./ControlDocMaintain.vue";
 import ProjectFormModal from "./ProjectFormModal.vue";
 import MultiSelect from "./MultiSelect.vue";
 import DateRangePicker from "./DateRangePicker.vue";
+import AircraftQueryCard from "./AircraftQueryCard.vue";
 
 const props = defineProps<{ store: ToolboxStore }>();
 const emit = defineEmits<{ share: [] }>();
@@ -404,6 +405,8 @@ async function batchDeleteNoDate(): Promise<void> {
             <button title="复制本页链接，对方打开后自动定位" @click="emit('share')">分享本页</button>
             <button title="强制同步数据" @click="store.refresh()">刷新</button>
           </div>
+          <!-- 飞机查询卡片：复用二级页「飞机信息」字段的只读查询，数据取本地常驻的飞机信息标准库 -->
+          <AircraftQueryCard :store="store" />
           <div class="side-divider" />
           <div class="side-title">筛选条件</div>
 

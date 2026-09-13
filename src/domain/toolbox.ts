@@ -26,6 +26,7 @@ export const STANDARD_LIB_META: Record<StandardLibKey, { label: string; rowKeys:
   aircraft_info: { label: "飞机信息标准库", rowKeys: ["飞机号", "MSN", "FSN", "机型", "发动机", "ETOPS", "ELT-DT"] },
   workcard_320: { label: "工卡分配标准库", rowKeys: ["工卡号", "工卡名", "MP项目号", "部位", "分级"] },
 };
+/** 标准库行（键为中文列名）。单独导出，供只读查询卡片等非 store 场景引用。 */
 export type StandardLibRow = Record<string, string>;
 export interface StandardLib {
   rows: StandardLibRow[];
