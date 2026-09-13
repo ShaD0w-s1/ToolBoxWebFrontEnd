@@ -57,6 +57,37 @@
 - **Segmented**（三级选择/筛选）：药丸式，active 白底胶囊 + 轻阴影（工卡分配 waSegment、换发 splitbutton 菜单同族）
 - 换发 5 子 tab 与 A检 5 子页同为 Tab 语义，不得混用 Segmented 充当导航
 
+### 2.3.1 内嵌「×」按钮规范：方形 + 随格高自适应（✅ 已落地 2026-09-13）
+
+**结论：内嵌清空/删除「×」一律为方形（`--r-sm`），高度随所在格高度自适应；禁止 `border-radius: 50%`。**
+
+```css
+.xxx-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  height: calc(100% - 8px);      /* 随所在格高度自适应（上下各留 4px） */
+  aspect-ratio: 1 / 1;           /* 方形：宽随高等比推导 */
+  width: auto; min-width: 18px;  /* 极窄格兜底 */
+  min-height: 0;                 /* ★必须：覆盖全局 button{min-height:36px} */
+  padding: 0; border: none; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+}
+```
+
+**⚠️ 关键坑（务必遵守）**：main.css 全局 `button { min-height: 36px }` 会覆盖内嵌按钮的 `height`，把「固定宽 + 圆角 50%」的按钮撑成 **20×36 竖椭圆**（视觉故障根因）。因此内嵌小按钮**必须显式 `min-height: 0`**，否则 `calc(100% - 8px)` 与 `aspect-ratio` 均失效。
+
+**已按此规范整改的 4 处**（原均为 20/18px 圆形）：
+
+| 组件 | 类名 | 所在格 / 格高 | 效果 |
+|---|---|---|---|
+| `ProjectList.vue` | `.side-clear-x` | `.side-search-wrap` / `.inp` 36px | 28×28 方形 |
+| `AircraftQueryCard.vue` | `.aq-clear` | `.aq-search` / `.ars-input` 30px | 22×22 方形 |
+| `MultiSelect.vue` | `.ms-clear` | `.ms` / `.ms-trigger` 34px | 26×26 方形 |
+| `GanttPrep.vue` | `.gantt-card .card-close` | 卡片标题带 `--gp-card-head` 20px | 20×20 方形 |
+
+- 甘特卡关闭叉号的高度不再硬编码，改为读卡片变量 `--gp-card-head: 20px`（定义在 `.gantt-card`），与标题带高度联动。
+- 配套：`.side-search-wrap .inp` 的 `padding-right` 由 34px 调至 40px（给方形按钮让位），`.aq-search :deep(.ars-input)` 由 30px 调至 34px。
+- 新增内嵌「×」按钮必须套用上述模板，**不得**再写 `border-radius: 50%` + 固定 `width/height`。
+
 ### 2.4 字体规范（✅ 已落地 2026-08-23，组件非令牌字号已清理 225 处）
 **字体族**（main.css `:root`，全局继承 `font: inherit`）：
 ```css
