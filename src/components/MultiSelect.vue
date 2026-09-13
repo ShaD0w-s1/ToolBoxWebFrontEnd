@@ -64,10 +64,14 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 .ms-count { font-size: var(--fs-11); background: var(--blue); color: var(--n0); border-radius: var(--r-pill); padding: 0 7px; line-height: 16px; }
 .ms-arrow { font-size: var(--fs-10); color: var(--n6); transition: transform var(--t-fast); }
 .ms-arrow.up { transform: rotate(180deg); }
+/* 清空 ×：方形（非圆形），高度随所在格（.ms 高 = .ms-trigger 34px）自适应。
+   ⚠️ 必须 min-height:0：main.css 全局 button{min-height:36px} 会把固定宽按钮撑成椭圆。 */
 .ms-clear {
   position: absolute; right: 26px; top: 50%; transform: translateY(-50%);
-  width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%;
+  height: calc(100% - 8px); aspect-ratio: 1 / 1; width: auto; min-width: 18px;
+  min-height: 0; padding: 0; border: none; border-radius: var(--r-sm);
   background: var(--danger-bg); color: var(--danger); font-size: var(--fs-13); line-height: 1;
+  display: flex; align-items: center; justify-content: center;
 }
 .ms-clear:hover { background: #f9dcdc; }
 .ms-menu {

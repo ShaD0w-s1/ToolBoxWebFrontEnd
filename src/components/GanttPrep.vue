@@ -2899,6 +2899,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 
 /* ===== 甘特卡片（工序=灰渐变至白 / 串件=橙渐变至白，从顶部渐变到负责行后全白） ===== */
 .gantt-card {
+  /* 卡片标题带高度：右上角关闭叉号与其等高（方形自适应该格高度） */
+  --gp-card-head: 20px;
   margin: 2px; padding: 0; border-radius: var(--r-md); background: var(--n0);
   border: 2.5px solid var(--focus); box-shadow: 0 1px 3px rgba(0,0,0,.04); position: relative;
   display: flex; flex-direction: column; min-height: 64px; z-index: 2; transition: box-shadow .15s;
@@ -2940,10 +2942,12 @@ async function importAllXlsx(event: Event): Promise<void> {
 .day-move-select { width: 100%; height: 20px; padding: 0 4px; font-size: var(--fs-10); color: var(--blue-dark, var(--blue-dark)); border: 1px dashed var(--blue, var(--blue)); border-radius: 4px; background: rgba(255,255,255,.75); cursor: pointer; font-family: inherit; }
 .day-move-select.form { width: auto; flex-shrink: 0; height: 24px; font-size: var(--fs-12); }
 .day-move-select:hover { border-style: solid; background: var(--n0); }
-/* 甘特卡右上角黑色关闭叉号（黄/橙标题区上可见） */
+/* 甘特卡右上角关闭叉号：方形（非圆形），高度对齐卡片标题带 --gp-card-head。
+   ⚠️ 必须 min-height:0：main.css 全局 button{min-height:36px} 会把固定宽按钮撑成椭圆。 */
 .gantt-card .card-close {
-  position: absolute; top: 3px; right: 5px; z-index: 6;
-  width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
+  position: absolute; top: 2px; right: 5px; z-index: 6;
+  height: var(--gp-card-head); aspect-ratio: 1 / 1; width: auto; min-width: 16px;
+  min-height: 0; padding: 0; border: none; border-radius: var(--r-sm);
   background: rgba(255,255,255,.72); color: #000; cursor: pointer;
   font-size: var(--fs-12); line-height: 1; display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity .15s, background .15s, color .15s;

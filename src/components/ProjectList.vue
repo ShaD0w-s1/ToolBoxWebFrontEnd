@@ -793,13 +793,16 @@ async function batchDeleteNoDate(): Promise<void> {
 .side-label { font-size: var(--fs-12); font-weight: 600; color: var(--n9); }
 /* 名称搜索：input + 内嵌红色 × */
 .side-search-wrap { position: relative; display: flex; align-items: center; }
-.side-search-wrap .inp { width: 100%; padding-right: 34px; }
-/* 红色 ×（内嵌于搜索组件） */
+.side-search-wrap .inp { width: 100%; padding-right: 40px; }
+/* 红色 ×（内嵌于搜索组件）：方形（非圆形），高度随所在格（.side-search-wrap 高 = .inp 36px）自适应。
+   ⚠️ 必须 min-height:0：main.css 全局 button{min-height:36px} 会把固定宽按钮撑成椭圆。 */
 .side-clear-x {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-  width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
+  height: calc(100% - 8px); aspect-ratio: 1 / 1; width: auto; min-width: 20px;
+  min-height: 0; padding: 0; border: none; border-radius: var(--r-sm);
   background: var(--danger-bg); color: var(--danger); font-size: var(--fs-14); line-height: 1;
   cursor: pointer; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
 }
 .side-clear-x:hover { background: #f9dcdc; }
 /* 右侧列表头操作组 */

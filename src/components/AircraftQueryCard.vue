@@ -159,12 +159,16 @@ function hasSpecialConfig(value: string): boolean {
   background: var(--n3); color: var(--n7); font-size: var(--fs-10); font-weight: 700;
 }
 .aq-search { position: relative; display: flex; align-items: center; }
-.aq-search :deep(.ars-input) { padding-right: 30px; }
+.aq-search :deep(.ars-input) { padding-right: 34px; }
+/* 清空 ×：方形（非圆形），高度随所在输入格高度自适应（.aq-search 高 = .ars-input 30px）。
+   ⚠️ 必须 min-height:0：main.css 全局 button{min-height:36px} 会把固定宽按钮撑成椭圆。 */
 .aq-clear {
-  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-  width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  height: calc(100% - 8px); aspect-ratio: 1 / 1; width: auto; min-width: 18px;
+  min-height: 0; padding: 0; border: none; border-radius: var(--r-sm);
   background: var(--danger-bg); color: var(--danger); font-size: var(--fs-14); line-height: 1;
   cursor: pointer; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
 }
 .aq-clear:hover { background: #f9dcdc; }
 .aq-hint { margin: 0; font-size: var(--fs-12); color: var(--n6); }
