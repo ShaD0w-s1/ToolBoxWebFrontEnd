@@ -198,6 +198,21 @@ function baseUrl(): string {
   return location.origin + location.pathname.replace(/index\.html$/i, "");
 }
 
+/** 分享剪贴板格式：`链接` + 隔断 + `名称`。
+ *  隔断取换行 —— 链接本体独占一行，任何聊天窗口都能整段识别为可点击链接，名称在下一行说明是哪个项目。 */
+const SHARE_LABEL_SEP = "\n";
+function shareText(url: string, label: string): string {
+  const name = (label || "").trim();
+  return name ? `${url}${SHARE_LABEL_SEP}${name}` : url;
+}
+/** 当前所处的分享语境名称：换发/APU 等二级页取项目名，标准库/工具车取各自标题。 */
+function currentShareLabel(): string {
+  if (store.editingLibrary.value) return `${store.editingLibrary.value} 工具标准库`;
+  if (store.editingMaterialLibrary.value) return `${store.editingMaterialLibrary.value} 航材标准库`;
+  if (store.editingStdLib.value) return store.stdLibTitle.value;
+  return store.currentProject.value?.name || "";
+}
+
 async function share(scope: SharePayload["scope"]): Promise<void> {
   try {
     if (scope === "app") {
@@ -207,9 +222,10 @@ async function share(scope: SharePayload["scope"]): Promise<void> {
       return;
     }
     if (scope === "detail" && !store.editingLibrary.value && store.currentProject.value) {
-      // 二级页面（工作项目）：hash 路由直链，接收方打开后定位到该项目（刷新保持）
-      await copyText(`${baseUrl()}#/project/${encodeURIComponent(store.currentProject.value.id)}`);
-      store.notify("二级页面链接已复制");
+      // 二级页面（工作项目）：hash 路由直链（带项目 id），接收方打开后直达该项目的二级页（刷新保持）。
+      const url = `${baseUrl()}#/project/${encodeURIComponent(store.currentProject.value.id)}`;
+      await copyText(shareText(url, store.currentProject.value.name));
+      store.notify(`二级页面链接已复制（${store.currentProject.value.name}）`);
       return;
     }
     // 标准库 / 工具车：仍用内联 #s= 方式（自带数据，跨设备稳健），保持旧行为
@@ -224,7 +240,7 @@ async function share(scope: SharePayload["scope"]): Promise<void> {
         : store.currentProject.value,
     };
     const longUrl = await createShareUrl(payload);
-    await copyText(longUrl);
+    await copyText(shareText(longUrl, currentShareLabel()));
     store.notify("分享链接已复制");
   }
   catch { store.notify("复制失败，请检查浏览器权限"); }
@@ -268,7 +284,14 @@ function applyRoutePath(path: string): void {
   if (path === "/" || path === "") { store.backToList(); return; }
   if (path === "/cart") { store.openCart(); return; }
   if (path.startsWith("/project/")) {
-    store.openProject(decodeURIComponent(path.slice("/project/".length)));
+    const id = decodeURIComponent(path.slice("/project/".length));
+    // 项目不存在（已被删除 / 未同步到本端）：提示后停留在一级页，避免“点链接没反应”的无反馈。
+    if (!store.app.value.projects.some((item) => item.id === id)) {
+      store.notify("未找到该项目，可能已被删除或尚未同步");
+      store.backToList();
+      return;
+    }
+    store.openProject(id);
     return;
   }
   if (path.startsWith("/library/")) {
@@ -288,9 +311,16 @@ function applyRoutePath(path: string): void {
   }
 }
 // 双向同步：screen 变化 → 同步 URL；URL 变化（手动改 hash / 前进后退）→ 恢复 screen。
+// ⚠️ routeReady 闸门：项目数据加载完成前禁止「视图 → URL」回写。
+// 否则深链 #/project/:id 打开时，若此刻 projects 还没加载完，screenPath() 因取不到
+// currentProject.id 会退化为 "/"，watcher 随即 router.replace("/")，把深链清掉，
+// 最终回落一级页（“分享本页链接打不开对应项目”的根因）。
 let routeSyncing = false;
+let routeReady = false;
+/** 数据就绪前到达的 hash 路径：先挂起，等 loadRemote 完成后再统一应用，避免视图来回切换。 */
+let pendingRoutePath: string | null = null;
 watch(() => store.screen.value, () => {
-  if (routeSyncing) return;
+  if (routeSyncing || !routeReady) return;
   const target = screenPath();
   if (route.path === target) return;
   routeSyncing = true;
@@ -298,6 +328,7 @@ watch(() => store.screen.value, () => {
 });
 watch(() => route.path, (path) => {
   if (routeSyncing) return;
+  if (!routeReady) { pendingRoutePath = path; return; }
   applyRoutePath(path);
 });
 
@@ -346,11 +377,18 @@ onMounted(async () => {
     // 旧版内联 #s= 分享链接（标准库/工具车/历史项目链接）仍兼容
     await applySharedPayload();
   } else {
+    // ① 先等 vue-router 完成首次导航解析：否则此刻 route.path 仍为 "/"，
+    //    深链会被误判成“无路径”，直接落到一级页。
+    await router.isReady();
+    // ② 再等远端数据到位，保证 #/project/:id 能解析出对应项目。
     await store.loadRemote();
-    // 深链恢复：优先 hash 路由（新格式），无具体路径时退回旧 ?p= 分享格式
-    if (route.path && route.path !== "/") applyRoutePath(route.path);
+    // ③ 深链恢复：优先 hash 路由（新格式），无具体路径时退回旧 ?p= 分享格式。
+    const target = pendingRoutePath ?? route.path;
+    if (target && target !== "/") applyRoutePath(target);
     else openFromQuery();
   }
+  // ④ 数据与视图均就位后才放行「视图 → URL」回写。
+  routeReady = true;
   // 无密码身份标识：首次（或本设备无身份）时弹窗输入姓名
   if (!store.identityReady.value) showIdentityModal.value = true;
   // 启动每 2 秒自动同步（推送本地变更到云端，不覆盖本地编辑）
