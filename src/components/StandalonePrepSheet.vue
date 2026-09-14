@@ -489,8 +489,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-process-card { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); padding: 3px 6px; background: var(--n0); }
 .sp-process-card .sp-card-title {
   display: flex; align-items: center; gap: 2px;
-  background: #FDCA17; border-radius: var(--r-sm);
-  border-right: 2px solid #C9A227;
+  background: var(--proc-yellow); border-radius: var(--r-sm);
+  border-right: 2px solid var(--proc-yellow-line);
   flex: none; max-width: 100%; min-width: 0;
   padding: 2px 4px 2px 2px;
 }

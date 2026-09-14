@@ -8,6 +8,10 @@
   --blue-dark: #2f5597;
   --blue-light: #d9e1f2;
   --blue-bg: #eef3fb;
+  /* 焦点环色：全库 var(--focus) 引用 35 处，此前从未定义 → 声明在计算值阶段失效，
+     焦点指示器完全消失（WCAG 2.4.7）。取值需 ≥3:1（对白底 3.02:1）；
+     勿改回规范旧稿的 #8eaadb（仅 2.35:1，不达标）。 */
+  --focus: #7395d2;
   --line: #dde2ec;
   --muted: #697386;
   --danger: #c0392b;
@@ -21,7 +25,7 @@
   --ok-bg: #e8f5e9;
   /* 中性色阶（UI/UX 审计规范新增） */
   --n0: #ffffff; --n1: #f7f9fc; --n2: #f0f3f8; --n3: #e6eaf2; --n4: #dde2ec;
-  --n5: #b9c1cf; --n6: #8a93a6; --n7: #697386; --n8: #3d4657; --n9: #1f2a44; --n10: #141b2e;
+  --n5: #b9c1cf; --n6: #6a758c; --n7: #697386; --n8: #3d4657; --n9: #1f2a44; --n10: #141b2e;
   /* 字号阶梯 */
   --fs-10: 10px; --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-15: 15px;
   --fs-16: 16px; --fs-18: 18px; --fs-21: 21px; --fs-24: 24px;
@@ -37,7 +41,7 @@
   --t-fast: .15s; --t-med: .2s;
   /* 业务语义色（换发/APU 定稿，全局可用） */
   --proc-yellow: #FDCA17; --proc-yellow-line: #C9A227;
-  --sp-orange: #E8A44D; --sp-orange-deep: #c2701a;
+  --sp-orange: #E8A44D; --sp-orange-deep: #ad6417;
   --day-bg: #E8F1FC;
 }
 
@@ -45,7 +49,7 @@
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, select, textarea { font: inherit; }
 button, .button { cursor: pointer; }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #8eaadb; outline-offset: 1px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 .top {
   display: flex;
@@ -74,7 +78,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .online-badge {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
-  background: var(--proc-yellow, #FDCA17); color: #000;
+  background: var(--proc-yellow); color: #000;
   border-radius: var(--r-pill); font-size: var(--fs-10); font-weight: 700; line-height: 1;
 }
 

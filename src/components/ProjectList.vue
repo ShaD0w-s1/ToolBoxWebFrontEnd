@@ -864,7 +864,7 @@ async function batchDeleteNoDate(): Promise<void> {
 }
 .settings-field span { font-size: var(--fs-12, 12px); color: var(--muted, var(--n7)); line-height: 1.5; }
 .settings-toggle { flex-direction: row; align-items: center; gap: 8px; font-weight: 400 !important; }
-.settings-toggle input { width: 16px; height: 16px; accent-color: var(--proc-yellow, #FDCA17); }
+.settings-toggle input { width: 16px; height: 16px; accent-color: var(--proc-yellow); }
 /* 设置卡内行式操作（日期区间+导出 / 数据维护按钮） */
 .settings-dir-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .settings-dir-row .settings-date { flex: 0 1 140px; min-width: 0; }

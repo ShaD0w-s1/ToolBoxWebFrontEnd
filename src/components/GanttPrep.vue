@@ -2794,7 +2794,7 @@ async function importAllXlsx(event: Event): Promise<void> {
 /* ===== 通用卡片 ===== */
 .gp-card { border: 1px solid var(--line, var(--n4)); border-radius: var(--r-lg); background: var(--n0); padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
 /* DAY 卡片：浅蓝底黑字；填空栏/选择框保持白底黑字 */
-.gp-card.day-card { background: #E8F1FC; }
+.gp-card.day-card { background: var(--day-bg); }
 .gp-card.day-card .day-label { color: #222; }
 .gp-card.day-card .chart-title-input { color: #222; }
 .gp-card.day-card .chart-title-input:hover { background: rgba(255, 255, 255, .6); border-radius: 4px; }
@@ -2907,20 +2907,20 @@ async function importAllXlsx(event: Event): Promise<void> {
   background: var(--n0);
 }
 .gantt-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 3; }
-.gantt-card.unassigned { background: var(--n0); border-color: #e8a44d; }
+.gantt-card.unassigned { background: var(--n0); border-color: var(--sp-orange); }
 .gantt-card.unassigned .card-warn { position: absolute; top: 0; left: 0; color: var(--danger, var(--danger)); font-size: var(--fs-10); line-height: 1; padding: 1px 3px; z-index: 5; }
 .gantt-card.part-item {
-  border-color: #e8a44d;
+  border-color: var(--sp-orange);
   background: var(--n0);
 }
 /* 标题栏及以上：工序卡=黄底 #FDCA17（无渐变，标题栏底边清晰分界）；串件卡=橙底 #E8A44D 标题白字 */
-.gantt-card .card-grip { background: #FDCA17; border-radius: 6px 6px 0 0; }
-.gantt-card .f-content { background: #FDCA17; margin-top: -2px; border-radius: 0 0 3px 3px; }
-.gantt-card.part-item .card-grip, .gantt-card.unassigned .card-grip { background: #E8A44D; }
-.sp-title-row { display: flex; align-items: center; gap: 5px; margin: -2px -9px 4px; padding: 2px 9px; background: #E8A44D; color: var(--n0); border-radius: 0 0 6px 6px; min-width: 0; }
-.sp-title-row .sp-view-content, .sp-title-row .f-content { color: var(--n0); font-weight: 600; flex: 1; min-width: 0; width: auto; background: transparent; border-radius: 0; box-shadow: none; }
-.part-tag { flex-shrink: 0; font-size: var(--fs-10); font-weight: 700; color: var(--n0); background: #c2701a; border-radius: var(--r-pill); padding: 0 7px; line-height: 14px; z-index: 5; }
-.card-grip { position: absolute; top: 0; left: 8px; right: 8px; height: 14px; cursor: grab; display: flex; align-items: center; justify-content: center; color: var(--muted, var(--n7)); font-size: var(--fs-10); letter-spacing: 3px; user-select: none; touch-action: none; z-index: 4; }
+.gantt-card .card-grip { background: var(--proc-yellow); border-radius: 6px 6px 0 0; }
+.gantt-card .f-content { background: var(--proc-yellow); margin-top: -2px; border-radius: 0 0 3px 3px; }
+.gantt-card.part-item .card-grip, .gantt-card.unassigned .card-grip { background: var(--sp-orange); }
+.sp-title-row { display: flex; align-items: center; gap: 5px; margin: -2px -9px 4px; padding: 2px 9px; background: var(--sp-orange); color: var(--n10); border-radius: 0 0 6px 6px; min-width: 0; }
+.sp-title-row .sp-view-content, .sp-title-row .f-content { color: var(--n10); font-weight: 600; flex: 1; min-width: 0; width: auto; background: transparent; border-radius: 0; box-shadow: none; }
+.part-tag { flex-shrink: 0; font-size: var(--fs-10); font-weight: 700; color: var(--n0); background: var(--sp-orange-deep); border-radius: var(--r-pill); padding: 0 7px; line-height: 14px; z-index: 5; }
+.card-grip { position: absolute; top: 0; left: 8px; right: 8px; height: 14px; cursor: grab; display: flex; align-items: center; justify-content: center; color: var(--n10); font-size: var(--fs-10); letter-spacing: 3px; user-select: none; touch-action: none; z-index: 4; }
 .card-grip:active { cursor: grabbing; }
 .resize-l, .resize-r { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; z-index: 4; touch-action: none; }
 .resize-l { left: 0; border-radius: 8px 0 0 8px; }
@@ -2951,8 +2951,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 .gantt-card .card-close:hover { background: var(--n0); color: var(--danger, var(--danger)); }
 
 /* ===== 未分配串件 ===== */
-.unassigned-banner { margin: 12px 0 0; padding: 10px 12px; background: #ffe8c7; border: 1.5px solid #e8a44d; border-radius: var(--r-lg); }
-.unassigned-banner-h { font-size: var(--fs-13); font-weight: 700; color: #b45309; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.unassigned-banner { margin: 12px 0 0; padding: 10px 12px; background: #ffe8c7; border: 1.5px solid var(--sp-orange); border-radius: var(--r-lg); }
+.unassigned-banner-h { font-size: var(--fs-13); font-weight: 700; color: #92400e; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 .unassigned-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
 
 /* ===== 表单段落 ===== */
@@ -3024,8 +3024,8 @@ textarea.textwrap {
 /* 表单工序行：左侧纯黄（拖拽柄+标题）随标题自适应、黄色竖线分界、右半白；备注红字；串件行除外 */
 .form-card-row:not(.part-form-row) .form-card-title {
   display: flex; align-items: center; gap: 2px;
-  background: #FDCA17; border-radius: var(--r-sm);
-  border-right: 2px solid #C9A227;
+  background: var(--proc-yellow); border-radius: var(--r-sm);
+  border-right: 2px solid var(--proc-yellow-line);
   flex: none; max-width: 50%; min-width: 0;
   padding: 1px 3px 1px 1px;
 }
