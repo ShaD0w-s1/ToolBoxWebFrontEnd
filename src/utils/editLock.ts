@@ -64,11 +64,26 @@ export function createEditLockDirective(store: ToolboxStore): {
       el.addEventListener("keydown", touch);
       el.addEventListener("focusout", () => {
         if (state.__focusTimer !== undefined) { clearInterval(state.__focusTimer); state.__focusTimer = undefined; }
+        // ⚠️ 必须用 focus 瞬间的快照键结束会话，绝不能用 binding.value：
+        //    部分单元格的 key 内嵌「正在编辑的字段」——物品行 itemKey 含名称/件号，
+        //    工卡行 rowKeyOf 含工卡号。编辑这些字段时 binding.value 每敲一键就漂移，
+        //    若用当前值 endEdit，会因 editingLocal 查不到该 key 而提前 return：
+        //    旧会话既不保存也不释放 → 变成「幽灵会话」，他人一直看到该格被占用，
+        //    直到 sessionTimeoutMs（2 分钟）空闲超时才被动保存脱离（用户表现为
+        //    「未满 2 分钟自动关闭填写并上传」）。
+        const endKey = state.__lockKey || binding.value;
         state.__lockKey = undefined;
-        store.endEdit(binding.value);
+        store.endEdit(endKey);
       });
     },
     updated(el: HTMLElement, binding: { value: string }) {
+      const state = el as HTMLElement & { __lockKey?: string; __focusTimer?: number };
+      // 编辑中键漂移（名称/件号/工卡号被改动）→ 把会话原地迁移到新键，
+      // 保证 editingLocal 里的键始终等于当前 binding.value，杜绝幽灵会话残留。
+      if (state.__lockKey && state.__lockKey !== binding.value) {
+        store.migrateEditKey(state.__lockKey, binding.value);
+        state.__lockKey = binding.value;
+      }
       applyLockState(el, binding.value);
     },
     unmounted(el: HTMLElement, binding: { value: string }) {

@@ -279,6 +279,18 @@ export function useToolbox() {
     if (pid && f && syncSettings.autoSaveOnEnd) persistFieldOfProject(pid, f);
     void reportEditingHeartbeat();
   }
+  /** 编辑中「锁定键漂移」时原地迁移会话（不动时间戳、不触发保存）。
+   *  背景：部分单元格的 lock key 内嵌其正在编辑的字段（物品行 key 含名称/件号、工卡行 key 含工卡号），
+   *  用户每敲一键 key 就变化。若不迁移，旧键会残留成「幽灵会话」——他人持续看到该格被占用，
+   *  且直到 sessionTimeoutMs 空闲超时才被动保存脱离。迁移后 editingLocal 的键始终与当前 key 一致。 */
+  function migrateEditKey(oldKey: string, newKey: string): void {
+    if (!oldKey || !newKey || oldKey === newKey) return;
+    const ts = editingLocal.get(oldKey);
+    if (ts === undefined) return;
+    editingLocal.delete(oldKey);
+    editingLocal.set(newKey, Date.now());
+    // 不立即上报：逐键上报会打爆接口；由 12s 保活定时器统一把最新快照同步到后端。
+  }
   /** 切项目 / 关页：终止当前项目全部编辑会话（保存并释放）。 */
   function endAllEditing(): void {
     const pid = currentProjectId.value;
@@ -2338,7 +2350,7 @@ export function useToolbox() {
     announcement, setAnnouncement, saveAnnouncement,
     saveLibraryNow, saveCartNow, saveStdLibNow,
     identityName, identityReady, setIdentity, unlockSiteAdmin, onlineCount, startOnlinePing,
-    syncSettings, persistSettings, sessionId, beginEdit, touchEdit, endEdit, endAllEditing, startEditingSync,
+    syncSettings, persistSettings, sessionId, beginEdit, touchEdit, endEdit, migrateEditKey, endAllEditing, startEditingSync,
     isLockedByOther, lockOwnerOf, isEditingHere, editingLocal, editingByOthers, lockVersion,
     saveGantt, queueSaveGantt, applyGanttTemplate, openEngTemplateForEdit,
     saveStandaloneTemplate, applyStandaloneTemplate, openStandaloneTemplateForEdit,
