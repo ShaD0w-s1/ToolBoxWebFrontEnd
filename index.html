@@ -4,15 +4,58 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2f5597" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- ⚠️ 以下 canonical / og:url / og:image 是绝对地址，必须手工维护。
+         部署路径或自定义域名变更时（例如 ICP 备案后换域名），需同步改这三处。 -->
+    <title>工作准备工具站</title>
+    <meta
+      name="description"
+      content="航空定检工作准备协作工具：工作准备单、工卡分配清单、航材与工具清单、换发/APU 甘特准备单，多人实时协同、免登录使用。"
+    />
+    <!-- 内部工具：不收录进搜索引擎。这同时是对「安全边界依赖 URL 保密」的一道加固。
+         若将来需要被搜索收录，把下面这行改为 index, follow 或直接删除。 -->
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="canonical" href="https://da-tool-list-d2g0awsejc0658949-1464163374.tcloudbaseapp.com/workpreparation-01/" />
+
+    <!-- Open Graph：决定链接粘贴到企业微信 / 微信 / 钉钉 / 邮件时的预览卡片 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="工作准备工具站" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:title" content="工作准备工具站" />
+    <meta
+      property="og:description"
+      content="航空定检工作准备协作工具：工作准备单、工卡分配清单、航材与工具清单、换发/APU 甘特准备单，多人实时协同、免登录使用。"
+    />
+    <meta property="og:url" content="https://da-tool-list-d2g0awsejc0658949-1464163374.tcloudbaseapp.com/workpreparation-01/" />
+    <meta property="og:image" content="https://da-tool-list-d2g0awsejc0658949-1464163374.tcloudbaseapp.com/workpreparation-01/favicon-512x512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="工作准备工具站" />
+
+    <!-- Twitter / X 卡片（部分客户端与抓取服务也会读这一组） -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="工作准备工具站" />
+    <meta
+      name="twitter:description"
+      content="航空定检工作准备协作工具：工作准备单、工卡分配清单、航材与工具清单、换发/APU 甘特准备单，多人实时协同、免登录使用。"
+    />
+    <meta name="twitter:image" content="https://da-tool-list-d2g0awsejc0658949-1464163374.tcloudbaseapp.com/workpreparation-01/favicon-512x512.png" />
+
     <link rel="icon" href="./favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="48x48" href="./favicon-48x48.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <link rel="manifest" href="./site.webmanifest" />
-    <title>工作准备工具站</title>
   </head>
   <body>
     <div id="app"></div>
+    <noscript>
+      <p style="font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;padding:32px;color:#1a1f2b">
+        本工具需要启用 JavaScript 才能运行，请在浏览器设置中开启后刷新页面。
+      </p>
+    </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -418,7 +418,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
     <!-- 单项工作模板弹窗（调取/保存共用，与换发/APU 二级页一致：调取=仅加载；保存=新模板+覆盖/改名/删除） -->
     <div v-if="showTplModal" class="tpl-modal" @click.self="showTplModal = false">
       <div class="tpl-modal-card">
-        <div class="tpl-modal-head"><h3>{{ tplMode === 'load' ? '调取模板' : '保存模板' }}</h3><button class="icon-btn" @click="showTplModal = false">×</button></div>
+        <div class="tpl-modal-head"><h3>{{ tplMode === 'load' ? '调取模板' : '保存模板' }}</h3><button class="icon-btn" aria-label="关闭弹窗" @click="showTplModal = false">×</button></div>
         <div v-if="tplMode === 'save'" class="tpl-save-row">
           <input ref="saveTplInputRef" v-model="saveTplName" placeholder="新模板名称" @keydown.enter="saveAsTemplate" />
           <button class="primary" @click="saveAsTemplate">保存为新模板</button>

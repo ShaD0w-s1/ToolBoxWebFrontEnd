@@ -2233,7 +2233,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <div v-for="it in arrangementItems" :key="it.id" class="arrange-item">
                 <label class="gpf"><span class="gpf-label">内容</span><textarea class="textwrap" rows="1" v-model="it.content" @input="queueSave" v-lock="lockKey('arrangeitem', it.id, 'content')"></textarea></label>
                 <label class="gpf"><span class="gpf-label">安排</span><textarea class="textwrap" rows="1" v-model="it.assign" @input="queueSave" v-lock="lockKey('arrangeitem', it.id, 'assign')"></textarea></label>
-                <button class="icon-btn" @click="removeArrangementItem(it.id)">×</button>
+                <button class="icon-btn" aria-label="删除该人员安排" @click="removeArrangementItem(it.id)">×</button>
               </div>
             </div>
             <button class="gp-add" @click="addArrangementItem">+ 新增安排</button>
@@ -2244,7 +2244,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             <div v-for="(c, i) in components" :key="c.id" class="component-card">
               <div class="meta-group-head">
                 <label class="gpf component-name-wrap"><input v-model="c.name" class="component-name-input" :placeholder="`部件卡片 ${i + 1} 名称`" @input="queueSave" v-lock="lockKey('component', c.id, 'name')" /></label>
-                <button class="icon-btn" @click="removeComponent(c.id)">×</button>
+                <button class="icon-btn" aria-label="删除该部件" @click="removeComponent(c.id)">×</button>
               </div>
               <div class="component-cols">
                 <div class="component-col">
@@ -2318,7 +2318,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                   <input v-model="r.label" class="resp-label-input" title="负责内容" @input="queueSave" v-lock="lockKey('resp', r.id, 'label')" />
                   <span class="resp-colon">:</span>
                   <NameSuggest :model-value="r.name" :suggestions="participantSuggestions" placeholder="姓名" @update:model-value="r.name = $event; save()" v-lock="lockKey('resp', r.id, 'name')" />
-                  <button class="icon-btn resp-del" @click="removeResp(chart.id, r.id)">×</button>
+                  <button class="icon-btn resp-del" aria-label="删除该负责项" @click="removeResp(chart.id, r.id)">×</button>
                 </div>
                 <div class="resp-cell resp-add"><button @click="addResp(chart.id)">+ 添加安排</button></div>
               </div>
@@ -2334,7 +2334,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <option v-for="c in dayOptionsExcluding(chart.id)" :key="c.id" :value="c.id">{{ c.label }}</option>
                     </select>
                     <button class="icon-btn" title="在当前位置前插入阶段" @click="insertStage(chart.id, si)">+插</button>
-                    <button class="icon-btn" @click="removeStage(chart.id, si)">×</button>
+                    <button class="icon-btn" aria-label="删除该阶段" @click="removeStage(chart.id, si)">×</button>
                   </div>
                   <div class="form-stage-body">
                     <div v-for="card in cardsOfStage(chart, si)" :key="card.id" class="form-card-row">
@@ -2346,7 +2346,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                       <NameSuggest :model-value="card.participants" :suggestions="participantSuggestions" placeholder="参与人" @update:model-value="card.participants = $event; save()" v-lock="lockKey('card', card.id, 'participants')" />
                       <textarea class="textwrap" rows="1" v-model="card.note" placeholder="备注" @input="queueSave" v-lock="lockKey('card', card.id, 'note')"></textarea>
                       <span v-if="card.endStage > card.startStage" class="fc-span">持续至「{{ chart.stages[card.endStage]?.name }}」</span>
-                      <button class="icon-btn" @click="deleteCard(chart.id, card.id)">×</button>
+                      <button class="icon-btn" aria-label="删除该工序卡" @click="deleteCard(chart.id, card.id)">×</button>
                     </div>
                     <div v-for="x in spRowsOfStage(chart.id, si)" :key="'sp' + x.row.id" class="form-card-row part-form-row">
                       <span class="part-form-tag">{{ x.row.tag ? '（' + x.row.tag + '）' : '' }}{{ x.arr.type }}</span>
@@ -2399,7 +2399,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <div v-for="r in chart.responsibilities" :key="r.id" class="resp-cell">
                   <input v-model="r.label" class="resp-label-input" @input="queueSave" v-lock="lockKey('resp', r.id, 'label')" /><span class="resp-colon">:</span>
                   <NameSuggest :model-value="r.name" :suggestions="participantSuggestions" placeholder="姓名" @update:model-value="r.name = $event; save()" v-lock="lockKey('resp', r.id, 'name')" />
-                  <button class="icon-btn resp-del" @click="removeResp(chart.id, r.id)">×</button>
+                  <button class="icon-btn resp-del" aria-label="删除该负责项" @click="removeResp(chart.id, r.id)">×</button>
                 </div>
                 <div class="resp-cell resp-add"><button @click="addResp(chart.id)">+ 添加安排</button></div>
               </div>
@@ -2497,7 +2497,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <tr v-for="(x, i) in state.docs.wp" :key="'wp' + i">
                   <td><input v-model="(x as any).jc" placeholder="工卡号" @input="queueSave" v-lock="lockKey('docwp', 'row' + i, 'jc')" /></td>
                   <td><input v-model="(x as any).name" placeholder="工卡名称" @input="queueSave" v-lock="lockKey('docwp', 'row' + i, 'name')" /></td>
-                  <td><button class="icon-btn" @click="removeDoc('wp', i)">×</button></td>
+                  <td><button class="icon-btn" aria-label="删除该工包工卡" @click="removeDoc('wp', i)">×</button></td>
                 </tr>
               </tbody>
             </table>
@@ -2520,7 +2520,7 @@ async function importAllXlsx(event: Event): Promise<void> {
                 <tr v-for="(x, i) in state.docs.eng" :key="'eng' + i">
                   <td><input v-model="(x as any).jc" placeholder="工卡号" @input="queueSave" v-lock="lockKey('doceng', 'row' + i, 'jc')" /></td>
                   <td><input v-model="(x as any).name" placeholder="工卡名称" @input="queueSave" v-lock="lockKey('doceng', 'row' + i, 'name')" /></td>
-                  <td><button class="icon-btn" @click="removeDoc('eng', i)">×</button></td>
+                  <td><button class="icon-btn" aria-label="删除该换发工卡" @click="removeDoc('eng', i)">×</button></td>
                 </tr>
               </tbody>
             </table>
@@ -2665,7 +2665,7 @@ async function importAllXlsx(event: Event): Promise<void> {
               <button class="pt-collapse" :title="collapsedCards.has(card.id) ? '展开卡片' : '折叠卡片'" @click="toggleCardCollapse(card.id)">{{ collapsedCards.has(card.id) ? '▸' : '▾' }}</button>
               <input v-model="card.name" class="pt-card-name" placeholder="卡片名称(可输入或搜索串件内容)" list="gp-part-contents" @input="queueSave" v-lock="lockKey('partcard', card.id, 'name')" />
               <span class="pt-count">{{ card.items.length }} 项</span>
-              <button class="icon-btn" @click="removePartList(partKind, card.id)">×</button>
+              <button class="icon-btn" aria-label="删除该串件清单卡片" @click="removePartList(partKind, card.id)">×</button>
             </div>
             <template v-if="!collapsedCards.has(card.id)">
             <div v-if="card.items.length" class="itg" :style="{ gridTemplateColumns: tab === 'airparts' ? '1.55fr 1.55fr 0.6fr 2.2fr auto' : '2fr 0.6fr 2.2fr auto' }">
@@ -2699,7 +2699,7 @@ async function importAllXlsx(event: Event): Promise<void> {
       <!-- 模板库弹窗：调取模式=仅加载；保存模式=保存为新模板 + 覆盖/改名/删除 -->
       <div v-if="showTplModal" class="gp-modal" @click.self="showTplModal = false">
         <div class="gp-modal-card">
-          <div class="gp-modal-head"><h3>{{ tplMode === 'load' ? '调取模板' : '保存模板' }}</h3><button class="icon-btn" @click="showTplModal = false">×</button></div>
+          <div class="gp-modal-head"><h3>{{ tplMode === 'load' ? '调取模板' : '保存模板' }}</h3><button class="icon-btn" aria-label="关闭弹窗" @click="showTplModal = false">×</button></div>
           <div v-if="tplMode === 'save'" class="gp-save-tpl-row">
             <input ref="saveTplInputRef" v-model="saveTplName" placeholder="新模板名称" @keydown.enter="saveAsTemplate" />
             <button class="primary" @click="saveAsTemplate">保存为新模板</button>
