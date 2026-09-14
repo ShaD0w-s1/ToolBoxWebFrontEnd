@@ -729,7 +729,7 @@ async function batchDeleteNoDate(): Promise<void> {
   flex: 1 1 0;
   min-width: 0;
   padding: 5px 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--n4);
   border-radius: var(--r-sm);
   font-size: var(--fs-14);
 }
@@ -742,7 +742,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .site-admin-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; background: rgba(17, 24, 39, 0.45); }
 .site-admin-card { width: min(560px, calc(100% - 48px)); max-height: none; margin: 24px auto; padding: 20px 24px; background: var(--n0); border-radius: var(--r-lg); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
 .site-admin-newtpl { display: flex; gap: 8px; margin-bottom: 12px; }
-.site-admin-newtpl input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); }
+.site-admin-newtpl input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-13); }
 .site-admin-newtpl .primary { flex: 0 0 auto; }
 /* 模板弹窗模糊搜索 */
 .tpl-search { position: relative; flex: 1 1 180px; min-width: 180px; display: block; }
@@ -784,7 +784,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .list-side {
   min-width: 0;
   display: flex; flex-direction: column; gap: 12px;
-  background: var(--n0); border: 1px solid var(--line); border-radius: var(--r-lg);
+  background: var(--n0); border: 1px solid var(--n4); border-radius: var(--r-lg);
   padding: 14px;
 }
 .list-main { flex: 1 1 66.6667%; min-width: 0; }
@@ -795,7 +795,7 @@ async function batchDeleteNoDate(): Promise<void> {
 }
 .side-row { display: flex; gap: 8px; }
 .side-row button { flex: 1; }
-.side-divider { height: 1px; background: var(--line); margin: 2px 0; }
+.side-divider { height: 1px; background: var(--n4); margin: 2px 0; }
 .side-title { font-size: var(--fs-14); font-weight: 700; color: var(--n8); }
 .side-field { display: flex; flex-direction: column; gap: 6px; }
 .side-label { font-size: var(--fs-12); font-weight: 600; color: var(--n9); }
@@ -859,10 +859,10 @@ async function batchDeleteNoDate(): Promise<void> {
 .settings-field { display: flex; flex-direction: column; gap: 6px; }
 .settings-field > label { font-weight: 600; font-size: var(--fs-13, 13px); color: var(--text, var(--n8)); }
 .settings-field select {
-  padding: 7px 10px; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-md, 8px);
+  padding: 7px 10px; border: 1px solid var(--n4); border-radius: var(--r-md, 8px);
   font-size: var(--fs-13, 13px); background: var(--n0, #fff); font-family: inherit;
 }
-.settings-field span { font-size: var(--fs-12, 12px); color: var(--muted, var(--n7)); line-height: 1.5; }
+.settings-field span { font-size: var(--fs-12, 12px); color: var(--n7); line-height: 1.5; }
 .settings-toggle { flex-direction: row; align-items: center; gap: 8px; font-weight: 400 !important; }
 .settings-toggle input { width: 16px; height: 16px; accent-color: var(--proc-yellow); }
 /* 设置卡内行式操作（日期区间+导出 / 数据维护按钮） */

@@ -534,7 +534,7 @@ async function exportCurrentState(displayCats?: string[]): Promise<void> {
   gap: 14px;
   padding: 28px 36px;
   background: var(--n0);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 .sync-overlay-card p {
@@ -569,12 +569,12 @@ async function exportCurrentState(displayCats?: string[]): Promise<void> {
   gap: 12px;
   padding: 28px 32px;
   background: var(--n0);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
   width: min(360px, calc(100% - 48px));
 }
 .identity-modal-card h3 { margin: 0; color: #333; font-size: 17px; }
 .identity-hint { margin: 0; color: #888; font-size: 13px; line-height: 1.5; }
-.identity-modal-card input { padding: 8px 12px; border: 1px solid #d7dbe4; border-radius: 6px; font-size: 15px; }
+.identity-modal-card input { padding: 8px 12px; border: 1px solid #d7dbe4; border-radius: var(--r-sm); font-size: 15px; }
 .identity-actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

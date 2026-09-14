@@ -457,24 +457,24 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .field-label { font-size: var(--fs-13); color: #000; font-weight: 500; }
 .prep-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 14px; margin-bottom: 8px; }
 .prep-field { display: flex; flex-direction: column; gap: 4px; }
-.prep-field input, .prep-field textarea { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.prep-field input, .prep-field textarea { padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .special-config { color: var(--danger) !important; font-weight: 700 !important; }
 .prep-personnel-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
 .prep-personnel-cell { display: flex; flex-direction: column; gap: 4px; }
-.prep-personnel-cell input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.prep-personnel-cell input { padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .prep-personnel-fullrow { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
-.prep-personnel-fullrow textarea { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); resize: vertical; }
+.prep-personnel-fullrow textarea { padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); resize: vertical; }
 .prep-extra-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .prep-extra-item { display: flex; gap: 6px; align-items: stretch; }
-.extra-title { flex: 0 0 18%; min-width: 80px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
-.extra-value { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.extra-title { flex: 0 0 18%; min-width: 80px; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.extra-value { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .danger-cell { padding: 6px 10px; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: var(--fs-12); cursor: pointer; }
 .prep-block-actions { margin-top: 10px; display: flex; gap: 8px; }
 .sp-works { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .sp-work-row { display: flex; gap: 6px; align-items: stretch; }
 .sp-idx { flex: 0 0 24px; display: flex; align-items: center; justify-content: center; color: var(--n6); font-size: var(--fs-13); }
-.sp-w-no { flex: 0 0 22%; min-width: 90px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
-.sp-w-content { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.sp-w-no { flex: 0 0 22%; min-width: 90px; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.sp-w-content { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .sp-parts { display: flex; flex-direction: column; gap: 10px; }
 /* 工序组卡列表：与部件信息 sp-parts 一致的纵向等距排列 */
 .sp-groups { display: flex; flex-direction: column; gap: 10px; }
@@ -486,7 +486,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-group-card { border: 1px solid var(--n3); border-radius: var(--r-md); padding: 10px 12px; background: var(--n1); }
 /* 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） */
 .sp-process-list { display: flex; flex-direction: column; gap: 6px; }
-.sp-process-card { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); padding: 3px 6px; background: var(--n0); }
+.sp-process-card { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--n4); border-radius: var(--r-sm); padding: 3px 6px; background: var(--n0); }
 .sp-process-card .sp-card-title {
   display: flex; align-items: center; gap: 2px;
   background: var(--proc-yellow); border-radius: var(--r-sm);
@@ -500,11 +500,11 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   flex: 1; min-width: 27em; max-width: 54em; border: none; background: transparent;
   font-size: var(--fs-13); font-weight: 600; color: #000; padding: 2px 4px;
 }
-.sp-process-card .sp-card-title textarea:focus { background: var(--n0); border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark, var(--blue-dark)); }
+.sp-process-card .sp-card-title textarea:focus-visible { background: var(--n0); border-radius: var(--r-xs); outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark); }
 .sp-process-card .sp-cell { flex: 1; min-width: 90px; }
 /* 人员安排/检测&必检/备注：淡灰底，聚焦白底 */
 .sp-process-card .sp-assign, .sp-process-card .sp-check, .sp-process-card .sp-note { background: var(--n1); }
-.sp-process-card .sp-assign:focus, .sp-process-card .sp-check:focus, .sp-process-card .sp-note:focus { background: var(--n0); }
+.sp-process-card .sp-assign:focus-visible, .sp-process-card .sp-check:focus-visible, .sp-process-card .sp-note:focus-visible { background: var(--n0); }
 /* 人员安排：flex:1 自适应，填满工序行剩余长度（检测&必检 8em / 备注 15em / × 固定宽除外） */
 .sp-process-card .sp-assign { flex: 1 1 0%; min-width: 90px; }
 /* 检测&必检：限宽约 8 个中文字符 */
@@ -522,7 +522,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 /* 拖拽占位虚线框（参照换发 drag-ghost：蓝色虚线 + 淡蓝底） */
 .drag-ghost {
   position: fixed; z-index: 998; pointer-events: none;
-  border: 1.5px dashed var(--blue, var(--blue)); background: rgba(68, 114, 196, .08);
+  border: 1.5px dashed var(--blue); background: rgba(68, 114, 196, .08);
   border-radius: var(--r-sm);
 }
 .table-wrap { overflow-x: auto; }
@@ -530,18 +530,18 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-table th, .sp-table td { border: 1px solid var(--n3); padding: 4px; text-align: left; font-size: var(--fs-13); vertical-align: top; }
 .sp-table th { background: var(--n1); font-weight: 600; color: #000; }
 .sp-cell { width: 100%; box-sizing: border-box; padding: 5px 6px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; line-height: 1.5; font-family: inherit; }
-.sp-cell:focus { border-color: var(--focus); background: var(--n0); }
+.sp-cell:focus-visible { border-color: var(--focus); background: var(--n0); }
 .sp-group-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: #4a5160; }
-.sp-group-name:hover, .sp-group-name:focus { border-color: var(--focus); background: var(--n0); }
+.sp-group-name:hover, .sp-group-name:focus-visible { border-color: var(--focus); background: var(--n0); }
 .sp-part-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: #4a5160; }
-.sp-part-name:hover, .sp-part-name:focus { border-color: var(--focus); background: var(--n0); }
+.sp-part-name:hover, .sp-part-name:focus-visible { border-color: var(--focus); background: var(--n0); }
 /* 单项工作模板弹窗 */
 .tpl-modal { position: fixed; inset: 0; z-index: 300; background: rgba(15, 23, 42, .45); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px 20px; }
 .tpl-modal-card { background: var(--n0); border-radius: var(--r-lg); padding: 18px 20px; width: 520px; max-width: 100%; margin: 0 auto; box-shadow: 0 8px 30px rgba(0, 0, 0, .18); }
 .tpl-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .tpl-modal-head h3 { font-size: var(--fs-16); margin: 0; color: #222; }
 .tpl-save-row { display: flex; gap: 8px; margin-bottom: 12px; }
-.tpl-save-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); }
+.tpl-save-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-13); }
 .tpl-empty { color: var(--n7); font-size: var(--fs-13); text-align: center; padding: 14px 0; }
 /* 模板列表滚动区：最多显示 8 条模板，超出纵向滚动下移。
    --tpl-row-h = 操作按钮 36px + 上下 padding 16px + 边框 2px，与真实行高对齐。 */
@@ -582,9 +582,9 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 }
 
 /* 模板弹窗模糊搜索行 */
-.gp-tpl-search { display: flex; align-items: center; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--line, var(--n4)); }
-.gp-tpl-search input { flex: 1; height: 32px; padding: 0 10px; border: 1.5px solid var(--line, var(--n4)); border-radius: var(--r-md); font-size: var(--fs-13); font-family: inherit; }
-.gp-tpl-search input:focus { border-color: var(--focus); outline: none; }
+.gp-tpl-search { display: flex; align-items: center; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--n4); }
+.gp-tpl-search input { flex: 1; height: 32px; padding: 0 10px; border: 1.5px solid var(--n4); border-radius: var(--r-md); font-size: var(--fs-13); font-family: inherit; }
+.gp-tpl-search input:focus-visible { border-color: var(--focus); outline: none; }
 .gp-tpl-search .clear-btn { border: none; background: none; color: var(--n7, #888); font-size: 15px; line-height: 1; cursor: pointer; }
 
 /* 人名联想格（工序行）：输入框融入原 sp-cell 视觉（透明底融入卡片，聚焦显边） */
@@ -592,8 +592,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-process-card :deep(.ns-wrap.sp-check textarea.ns-input) {
   border-color: transparent; background: var(--n1); padding: 5px 6px; font-size: var(--fs-13);
 }
-.sp-process-card :deep(.ns-wrap.sp-assign textarea.ns-input:focus),
-.sp-process-card :deep(.ns-wrap.sp-check textarea.ns-input:focus) { background: var(--n0); border-color: var(--focus); }
+.sp-process-card :deep(.ns-wrap.sp-assign textarea.ns-input:focus-visible),
+.sp-process-card :deep(.ns-wrap.sp-check textarea.ns-input:focus-visible) { background: var(--n0); border-color: var(--focus); }
 /* 参与人员整行联想：占满宽度 */
 .prep-personnel-fullrow .ns-wrap { width: 100%; }
 </style>

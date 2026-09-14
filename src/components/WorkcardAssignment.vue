@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
 .wa-card-head h4 { margin: 0; background: var(--sec-bg, var(--n1)); color: var(--n8); padding: 5px 10px; border-radius: var(--r-sm); display: inline-flex; align-items: center; }
 .wa-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
 /* 工卡安排标题前的缩进/放出箭头 */
-.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); background: var(--n0); color: var(--n7); font-size: var(--fs-12); line-height: 1; cursor: pointer; flex-shrink: 0; }
+.wa-indent-arrow { width: 22px; height: 22px; padding: 0; margin-right: 6px; border: 1px solid var(--n4); border-radius: var(--r-sm); background: var(--n0); color: var(--n7); font-size: var(--fs-12); line-height: 1; cursor: pointer; flex-shrink: 0; }
 .wa-indent-arrow:hover { border-color: var(--blue); color: var(--blue-dark); }
 .wa-indent-arrow.off { color: #a8b2c4; }
 
@@ -497,7 +497,7 @@ onBeforeUnmount(() => {
 .wa-personnel { margin-bottom: 10px; }
 .wa-person { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-13); color: #000; }
 .wa-person span { font-size: var(--fs-12); color: var(--n7); }
-.wa-person input { padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.wa-person input { padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .wa-person-top { margin-bottom: 8px; }
 .wa-person-top .wa-full { margin-bottom: 6px; }
 .wa-person-second { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 12px; margin-bottom: 8px; }
@@ -507,8 +507,8 @@ onBeforeUnmount(() => {
 .add-arrange { margin: 2px 0 8px; }
 .wa-arrange-list { margin-bottom: 8px; }
 .wa-arrange-row { display: flex; gap: 6px; align-items: center; max-width: calc(var(--wa-col) * 1.7); margin-bottom: 6px; }
-.wa-arrange-name { flex: 0.7 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
-.wa-arrange-person { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.wa-arrange-name { flex: 0.7 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
+.wa-arrange-person { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .wa-arrange-del { flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: var(--fs-16); cursor: pointer; }
 
 /* 工卡安排表格（比例列宽 + 宽列换行显示） */
@@ -532,7 +532,7 @@ onBeforeUnmount(() => {
 .wa-cell input,
 .wa-cell select {
   width: 100%; box-sizing: border-box; padding: 5px 6px;
-  border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0;
+  border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0;
 }
 /* 工卡分级列：网页版字号与工卡名称一致（13px），移动端在 media query 内缩小 */
 .wa-cell select {
@@ -571,7 +571,7 @@ onBeforeUnmount(() => {
 .wa-cell input:disabled { background: #f2f4f7; color: #98a2b3; }
 .wa-cell.wa-wrap textarea {
   width: 100%; box-sizing: border-box; padding: 5px 6px;
-  border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13);
+  border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-13);
   resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word;
   line-height: 1.7; min-width: 0; font-family: inherit;
 }
@@ -602,7 +602,7 @@ onBeforeUnmount(() => {
 .wa-temp-tag {
   display: inline-block; margin-left: 6px; vertical-align: 1px;
   font-size: var(--fs-11, 11px); font-weight: 600; color: #8a6d1a;
-  background: #f7efd8; border: 1px solid #e3cf96; border-radius: 999px; padding: 0 8px; line-height: 1.7;
+  background: #f7efd8; border: 1px solid #e3cf96; border-radius: var(--r-pill); padding: 0 8px; line-height: 1.7;
 }
 .wa-sec-name {
   border: 1px dashed transparent; background: transparent; border-radius: var(--r-sm, 6px);
@@ -610,7 +610,7 @@ onBeforeUnmount(() => {
   min-width: 4em; max-width: 12em; padding: 1px 4px; margin: 0 2px; font-family: inherit;
 }
 .wa-sec-name:hover { border-color: #e3cf96; background: #fffdf4; }
-.wa-sec-name:focus { outline: none; border-color: var(--focus); background: var(--n0); color: var(--n8); }
+.wa-sec-name:focus-visible { outline: none; border-color: var(--focus); background: var(--n0); color: var(--n8); }
 .wa-sec-suffix { margin-left: 2px; }
 .wa-del-group { color: var(--danger, #b53a3a); border-color: #f2cdcd; background: #fdecec; }
 .wa-del-group:hover { background: var(--danger-bg-hover); }

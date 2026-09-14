@@ -97,17 +97,17 @@ function blurHide(): void {
 <style scoped>
 .ns-wrap { position: relative; flex: 1 1 0; min-width: 0; width: 100%; }
 .ns-input {
-  width: 100%; min-height: 28px; padding: 0 6px; border: 1px solid var(--line, var(--n4));
+  width: 100%; min-height: 28px; padding: 0 6px; border: 1px solid var(--n4);
   border-radius: var(--r-sm); font-size: var(--fs-13); background: var(--n0); resize: none; overflow: hidden;
   line-height: 1.4; word-break: break-word; overflow-wrap: break-word; white-space: pre-wrap;
   font-family: inherit; box-sizing: border-box; field-sizing: content; display: block;
 }
-.ns-input:focus { border-color: var(--focus); outline: none; }
+.ns-input:focus-visible { border-color: var(--focus); outline: none; }
 .ns-list {
   position: absolute; top: 100%; left: 0; right: 0; z-index: 3000; margin: 2px 0 0; padding: 4px;
-  list-style: none; background: var(--n0); border: 1px solid var(--line, var(--n4)); border-radius: var(--r-md);
+  list-style: none; background: var(--n0); border: 1px solid var(--n4); border-radius: var(--r-md);
   box-shadow: 0 8px 24px rgba(0,0,0,.12); max-height: 220px; overflow-y: auto;
 }
-.ns-list li { padding: 6px 10px; font-size: var(--fs-13); color: var(--blue-dark, var(--blue-dark)); border-radius: var(--r-sm); cursor: pointer; }
+.ns-list li { padding: 6px 10px; font-size: var(--fs-13); color: var(--blue-dark); border-radius: var(--r-sm); cursor: pointer; }
 .ns-list li:hover { background: var(--blue-light, var(--blue-light)); }
 </style>

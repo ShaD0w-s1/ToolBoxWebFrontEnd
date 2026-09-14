@@ -179,7 +179,7 @@ async function supplementWork(sub: string): Promise<void> {
  * 此处仅保留航材子卡特有：子卡折叠按钮与「工作名」输入框。 */
 .sub-collapse { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: var(--fs-16); line-height: 1; color: #4a5160; flex: 0 0 auto; }
 .type-name { flex: 1 1 0; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-14); }
-.type-name:hover, .type-name:focus { border-color: var(--focus); background: var(--n0); }
+.type-name:hover, .type-name:focus-visible { border-color: var(--focus); background: var(--n0); }
 @media (max-width: 768px) {
   .sub-grid { grid-template-columns: 1fr !important; }
 }

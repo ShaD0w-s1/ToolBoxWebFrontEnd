@@ -149,7 +149,7 @@ function hasSpecialConfig(value: string): boolean {
 /* 与筛选条件卡片同级：白底 + 同款边框/圆角/内边距，独立成一卡。 */
 .aq-card {
   display: flex; flex-direction: column; gap: 10px;
-  padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 14px; border: 1px solid var(--n4); border-radius: var(--r-lg);
   background: var(--n0);
 }
 .aq-head { display: flex; align-items: center; gap: 8px; }
@@ -177,7 +177,7 @@ function hasSpecialConfig(value: string): boolean {
 .aq-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .aq-cell, .aq-block {
   display: flex; flex-direction: column; gap: 2px;
-  padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm);
   background: var(--n0); min-width: 0;
 }
 .aq-body dt { font-size: var(--fs-10); font-weight: 700; color: var(--n7); letter-spacing: .3px; }

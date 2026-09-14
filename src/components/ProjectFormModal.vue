@@ -112,7 +112,7 @@ async function submit(): Promise<void> {
   transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
 }
 .pfm-field input:hover, .pfm-field select:hover { border-color: var(--n5); }
-.pfm-field input:focus, .pfm-field select:focus {
+.pfm-field input:focus-visible, .pfm-field select:focus-visible {
   outline: none; background: var(--n0); border-color: var(--blue);
   box-shadow: 0 0 0 3px rgba(68, 114, 196, .16);
 }

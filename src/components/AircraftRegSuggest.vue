@@ -96,16 +96,16 @@ function blurHide(): void {
 .ars-wrap { position: relative; width: 100%; min-width: 0; display: block; }
 .ars-input {
   width: 100%; box-sizing: border-box; padding: 6px 8px; min-height: 30px;
-  border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm);
+  border: 1px solid var(--n4); border-radius: var(--r-sm);
   font-size: var(--fs-13, 13px); font-family: inherit; color: inherit;
   background: var(--n0); line-height: 1.4;
 }
-.ars-input:focus { border-color: var(--focus); outline: none; }
+.ars-input:focus-visible { border-color: var(--focus); outline: none; }
 .ars-input:disabled { opacity: .7; }
 .ars-list {
   position: absolute; top: 100%; left: 0; right: 0; z-index: 3000;
   margin: 2px 0 0; padding: 4px; list-style: none; background: var(--n0);
-  border: 1px solid var(--line, var(--n4)); border-radius: var(--r-md);
+  border: 1px solid var(--n4); border-radius: var(--r-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .12); max-height: 230px; overflow-y: auto;
   text-align: left;
 }
