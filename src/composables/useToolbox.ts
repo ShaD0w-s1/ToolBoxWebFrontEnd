@@ -75,6 +75,38 @@ function listDocuments(payload: ApiEnvelope<unknown>): unknown[] {
   return [];
 }
 
+/** 同步域：与后端 `api/sync_domains.py` 的 `SYNC_DOMAINS` 一一对应。
+ *  后端 `poll` 返回各域的修订值，前端据此**只重拉真正变化的域**对应的端点，
+ *  而不是每次变化都重拉全部 12 个端点（实测约 1.4 MB）。
+ *
+ *  ⚠️ 域名与端点集合是前后端契约，改一侧必须同步另一侧。
+ *     后端 `scripts/check_sync_domains.py` 会核对这份映射的一致性。 */
+type SyncDomain =
+  | "projects"
+  | "templates"
+  | "stdlibs"
+  | "cart"
+  | "announcement"
+  | "control"
+  | "syncTemplates";
+
+/** 域 → `loadRemote` 需要请求的端点。
+ *  空数组表示该域不参与全量重拉（模板库 / 现场管控单由页面按需拉取）。 */
+const DOMAIN_ENDPOINTS: Record<SyncDomain, string[]> = {
+  projects: ["/api/projects/"],
+  templates: ["/api/templates/<type>/", "/api/material-templates/<type>/"],
+  stdlibs: ["/api/standard-libraries/<key>/", "/api/aircraft-numbers/"],
+  cart: ["/api/tool-cart/"],
+  announcement: ["/api/announcement/"],
+  control: [],
+  syncTemplates: [],
+};
+
+/** 参与全量重拉的域：只有这些域变化时才需要发起请求。 */
+const PULLABLE_DOMAINS: SyncDomain[] = (
+  Object.keys(DOMAIN_ENDPOINTS) as SyncDomain[]
+).filter((domain) => DOMAIN_ENDPOINTS[domain].length > 0);
+
 export function useToolbox() {
   const app = ref(loadCache());
   const screen = ref<Screen>("list");
@@ -1939,38 +1971,59 @@ export function useToolbox() {
     });
   }
 
-  async function loadRemote(merge = false, showOverlay = true): Promise<void> {
+  /** 从后端拉取数据。
+   *
+   *  @param merge       是否字段级合并（只影响结果如何应用，与请求范围无关）
+   *  @param showOverlay 是否显示全屏同步遮罩
+   *  @param domains     只拉取这些域（分域增量拉取）；不传 = 全量拉取
+   *  @returns 是否成功应用 —— 失败时调用方**不应前进同步基线**，以便下一轮重试，
+   *           避免「基线已前进但没拉到」造成静默漏同步。
+   *
+   *  ⚠️ 分域拉取时，未列入 `domains` 的字段必须走「保留本地状态」分支，
+   *     否则会被重置为默认值（静默清空）。各字段处均有对应守卫。
+   */
+  async function loadRemote(merge = false, showOverlay = true, domains?: SyncDomain[] | null): Promise<boolean> {
+    const scoped = Array.isArray(domains);
+    const need = (domain: SyncDomain): boolean => !scoped || (domains as SyncDomain[]).includes(domain);
     if (showOverlay) syncing.value = true;
     cloud.text = "正在连接 Django 后端…";
     try {
-      const status = await backend.status();
-      if (!status.configured) {
-        cloud.text = "后端已连接 · CloudBase 尚未配置";
-        cloud.state = "warn";
-        return;
+      // 分域拉取由 poll 成功触发，说明后端可达，不必再查一次健康状态。
+      if (!scoped) {
+        const status = await backend.status();
+        if (!status.configured) {
+          cloud.text = "后端已连接 · CloudBase 尚未配置";
+          cloud.state = "warn";
+          return false;
+        }
       }
       const [projects, a320, b787, ma320, mb787, cart, aiLib, wc320, ann, cfg, nums] = await Promise.all([
-        backend.listProjects(),
-        backend.getTemplate("A320").catch(() => null),
-        backend.getTemplate("B787").catch(() => null),
-        backend.getMaterialTemplate("A320").catch(() => null),
-        backend.getMaterialTemplate("B787").catch(() => null),
-        backend.getToolCart().catch(() => null),
+        need("projects") ? backend.listProjects() : Promise.resolve(null),
+        need("templates") ? backend.getTemplate("A320").catch(() => null) : Promise.resolve(null),
+        need("templates") ? backend.getTemplate("B787").catch(() => null) : Promise.resolve(null),
+        need("templates") ? backend.getMaterialTemplate("A320").catch(() => null) : Promise.resolve(null),
+        need("templates") ? backend.getMaterialTemplate("B787").catch(() => null) : Promise.resolve(null),
+        need("cart") ? backend.getToolCart().catch(() => null) : Promise.resolve(null),
         // 飞机信息读取已放开为公开（2026-09-06，后端 GET 不再要求 AIRNAV token）：
         // 无条件全量拉取到本地，机号回填/下拉全部本地命中，输入框不依赖逐机号网络单查。
-        backend.getStandardLibrary("aircraft_info").catch(() => null),
-        backend.getStandardLibrary("workcard_320").catch(() => null),
-        backend.getAnnouncement().catch(() => null),
-        backend.getConfig().catch(() => null),
-        backend.getAircraftNumbers().catch(() => null),
+        need("stdlibs") ? backend.getStandardLibrary("aircraft_info").catch(() => null) : Promise.resolve(null),
+        need("stdlibs") ? backend.getStandardLibrary("workcard_320").catch(() => null) : Promise.resolve(null),
+        need("announcement") ? backend.getAnnouncement().catch(() => null) : Promise.resolve(null),
+        // 运行时配置（watch 开关/阈值）没有写入端点、不属于任何域，只在全量拉取时更新。
+        scoped ? Promise.resolve(null) : backend.getConfig().catch(() => null),
+        need("stdlibs") ? backend.getAircraftNumbers().catch(() => null) : Promise.resolve(null),
       ]);
       // 公开机号列表（不依赖 AIRNAV 授权），供机号下拉模糊搜索。
       const numsData = nums?.data;
       if (Array.isArray(numsData)) aircraftNumberList.value = numsData.filter((n): n is string => typeof n === "string");
       // 远端配置下发：watch 开关与阈值（方案C）。
+      // 仅在非分域（全量）拉取时更新：分域拉取不会请求 config，若照常赋值会把
+      // watch 开关误置为 false，等于无声关闭实时推送。
       const cfgDoc = unwrapDocument(cfg?.data);
-      watchEnabled = Boolean(cfgDoc?.watch_enabled);
-      watchMaxUsers = Number.parseInt(String(cfgDoc?.watch_max_users ?? "10"), 10) || 10;
+      if (!scoped) {
+        watchEnabled = Boolean(cfgDoc?.watch_enabled);
+        watchMaxUsers = Number.parseInt(String(cfgDoc?.watch_max_users ?? "10"), 10) || 10;
+      }
       const a320Document = unwrapDocument(a320?.data);
       const b787Document = unwrapDocument(b787?.data);
       const ma320Document = unwrapDocument(ma320?.data);
@@ -1985,7 +2038,11 @@ export function useToolbox() {
       };
       const cartDocument = unwrapDocument(cart?.data);
       const cartItems = Array.isArray(cartDocument?.items) ? cartDocument.items as Array<Record<string, unknown>> : [];
-      const toolCart: ToolCartItem[] = cartItems.map((item) => ({ name: String(item.name || ""), qty: Math.max(0, Number.parseInt(String(item.quantity ?? item.qty), 10) || 0) }));
+      // 未拉取 cart 域时保留本地工具车。用 need() 而不是「文档是否存在」判断，
+      // 才能同时保留「远端清空 → 本地也清空」的原有语义。
+      const toolCart: ToolCartItem[] = need("cart")
+        ? cartItems.map((item) => ({ name: String(item.name || ""), qty: Math.max(0, Number.parseInt(String(item.quantity ?? item.qty), 10) || 0) }))
+        : app.value.toolCart;
       const stdLibs = defaultStandardLibraries();
       const aiDoc = unwrapDocument(aiLib?.data);
       const wc320Doc = unwrapDocument(wc320?.data);
@@ -1995,13 +2052,21 @@ export function useToolbox() {
         // 拉取失败/为空时保留本地已有的飞机信息（不因单次网络失败而清空）。
         stdLibs.aircraft_info = app.value.standardLibraries.aircraft_info || stdLibs.aircraft_info;
       }
-      if (wc320Doc && Array.isArray(wc320Doc.rows)) stdLibs.workcard_320 = normalizeStdLib({ rows: wc320Doc.rows as StandardLibRow[] });
+      if (wc320Doc && Array.isArray(wc320Doc.rows)) {
+        stdLibs.workcard_320 = normalizeStdLib({ rows: wc320Doc.rows as StandardLibRow[] });
+      } else {
+        // 没拿到行数据就保留本地（含分域跳过、单次请求失败两种情形）：
+        // 否则工卡标准库会被重置成空库，属于静默失效。
+        stdLibs.workcard_320 = app.value.standardLibraries.workcard_320 || stdLibs.workcard_320;
+      }
       const annDoc = unwrapDocument(ann?.data);
-      if (!merge || !announcementDirty) {
+      // need() 守卫：未拉取公告域时不能赋值，否则会把公告清空。
+      if (need("announcement") && (!merge || !announcementDirty)) {
         announcement.value = String(annDoc?.content || "");
         announcementDirty = false;
       }
-      const remoteProjects = listDocuments(projects).map(projectFromDocument);
+      // 未拉取 projects 域时沿用本地数组：既不清空，也让下游合并自然成为空操作。
+      const remoteProjects = projects ? listDocuments(projects).map(projectFromDocument) : app.value.projects;
       if (merge) {
         applyRemoteMerge({ libraries, materialLibraries, projects: remoteProjects, toolCart, standardLibraries: stdLibs });
       } else {
@@ -2013,10 +2078,12 @@ export function useToolbox() {
       cloud.text = "已连接 Django · 数据已同步";
       cloud.state = "ok";
       syncRealtimeMode();
+      return true;
     } catch (error) {
       cloud.text = "后端连接失败 · 正在使用本地缓存";
       cloud.state = "err";
       notify(errorMessage(error, "无法连接后端"));
+      return false;
     } finally {
       if (showOverlay) syncing.value = false;
     }
@@ -2045,16 +2112,62 @@ export function useToolbox() {
     }
   }
 
-  /** 单次轮询：revision 有变化则做字段级合并。
+  /** 上次各域的修订值；空对象表示尚未建立基线。 */
+  let lastDomains: Record<string, string> = {};
+
+  /** 依据 poll 结果决定拉取范围，返回「是否可以前进同步基线」。
+   *
+   *  - 支持分域的后端：只拉变化的域，其余端点一个请求都不发。
+   *  - 旧后端（无 `scope` 标记）：沿用「有变化就全量拉取」的旧行为。
+   *  - 前端未知的新域：安全降级为全量，避免「静默漏同步」。
+   *  - 拉取失败返回 false → 调用方保留旧基线，下一轮 poll 自动重试。 */
+  async function applyPollResult(result: ApiEnvelope): Promise<boolean> {
+    const scope = typeof result.scope === "string" ? result.scope : "";
+    const domains = result.domains && typeof result.domains === "object"
+      ? result.domains as Record<string, string>
+      : undefined;
+    if (scope !== "domains") {
+      // 旧后端只能判断「有变化」，无法区分域。
+      return result.changed === true ? loadRemote(true, false) : true;
+    }
+    // 后端未附带域映射 = 明确告知「本轮到目前无变化」（空闲时省流量）。
+    if (!domains) return true;
+    if (!Object.keys(lastDomains).length) {
+      // 首次拿到映射：只建立基线。首屏数据已由 loadRemote 全量拉过，无需再拉。
+      lastDomains = { ...domains };
+      return true;
+    }
+    const changedDomains = Object.keys(domains).filter((name) => domains[name] !== lastDomains[name]);
+    if (!changedDomains.length) {
+      lastDomains = { ...domains };
+      return true;
+    }
+    // 未知域 = 后端新增了域而前端还没跟上 → 无法判断该拉哪些端点。
+    // 安全降级为全量，这是分域方案「静默漏同步」风险的主要防线。
+    if (changedDomains.some((name) => !(name in DOMAIN_ENDPOINTS))) {
+      const applied = await loadRemote(true, false);
+      if (applied) lastDomains = { ...domains };
+      return applied;
+    }
+    // 只有参与全量重拉的域需要请求；control / syncTemplates 由页面按需拉取。
+    const pullable = changedDomains.filter((name): name is SyncDomain =>
+      (PULLABLE_DOMAINS as string[]).includes(name),
+    );
+    const applied = pullable.length ? await loadRemote(true, false, pullable) : true;
+    if (applied) lastDomains = { ...domains };
+    return applied;
+  }
+
+  /** 单次轮询：按变化的域做增量拉取（字段级合并）。
    *  注意：不做「保存后重设基线」——那会越过别端的变更导致漏同步；
-   *  保存后的轮询会检测到自己的写入并触发一次合并，等价于把最新远端拉齐。 */
+   *  保存后的轮询会检测到自己的写入并触发一次合并，等价于把最新远端拉齐。
+   *  基线只在变更真正落地（loadRemote 成功）后前进，失败则下一轮自动重试。 */
   async function pollOnce(): Promise<void> {
     if (pollingPaused || syncing.value || remoteSaving.value) { scheduleNextPoll(); return; }
     try {
       const result = await backend.poll(lastRevision);
-      lastRevision = String(result.revision || lastRevision);
       consecutiveFailures = 0;
-      if (result.changed) await loadRemote(true, false);
+      if (await applyPollResult(result)) lastRevision = String(result.revision || lastRevision);
     } catch {
       consecutiveFailures += 1;
       if (consecutiveFailures >= 3) {

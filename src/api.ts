@@ -103,8 +103,17 @@ export const backend = {
       { method: "POST", body: payload },
     ),
   deleteProject: (id: string) => request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "DELETE" }),
+  /** 轻量轮询：`revision` 为全局修订值（向后兼容），`domains` 为各域修订值。
+   *  `scope === "domains"` 表示后端支持分域同步；此时 `domains` 仅在「有变化」
+   *  或「客户端无基线」时返回，为空表示确认无变化（省流量）。 */
   poll: (revision?: string) =>
-    request<ApiEnvelope<{ revision: string; changed: boolean; poll_after_ms?: number }>>(
+    request<ApiEnvelope<{
+      revision: string;
+      changed: boolean;
+      scope?: string;
+      domains?: Record<string, string>;
+      poll_after_ms?: number;
+    }>>(
       `/api/poll/${revision ? `?revision=${encodeURIComponent(revision)}` : ""}`,
     ),
   getTemplate: (type: string) => request<ApiEnvelope<unknown>>(`/api/templates/${encodeURIComponent(type)}/`),
