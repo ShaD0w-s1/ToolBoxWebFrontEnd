@@ -1,5 +1,4 @@
 import type { Project } from "../domain/toolbox";
-import { formatDay } from "../utils/format";
 
 export interface SharePayload {
   v: number;
@@ -83,10 +82,13 @@ export async function copyText(value: string): Promise<void> {
 }
 
 /**
- * 二级页面（某个工作项目）的分享/打开链接：裸域名 + ?p=名称/日期（查询格式，零配置、不触发 404）。
- * 新标签页打开二级页时复用此链接，接收方 onMounted 按名称+日期在云端匹配并打开。
+ * 二级页面（某个工作项目）深链：裸域名 + hash 路由 + **项目 id**。
+ * 用 id 而非名称/日期：项目改名后仍有效、同名同日的项目不会串、刷新可保持（与 App.vue 分享一致）。
+ *
+ * 注：旧版 `?p=名称/创建日期` 格式已不再生成（改名即失效、同名同日会串项目）；
+ * 但 App.vue `openFromQuery` 仍保留解析，用于兼容此前已分享出去的历史链接。
  */
-export function projectShareUrl(project: Project): string {
+export function projectDeepLink(project: Project): string {
   const base = location.origin + location.pathname.replace(/index\.html$/i, "");
-  return `${base}?p=${encodeURIComponent(project.name)}/${formatDay(project.createdAt)}`;
+  return `${base}#/project/${encodeURIComponent(project.id)}`;
 }

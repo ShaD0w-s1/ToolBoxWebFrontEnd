@@ -721,7 +721,9 @@ function onPartAutoSize(event: Event): void {
   const el = event.target as HTMLTextAreaElement;
   el.style.height = "auto";
   el.style.height = `${el.scrollHeight}px`;
-  save();
+  // ⚠️ 逐键路径必须用 queueSave（queuePersist，空闲落盘）；save() 会立即全量序列化 + 同步写
+  //    localStorage（MB 级，单次 0.3~1.5s），串件清单的件号/名称/备注逐键调用会致输入卡顿。
+  queueSave();
 }
 function autoSizeAllParts(): void {
   nextTick(() => {
@@ -2827,8 +2829,6 @@ async function importAllXlsx(event: Event): Promise<void> {
 .resp-label-input { width: 90px; flex-shrink: 0; padding: 2px 6px; outline: none; font-weight: 700; font-size: var(--fs-13); color: var(--blue-dark, var(--blue-dark)); background: transparent; border: none; border-bottom: 1px dashed transparent; }
 .resp-label-input:focus { background: var(--n0); border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .resp-colon { color: var(--muted, var(--n7)); flex-shrink: 0; }
-.resp-name { flex: 1; min-width: 60px; padding: 2px 6px; outline: none; font-weight: 600; font-size: var(--fs-13); background: transparent; border: none; border-bottom: 1px dashed transparent; }
-.resp-name:focus { background: var(--n0); border-radius: 4px; outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .resp-del { opacity: 0; width: 22px; height: 22px; }
 .resp-cell:hover .resp-del { opacity: 1; }
 .resp-cell.resp-add { justify-content: flex-start; }
@@ -2883,8 +2883,6 @@ async function importAllXlsx(event: Event): Promise<void> {
 .stage-split-menu button.danger:hover { background: var(--danger-bg); }
 .stage-col-drag { cursor: grab; color: rgba(255,255,255,.85); font-size: var(--fs-12); user-select: none; touch-action: none; flex-shrink: 0; }
 .stage-col-drag:active { cursor: grabbing; }
-.corner-cell { background: var(--n0); border-right: 1px solid var(--line, var(--n4)); border-bottom: 1px solid var(--line, var(--n4)); display: flex; align-items: center; justify-content: center; font-size: var(--fs-12); font-weight: 700; color: var(--muted, var(--n7)); padding: 6px 8px; }
-.lane-label-cell { background: var(--n0); border-right: 1px solid var(--line, var(--n4)); border-bottom: 1px dashed var(--line, var(--n4)); display: flex; align-items: center; justify-content: center; min-height: 72px; font-size: var(--fs-12); font-weight: 650; color: var(--blue-dark, var(--blue-dark)); }
 .card-slot { position: relative; }
 .stage-capsules { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .stage-capsule { font-size: var(--fs-12); font-weight: 600; color: var(--blue-dark, var(--blue-dark)); background: var(--blue-light, var(--blue-light)); border: 1px solid var(--blue, var(--blue)); border-radius: var(--r-pill); padding: 2px 10px; }
@@ -2933,9 +2931,6 @@ async function importAllXlsx(event: Event): Promise<void> {
 .f-content:focus { background: var(--n0); box-shadow: 0 0 0 2px var(--focus); }
 .people-row { display: flex; align-items: center; gap: 4px; font-size: var(--fs-12); }
 .people-row .pl { color: var(--muted, var(--n7)); flex-shrink: 0; }
-.f-owner, .f-part { outline: none; flex: 1; min-width: 0; word-break: break-word; border: none; background: transparent; font-size: var(--fs-12); padding: 1px 2px; resize: none; overflow: hidden; font-family: inherit; }
-.f-owner { font-weight: 600; }
-.f-owner:focus, .f-part:focus { background: var(--n0); box-shadow: 0 0 0 2px var(--focus); border-radius: 3px; }
 .f-note { font-size: var(--fs-12); color: var(--danger, var(--danger)); outline: none; word-break: break-word; font-weight: 500; min-height: 14px; border: none; background: transparent; width: 100%; padding: 1px 2px; resize: none; font-family: inherit; overflow: hidden; field-sizing: content; max-height: 140px; }
 .f-note:focus { background: var(--n0); box-shadow: 0 0 0 2px var(--focus); border-radius: 3px; }
 /* 阶段跨 DAY 迁移下拉 */
@@ -2982,7 +2977,7 @@ async function importAllXlsx(event: Event): Promise<void> {
   border: 1px solid #f2cdcd; border-radius: var(--r-sm);
   background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1;
 }
-.meta-x:hover { background: #f9dcdc; }
+.meta-x:hover { background: var(--danger-bg-hover); }
 .meta-divider { border: none; border-top: 1px solid var(--line, var(--n4)); margin: 14px 0 12px; }
 .meta-group-head { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-12); font-weight: 700; color: var(--blue-dark, var(--blue-dark)); margin-bottom: 8px; }
 /* 项目安排三行：去卡片框，行间水平虚线分割 */
@@ -2991,7 +2986,6 @@ async function importAllXlsx(event: Event): Promise<void> {
 .arrange-row-3 { grid-template-columns: repeat(3, 1fr); }
 .arrange-row-2 { grid-template-columns: repeat(2, 1fr); }
 .arrange-participants-row { grid-template-columns: 1fr; }
-.arrange-participants .participant-input { width: 100%; }
 .arrange-items { margin-top: 4px; }
 .arrange-item { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 10px; align-items: end; margin-bottom: 8px; }
 /* 部件卡片轮廓 */
@@ -3072,26 +3066,21 @@ textarea.textwrap {
 .parts-table textarea:focus { border-color: var(--focus); outline: none; }
 .parts-table .ns-wrap { width: 100%; }
 .parts-table .ns-input { font-size: var(--fs-12); }
-.parts-table tr.sp-auto { background: #fff6e8; }
 .part-rule { font-size: var(--fs-12); color: var(--muted, var(--n7)); margin: 4px 0 6px; }
 .col-act { width: 32px; text-align: center; }
 /* 串件工卡：工卡号/名称两列 + 类型/内容自动换行 + 串件/拆装汇总行 */
-.sp-content, .sp-name {
+.sp-name {
   width: 100%; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); padding: 3px 6px; font-size: var(--fs-12);
   resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; font-family: inherit;
   box-sizing: border-box; background: var(--n0); min-height: 26px;
 }
 .sp-name { min-height: 26px; color: var(--text, #222); }
-.sp-content { min-height: 26px; }
 .sp-table select { width: 100%; height: 28px; border: 1px solid var(--line, var(--n4)); border-radius: var(--r-sm); padding: 0 4px; font-size: var(--fs-12); background: var(--n0); }
-.sp-table-note { font-size: var(--fs-12); color: var(--muted, var(--n7)); margin: 6px 0 2px; }
-.sp-combine-row td { background: var(--blue-bg); }
 /* 串件安排表：拆/装标签 + 只读展示 */
 .sp-tag { color: #b45309; font-weight: 700; font-size: var(--fs-12); margin-right: 2px; white-space: nowrap; }
 .sp-view-content { flex: 1.5; min-width: 90px; padding: 3px 6px; font-size: var(--fs-12); line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
-.sp-view-field { flex: 1; min-width: 70px; padding: 3px 6px; font-size: var(--fs-12); line-height: 1.4; word-break: break-word; }
 .sp-view-note { flex: 1; min-width: 70px; padding: 3px 6px; font-size: var(--fs-12); color: var(--danger); word-break: break-word; }
-.gantt-card > .card-body > .sp-view-content, .gantt-card > .card-body > .sp-view-field, .gantt-card > .card-body > .sp-view-note { flex: none; width: 100%; padding: 0 2px; }
+.gantt-card > .card-body > .sp-view-content, .gantt-card > .card-body > .sp-view-note { flex: none; width: 100%; padding: 0 2px; }
 .sp-arr-table td { vertical-align: top; }
 /* 串件安排表：未填写栏浅红底色 */
 .sp-arr-table textarea.sp-empty { background: #fdeaea; border-color: #f0b9b9; }
@@ -3117,7 +3106,6 @@ textarea.textwrap {
 .psi-kind.pn { background: #fdecec; color: #b53a3a; }
 .psi-kind.name { background: #e8f5e9; color: #2e7d32; }
 /* 卡片折叠按钮（.pt-collapse 已上移 main.css 共享卡壳基元） */
-.danger-text { color: var(--danger, var(--danger)); }
 
 /* ===== 重复梳理（航材按件号 / 工具按名称 卡片聚拢）——UI 对齐 A检 PartNoGroupCard ===== */
 .dedupe-toggle { display: flex; align-items: center; gap: 4px; font-size: var(--fs-13); color: var(--text, #222); }

@@ -527,14 +527,6 @@ export function useToolbox() {
     editingField = field;
   }
 
-  function markAllDirty(): void {
-    for (const type of AIRCRAFT_TYPES) dirtyTemplates.add(type);
-    for (const type of AIRCRAFT_TYPES) dirtyMaterialTemplates.add(type);
-    for (const project of app.value.projects) if (project.id) dirtyProjects.add(project.id);
-    for (const key of STANDARD_LIB_KEYS) dirtyStdLibs.add(key);
-    dirtyToolCart = true;
-  }
-
   function hasDirtyData(): boolean {
     return dirtyProjects.size > 0 || dirtyTemplates.size > 0 || dirtyMaterialTemplates.size > 0 || dirtyToolCart || dirtyStdLibs.size > 0;
   }
@@ -675,14 +667,7 @@ export function useToolbox() {
     }
   }
 
-  function replaceApp(value: ToolboxApp): void {
-    app.value = normalizeApp(value);
-    computeNextId();
-    markAllDirty();
-    persist();
-  }
-
-  function openProject(id: string): void {
+  /** 复制项目：深拷贝当前项目全部数据（工具清单/工作准备单/工卡分配清单），默认命名“原名+副本”，云端创建并插入列表首位。 */  function openProject(id: string): void {
     currentProjectId.value = id;
     editingLibrary.value = null;
     detailTab.value = "display";
@@ -849,13 +834,6 @@ export function useToolbox() {
 
   function updateProject(project: Project, changes: Partial<Project>): void {
     Object.assign(project, changes);
-    persistField("meta");
-  }
-
-  /** 修改项目类型（需求 8）。 */
-  function updateProjectType(project: Project, newType: ProjectType | ""): void {
-    if (project.type === newType) return;
-    project.type = (PROJECT_TYPES as readonly string[]).includes(newType) ? newType : "";
     persistField("meta");
   }
 
@@ -1350,12 +1328,6 @@ export function useToolbox() {
     state.items = state.items.filter((it) => it.id !== id);
     persist();
   }
-  /** 航材标准库里的 (部位||类型) 选项，供类型下拉模糊匹配/替换。 */
-  const mStandardSubs = computed<string[]>(() => {
-    const type = editingMaterialLibrary.value ?? effectiveAircraftType.value;
-    const lib = type ? app.value.materialLibraries[type] : null;
-    return lib ? [...new Set(lib.items.map((it) => `${it.cat}||${it.sub}`))] : [];
-  });
   /** 从航材标准库导入某类型到当前 (cat,sub)。 */
   function mImportStandardSub(cat: string, currentSub: string, key: string): void {
     const state = requireMaterial();
@@ -2326,11 +2298,11 @@ export function useToolbox() {
 
   return {
     app, screen, listTab, detailTab, ganttTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
-    active, materialActive, materialCategories, standardMaterialCategories, mStandardSubs,
+    active, materialActive, materialCategories, standardMaterialCategories,
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
     dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toast, shared, imageExportBusy,
-    notify, notifyOk, notifyErr, persist, queuePersist, replaceApp, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
-    createProject, deleteProject, duplicateProject, updateProject, updateProjectType, setAircraftType, saveStdLib,
+    notify, notifyOk, notifyErr, persist, queuePersist, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
+    createProject, deleteProject, duplicateProject, updateProject, setAircraftType, saveStdLib,
     itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
     importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearProjectAllData, clearToolListNow, clearMaterialListNow, setToolCart, loadRemote, refresh, saveNow,

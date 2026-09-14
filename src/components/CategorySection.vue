@@ -102,9 +102,10 @@ function onRenameCat(event: Event): void {
   }
 }
 
+/** 部位备注输入：撑高 + 防抖落盘（逐键路径禁用立即 persist）。 */
 function onNotesInput(event: Event): void {
   growTextarea(event.target as HTMLTextAreaElement);
-  props.store.persist();
+  props.store.queuePersist();
 }
 
 function deleteCategory() {

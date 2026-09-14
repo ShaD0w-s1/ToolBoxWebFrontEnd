@@ -224,7 +224,9 @@ function onLevelChange(section: string, card: WorkCardRow): void {
 /** 需求 3：宽列（工卡号/工卡名称/参与人员）用 textarea，自动撑高以完整显示并换行。 */
 function onCardInput(event: Event): void {
   growTextarea(event.target as HTMLTextAreaElement);
-  props.store.persist();
+  // ⚠️ 工卡号/工卡名称逐键输入：queuePersist（空闲落盘），
+  //    persist() 会立即全量序列化 + 同步写 localStorage（MB 级，单次 0.3~1.5s）致输入卡顿。
+  props.store.queuePersist();
 }
 
 function growAll(): void {
@@ -611,7 +613,7 @@ onBeforeUnmount(() => {
 .wa-sec-name:focus { outline: none; border-color: var(--focus); background: var(--n0); color: var(--n8); }
 .wa-sec-suffix { margin-left: 2px; }
 .wa-del-group { color: var(--danger, #b53a3a); border-color: #f2cdcd; background: #fdecec; }
-.wa-del-group:hover { background: #f9dcdc; }
+.wa-del-group:hover { background: var(--danger-bg-hover); }
 .wa-segment { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; }
 @media (max-width: 768px) { .wa-seg-btn { padding: 6px 12px; } }
 

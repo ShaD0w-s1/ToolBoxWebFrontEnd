@@ -80,7 +80,8 @@ const toolSingles = computed(() => toolDedupeGroups.value.filter((g) => g.items.
 function onToolDedupeNote(it: ToolItem, event: Event): void {
   growTextarea(event.target as HTMLTextAreaElement);
   props.store.markNoteDirty(it);
-  props.store.persist();
+  // ⚠️ 逐键路径：queuePersist（空闲落盘），勿用立即全量写的 persist()。
+  props.store.queuePersist();
 }
 /** 数量步进：−/+ 增减 1，下限 0（重复工具梳理行表共用）。 */
 function stepQty(it: ToolItem, d: number): void {
@@ -580,10 +581,4 @@ async function runToolFilterByWorkcard(): Promise<void> {
 .tool-dedupe-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: #fbead2; }
 .tool-dedupe-head strong { font-size: var(--fs-14); color: var(--blue-dark); }
 .tool-dedupe-count { font-size: var(--fs-12); font-weight: 700; color: #b45309; }
-.tool-dedupe-row { display: grid; grid-template-columns: 1.2fr 0.5fr auto 2fr; gap: 6px; align-items: center; padding: 6px 10px; border-top: 1px dashed #f0d9b8; }
-.tool-dedupe-type { font-size: var(--fs-13); color: var(--n8); padding: 4px 8px; background: #f4f6fb; border-radius: var(--r-sm); min-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tool-dedupe-qty { width: 100%; min-height: 30px; padding: 4px 6px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-13); box-sizing: border-box; }
-.tool-dedupe-del { width: 26px; height: 26px; padding: 0; border: 1px solid #f2cdcd; border-radius: var(--r-sm); background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1; cursor: pointer; }
-.tool-dedupe-del:hover { background: #f9dcdc; }
-.tool-dedupe-note { min-height: 30px; padding: 4px 7px; border: 1px dashed var(--line); border-radius: var(--r-sm); font-size: var(--fs-12); resize: none; overflow: hidden; font-family: inherit; line-height: 1.4; box-sizing: border-box; width: 100%; background: var(--n0); }
 </style>

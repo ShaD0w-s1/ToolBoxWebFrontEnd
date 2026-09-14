@@ -16,7 +16,7 @@ import {
 } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import { backend } from "../api";
-import { projectShareUrl } from "../services/sharing";
+import { projectDeepLink } from "../services/sharing";
 import NameCompare from "./NameCompare.vue";
 import ControlDocMaintain from "./ControlDocMaintain.vue";
 import ProjectFormModal from "./ProjectFormModal.vue";
@@ -80,9 +80,9 @@ function remove(project: Project): void {
   if (window.confirm(`确认删除“${project.name}”？`)) props.store.deleteProject(project);
 }
 
-/** 在新标签页打开二级页面（工作项目详情）。 */
+/** 在新标签页打开二级页面（工作项目详情）：用 id 深链（改名/同名同日不影响，刷新可保持）。 */
 function openInNewTab(project: Project): void {
-  window.open(projectShareUrl(project), "_blank");
+  window.open(projectDeepLink(project), "_blank");
 }
 
 /** 复制项目：按当前项目数据新建一个“原名+副本”的工作项目。 */
@@ -812,7 +812,7 @@ async function batchDeleteNoDate(): Promise<void> {
   cursor: pointer; z-index: 2;
   display: flex; align-items: center; justify-content: center;
 }
-.side-clear-x:hover { background: #f9dcdc; }
+.side-clear-x:hover { background: var(--danger-bg-hover); }
 /* 右侧列表头操作组 */
 /* 项目卡片操作 split button：修订主按钮 + ▾ 下拉（复制/删除） */
 .card-split { position: relative; display: inline-flex; align-items: stretch; flex: 0 0 auto; }

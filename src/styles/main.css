@@ -12,6 +12,7 @@
   --muted: #697386;
   --danger: #c0392b;
   --danger-bg: #fdecea;
+  --danger-bg-hover: #f9dcdc;
   --card: #fff;
   /* 语义色（补充） */
   --warn: #b07d10;
@@ -443,7 +444,7 @@ input.remote-locked {
 }
 .itg .itg-ops button:hover { background: var(--blue-light, #eaf1fa); }
 .itg .itg-ops button.del { border-color: #f2cdcd; background: #fdecec; color: var(--danger); }
-.itg .itg-ops button.del:hover { background: #f9dcdc; }
+.itg .itg-ops button.del:hover { background: var(--danger-bg-hover); }
 @media (max-width: 768px) {
   /* —— 工具/航材行表移动端重排（A检工具 item-grid 卡式除外，其余 .itg 行表共用） ——
    * 取消「备注」列：表头整行隐藏（字段名由输入框 placeholder 承担），

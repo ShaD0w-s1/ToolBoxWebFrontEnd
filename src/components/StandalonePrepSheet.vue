@@ -194,10 +194,11 @@ async function renameTemplate(t: { _id: string; name: string; state: StandaloneT
   }
 }
 
-/** 表格单元格 textarea 自动撑高并持久化（需求：表单内容自动换行）。 */
+/** 表格单元格 textarea 自动撑高并持久化（需求：表单内容自动换行）。
+ *  ⚠️ 逐键路径用 queuePersist（空闲落盘）；persist() 会立即全量序列化 + 同步写 localStorage（MB 级）。 */
 function onRowInput(event: Event): void {
   growTextarea(event.target as HTMLTextAreaElement);
-  props.store.persist();
+  props.store.queuePersist();
 }
 
 // ===== 工序行拖拽排序（参照换发二级页表单工序卡：⠿ 柄拖动，目标位置虚线占位框） =====
@@ -338,7 +339,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
           <span class="field-label">{{ cell.key }}</span><input v-model="(sheet.personnel as unknown as Record<string, string>)[cell.key]" @input="store.queuePersist" v-lock="lockKey('personnel', 'single', cell.key)" />
         </label>
       </div>
-      <div class="prep-personnel-fullrow"><span class="field-label">参与人员</span><NameSuggest :model-value="String(sheet.personnel.参与人员 || '')" :suggestions="peoplePool" placeholder="参与人员（空格/顿号分隔，模糊联想已填姓名）" @update:model-value="sheet.personnel.参与人员 = $event; store.persist()" v-lock="lockKey('personnel', 'single', '参与人员')" /></div>
+      <div class="prep-personnel-fullrow"><span class="field-label">参与人员</span><NameSuggest :model-value="String(sheet.personnel.参与人员 || '')" :suggestions="peoplePool" placeholder="参与人员（空格/顿号分隔，模糊联想已填姓名）" @update:model-value="sheet.personnel.参与人员 = $event; store.queuePersist()" v-lock="lockKey('personnel', 'single', '参与人员')" /></div>
       <div class="prep-personnel-grid">
         <template v-for="(row, ri) in personnelLayout.slice(1)" :key="`pr-${ri}`">
           <label v-for="cell in row" :key="cell.key" class="prep-personnel-cell" :style="{ gridColumn: `span ${cell.cols}` }">
@@ -372,8 +373,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
                 <div class="sp-card-drag" title="拖动调整行序" @pointerdown="startSpRowDrag($event, gi, r.id)">⠿</div>
                 <textarea rows="1" v-model="r.工作步骤" @input="onRowInput" class="sp-cell" placeholder="工作步骤" v-lock="lockKey('row', String(r.id), '工作步骤')"></textarea>
               </div>
-            <NameSuggest class="sp-assign" :model-value="String(r.人员安排 || '')" :suggestions="peoplePool" placeholder="人员安排" @update:model-value="r.人员安排 = $event; store.persist()" v-lock="lockKey('row', String(r.id), '人员安排')" />
-            <NameSuggest class="sp-check" :model-value="String(r['检测&必检'] || '')" :suggestions="peoplePool" placeholder="检测&必检" @update:model-value="r['检测&必检'] = $event; store.persist()" v-lock="lockKey('row', String(r.id), '检测&必检')" />
+            <NameSuggest class="sp-assign" :model-value="String(r.人员安排 || '')" :suggestions="peoplePool" placeholder="人员安排" @update:model-value="r.人员安排 = $event; store.queuePersist()" v-lock="lockKey('row', String(r.id), '人员安排')" />
+            <NameSuggest class="sp-check" :model-value="String(r['检测&必检'] || '')" :suggestions="peoplePool" placeholder="检测&必检" @update:model-value="r['检测&必检'] = $event; store.queuePersist()" v-lock="lockKey('row', String(r.id), '检测&必检')" />
               <textarea rows="1" v-model="r.备注" @input="onRowInput" class="sp-cell sp-note" placeholder="备注" v-lock="lockKey('row', String(r.id), '备注')"></textarea>
               <button class="sp-del-x" title="删除该行" @click="store.spRemoveProcessRow(gi, r.id)">×</button>
             </div>
@@ -451,7 +452,6 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-sheet { padding: 4px 2px 40px; }
 .sp-title { margin: 0; font-size: var(--fs-18); cursor: pointer; padding: 4px 6px; border-radius: var(--r-sm); }
 .sp-title:hover { background: #eef2fa; }
-.sp-title-input { font-size: var(--fs-18); padding: 4px 8px; border: 1px solid #6f8ad6; border-radius: var(--r-sm); min-width: 240px; }
 .prep-block { margin-bottom: 18px; background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
 .prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: var(--n0); padding: 8px 12px; border-radius: var(--r-md); }
 .field-label { font-size: var(--fs-13); color: #000; font-weight: 500; }
@@ -518,7 +518,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1;
   cursor: pointer;
 }
-.sp-del-x:hover { background: #f9dcdc; }
+.sp-del-x:hover { background: var(--danger-bg-hover); }
 /* 拖拽占位虚线框（参照换发 drag-ghost：蓝色虚线 + 淡蓝底） */
 .drag-ghost {
   position: fixed; z-index: 998; pointer-events: none;

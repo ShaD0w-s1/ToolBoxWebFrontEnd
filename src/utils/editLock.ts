@@ -1,3 +1,4 @@
+import { watch } from "vue";
 import type { ToolboxStore } from "../composables/useToolbox";
 
 /**
@@ -45,8 +46,19 @@ export function createEditLockDirective(store: ToolboxStore): {
   return {
     mounted(el: HTMLElement, binding: { value: string }) {
       applyLockState(el, binding.value);
-      const state = el as HTMLElement & { __lockKey?: string; __focusTimer?: number };
+      const state = el as HTMLElement & {
+        __lockKey?: string;
+        __focusTimer?: number;
+        __lockStop?: () => void;
+      };
       const keyOf = (): string => state.__lockKey || binding.value;
+      // 他人编辑态实时性：lockVersion 由 fetchEditingOthers 在「他人编辑快照变化」时自增。
+      // applyLockState 是命令式调用、不建立渲染依赖，组件不会因该计数变化而重渲染——
+      // 若不显式订阅，黄锁（disabled + remote-locked + title）要等下一次无关重渲染才刷新。
+      state.__lockStop = watch(
+        () => store.lockVersion.value,
+        () => applyLockState(el, keyOf()),
+      );
       el.addEventListener("focusin", () => {
         // 会话 key 以 focus 瞬间快照为准：编辑中改名/改件号导致内容键漂移时，
         // blur 仍按同一 key 结束会话并触发保存（否则快速编辑会丢/滞留会话）。
@@ -87,7 +99,9 @@ export function createEditLockDirective(store: ToolboxStore): {
       applyLockState(el, binding.value);
     },
     unmounted(el: HTMLElement, binding: { value: string }) {
-      const state = el as HTMLElement & { __lockKey?: string; __focusTimer?: number };
+      const state = el as HTMLElement & { __lockKey?: string; __focusTimer?: number; __lockStop?: () => void };
+      state.__lockStop?.();
+      state.__lockStop = undefined;
       if (state.__focusTimer !== undefined) { clearInterval(state.__focusTimer); state.__focusTimer = undefined; }
       store.endEdit(state.__lockKey || binding.value);
     },

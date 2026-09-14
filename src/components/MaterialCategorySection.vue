@@ -42,12 +42,13 @@ function lock(it: ToolItem, prop: string): string {
 function subCols(): number {
   return 1;
 }
-/** 件号/名称 textarea 自动撑高：默认单行（与“数量”等高），文字超出宽度时自动换行。 */
+/** 件号/名称 textarea 自动撑高：默认单行（与“数量”等高），文字超出宽度时自动换行。
+ *  ⚠️ 逐键路径用 queuePersist（空闲落盘）；persist() 会立即全量序列化 + 同步写 localStorage（MB 级）。 */
 function onAutoSize(event: Event): void {
   const el = event.target as HTMLTextAreaElement;
   el.style.height = "auto";
   el.style.height = `${el.scrollHeight}px`;
-  props.store.persist();
+  props.store.queuePersist();
 }
 
 /** 撑高卡片内所有物品 textarea（初始渲染/数据加载后也要正确换行显示）。 */

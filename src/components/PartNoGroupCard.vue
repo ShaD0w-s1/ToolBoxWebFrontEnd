@@ -24,7 +24,8 @@ function stepQty(it: ToolItem, d: number): void {
 function commitNote(it: ToolItem, event: Event): void {
   growTextarea(event.target as HTMLTextAreaElement);
   props.store.markNoteDirty(it);
-  props.store.persist();
+  // ⚠️ 挂在 @input 上（逐键）：用 queuePersist（空闲落盘），勿用立即全量写的 persist()。
+  props.store.queuePersist();
 }
 function subLabel(it: ToolItem): string {
   return (it.sub && it.sub.trim()) || "固定";

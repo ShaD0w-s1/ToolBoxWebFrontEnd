@@ -17,7 +17,7 @@ import {
 } from "./domain/toolbox";
 import { useToolbox } from "./composables/useToolbox";
 import { setForceDesktop } from "./composables/useResponsiveGrid";
-import { copyText, createShareUrl, readSharePayload, type SharePayload } from "./services/sharing";
+import { copyText, createShareUrl, projectDeepLink, readSharePayload, type SharePayload } from "./services/sharing";
 import { download, exportFileName, formatDay } from "./utils/format";
 
 // 页面组件懒加载：首屏只加载列表页，二级页/标准库/工具车按需加载（SPA 路由懒加载）。
@@ -242,10 +242,9 @@ async function share(scope: SharePayload["scope"]): Promise<void> {
     }
     if (scope === "detail" && !store.editingLibrary.value && store.currentProject.value) {
       // 二级页面（工作项目）：hash 路由直链（带项目 id），接收方打开后直达该项目的二级页（刷新保持）；
-      // 复制内容 = 链接 + 隔断 + 项目名称 + 准备单及各清单。
+      // 复制内容 = 链接 + 隔断 + 项目名称 + 准备单及各清单。链接构造与「在新标签页打开」共用 projectDeepLink。
       const project = store.currentProject.value;
-      const url = `${baseUrl()}#/project/${encodeURIComponent(project.id)}`;
-      await copyText(shareText(url, projectShareLabel(project)));
+      await copyText(shareText(projectDeepLink(project), projectShareLabel(project)));
       store.notify(`二级页面链接已复制（${project.name}）`);
       return;
     }
