@@ -500,6 +500,18 @@ export interface Project {
   ganttPrep: GanttPrepState;
   /** 云端文档版本号（后端每次写入原子递增），用于乐观锁冲突检测。 */
   version: number;
+  /** ⚠️ 重字段（data / prepSheet / workcardAssignment / standalonePrepSheet /
+   *  materialList / ganttPrep）是否已按 `version` 从云端取回。
+   *
+   *  - `true`：上面的重字段是该 `version` 的权威内容，可读写。
+   *  - `false`：项目只从**列表响应**拿到了轻量元数据（列表不再返回重字段），
+   *    重字段是空占位值，**不得据以保存或展示** —— 必须先走 `ensureProjectLoaded()`。
+   *
+   *  合并与保存逻辑都以这个标记为准：未加载时只合并元数据，绝不把空值写回云端。 */
+  loaded?: boolean;
+  /** 该项目内物品的最大本地编号（服务端按物品条数下发）。
+   *  项目未加载时无法在本地扫描物品，靠它维持「新增物品编号不冲突」的不变式。 */
+  maxItemId?: number;
 }
 
 export interface ToolboxApp {
@@ -970,7 +982,15 @@ function ganttPrepFromDoc(doc: Record<string, unknown>): GanttPrepState {
   };
 }
 
-export function projectFromDocument(raw: unknown): Project {
+/** 把云端文档转换为前端 Project。
+ *
+ *  ⚠️ `opts.loaded` 决定重字段是否可信：
+ *    - `true`（默认，用于详情响应 / 本地遗留数据）：重字段按文档内容构建；
+ *    - `false`（用于**列表响应**，它只含轻量元数据）：重字段只能是空占位值，
+ *      此时必须置 `loaded=false`，让合并与保存逻辑知道"这些空值不可用"。
+ *  列表响应里 `max_item_id` 由服务端按物品条数下发，供 `computeNextId` 兜底。
+ */
+export function projectFromDocument(raw: unknown, opts?: { loaded?: boolean }): Project {
   const doc = unwrapDocument(raw) || {};
   const aircraft = String(doc.aircraft_type || "A320").toUpperCase();
   const typeRaw = String(doc.type || "");
@@ -989,6 +1009,8 @@ export function projectFromDocument(raw: unknown): Project {
     materialList: stateFromSections((doc.material_list || []) as SectionPayload[]),
     ganttPrep: ganttPrepFromDoc(doc),
     version: Number(doc.version) || 0,
+    loaded: opts?.loaded ?? true,
+    maxItemId: Math.max(0, Number(doc.max_item_id) || 0),
   };
 }
 

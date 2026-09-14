@@ -358,7 +358,12 @@ async function applySharedPayload(): Promise<void> {
   const payload = await readSharePayload();
   if (!payload?.scope) return;
   try {
-    if (payload.scope === "app") store.app.value = normalizeApp((payload.data || {}) as AppInput);
+    if (payload.scope === "app") {
+      // 旧版内联分享：整包数据自带全部重字段 → 全部项目标记为已加载，
+      // 否则会被详情页的"未加载"闸门拦下并去云端拉取（可能拉不到同 id 的项目）。
+      const shared = normalizeApp((payload.data || {}) as AppInput);
+      store.app.value = { ...shared, projects: shared.projects.map((p) => ({ ...p, loaded: true })) };
+    }
     else if (payload.scope === "cart") {
       store.app.value.toolCart = Array.isArray(payload.data) ? payload.data as ToolCartItem[] : [];
       store.openCart();
@@ -370,7 +375,8 @@ async function applySharedPayload(): Promise<void> {
         store.app.value.libraries[library] = normalizeState(rawProject.data);
         store.openLibrary(library);
       } else {
-        const project = normalizeApp({ projects: [rawProject as Project] }).projects[0];
+        // 内联分享的项目自带完整数据 → loaded: true（同上，避免闸门误拦）。
+        const project = { ...normalizeApp({ projects: [rawProject as Project] }).projects[0], loaded: true };
         const index = store.app.value.projects.findIndex((item) => item.id === project.id);
         if (index >= 0) store.app.value.projects[index] = project;
         else store.app.value.projects.push(project);

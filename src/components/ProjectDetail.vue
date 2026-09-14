@@ -42,6 +42,14 @@ const isEngApu = computed(() => {
   return Boolean(project) && !props.store.editingLibrary.value && project!.type === "换发/APU";
 });
 const subPage = ref<"prep" | "workcard" | "material" | "tools" | "gantt">("prep");
+
+/** 当前项目是否只拿到了轻量元数据（列表响应已不含重字段）→ 需要先按需拉取详情。
+ *  库 / 航材库 / 工具车等非项目视图不参与该闸门。 */
+const needsProjectLoad = computed(() => {
+  if (props.store.editingLibrary.value || props.store.editingMaterialLibrary.value) return false;
+  const project = props.store.currentProject.value;
+  return Boolean(project) && project!.loaded !== true;
+});
 watch(() => props.store.currentProject.value?.id, () => {
   subPage.value = props.store.currentProject.value?.type === "换发/APU" ? "gantt" : "prep";
 }, { immediate: true });
@@ -364,7 +372,18 @@ async function runToolFilterByWorkcard(): Promise<void> {
 </script>
 
 <template>
-  <section v-if="store.active.value || store.editingMaterialLibrary.value" ref="capture">
+  <!-- 项目重字段尚未拉取完成（列表响应只含轻量元数据，重字段按需拉取）→ 先显示加载态。
+       这道闸门同时挡住两个风险：① 子组件按空占位值渲染出"空清单"；
+       ② 在未加载状态下误编辑/误保存，把云端清单与准备单清空。 -->
+  <section v-if="needsProjectLoad" class="detail-loading">
+    <div class="sync-spinner" aria-hidden="true"></div>
+    <p class="loading-state">{{ store.projectLoadState.value === "error" ? "项目数据加载失败" : "正在加载项目数据…" }}</p>
+    <div class="load-actions">
+      <button v-if="store.projectLoadState.value === 'error'" class="ghost" @click="store.retryProjectDetail()">重试</button>
+      <button class="ghost" @click="store.backToList">← 返回列表</button>
+    </div>
+  </section>
+  <section v-else-if="store.active.value || store.editingMaterialLibrary.value" ref="capture">
     <div class="detail-sticky">
       <div v-if="store.currentProject.value" class="breadcrumb">
         <span class="cur" style="cursor:pointer" @click="store.backToList">项目列表</span>
@@ -556,6 +575,8 @@ async function runToolFilterByWorkcard(): Promise<void> {
   gap: 14px; min-height: 60vh; color: var(--n7);
 }
 .detail-loading p { margin: 0; font-size: var(--fs-16); }
+/* 加载失败时的操作区（重试 / 返回） */
+.detail-loading .load-actions { display: flex; gap: 10px; }
 .detail-loading .sync-spinner {
   width: 30px; height: 30px; border: 3px solid #e5e7eb; border-top-color: #2563eb;
   border-radius: 50%; animation: detail-spin .8s linear infinite;

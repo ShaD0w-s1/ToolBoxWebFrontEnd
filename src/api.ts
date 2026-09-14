@@ -94,6 +94,11 @@ export const backend = {
   deletePrepAttachment: (fileKey: string) =>
     request<ApiEnvelope>(`/api/prep-attachments/?file_key=${encodeURIComponent(fileKey)}`, { method: "DELETE" }),
   listProjects: () => request<ApiEnvelope<unknown>>("/api/projects/?limit=100"),
+  /** 项目详情：返回**完整文档**（含 sections/prep_sheet/workcard_assignment/
+   *  standalone_prep_sheet/material_list/gantt_prep）。列表响应只含轻量元数据，
+   *  重字段一律由本接口按需获取。 */
+  getProject: (id: string) =>
+    request<ApiEnvelope<Record<string, unknown>>>(`/api/projects/${encodeURIComponent(id)}/`),
   createProject: (project: ProjectPayload) => request<ApiEnvelope<Record<string, unknown>>>("/api/projects/", { method: "POST", body: project }),
   updateProject: (id: string, project: ProjectPayload | Partial<ProjectPayload>, expectedVersion?: number) =>
     request<ApiEnvelope>(`/api/projects/${encodeURIComponent(id)}/`, { method: "PATCH", body: { ...project, expected_version: expectedVersion } }),

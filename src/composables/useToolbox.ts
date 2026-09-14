@@ -490,14 +490,21 @@ export function useToolbox() {
   /** 所有标准库和项目共享递增编号，防止切换页面后发生键冲突。 */
   function computeNextId(): void {
     let maximum = 0;
+    // 只有「已加载」的项目才在本地持有清单，未加载项目的物品扫不到。
+    const loaded = app.value.projects.filter((project) => project.loaded === true);
     const states = [
       ...Object.values(app.value.libraries),
       ...Object.values(app.value.materialLibraries),
-      ...app.value.projects.map((project) => project.data),
-      ...app.value.projects.map((project) => project.materialList),
+      ...loaded.map((project) => project.data),
+      ...loaded.map((project) => project.materialList),
     ];
     for (const state of states) {
       for (const item of state.items) maximum = Math.max(maximum, Number(item.id) || 0);
+    }
+    // 未加载项目用服务端下发的 max_item_id 兜底（= 物品条数，等于本地载入后的最大编号），
+    // 以维持「新增物品编号大于所有项目既有编号」这一不变式（防止切换页面后键冲突）。
+    for (const project of app.value.projects) {
+      maximum = Math.max(maximum, Number(project.maxItemId) || 0);
     }
     nextId = maximum + 1;
   }
@@ -595,16 +602,35 @@ export function useToolbox() {
     persistTimer = setTimeout(() => { persistNow(); }, 8000);
   }
 
-  /** 显式以指定字段标记当前项目为脏并落盘（用于 meta 等非子页字段的变更）。 */
-  function persistField(field: ProjectField): void {
+  /** 以指定字段标记**某个**项目为脏并落盘。
+   *  ⚠️ 不要用「当前打开的项目」来推断目标：列表页的编辑弹窗里 currentProject 为 null，
+   *  按当前项目标脏会静默丢失改动（见 updateProject）。 */
+  function persistProjectField(id: string, field: ProjectField): void {
     persistNow();
-    markCurrentDirty(field);
+    dirtyProjects.add(id);
+    markProjectField(id, field);
     scheduleRemoteSave();
   }
 
   /** 保存单个项目：字段级部分 PATCH + 乐观锁（version）。成功则递增本地版本；409 冲突则采纳远端版本并保留本地编辑稍后重试。 */
+  /** 项目重字段：只有项目已加载（loaded === true）时这些字段才可信。 */
+  const HEAVY_PROJECT_FIELDS: ProjectField[] = ["data", "materialList", "prepSheet", "workcardAssignment", "standalonePrepSheet", "ganttPrep"];
+
   async function saveProject(project: Project, fields?: Set<ProjectField>): Promise<void> {
-    const payload = fields && fields.size ? projectPartialPayload(project, fields) : projectPayload(project);
+    // ⚠️ 最后一道防线：未加载项目的重字段是空占位值，一旦走整包 payload 或把重字段
+    // 放进 PATCH，就会把云端的清单/准备单清空。这里把重字段从脏集合中剔除；
+    // 剔除后没有可安全保存的字段则整单跳过并留日志。
+    let effectiveFields = fields;
+    if (project.loaded !== true) {
+      const safe = new Set([...(fields ?? [])].filter((f) => !HEAVY_PROJECT_FIELDS.includes(f)));
+      if (!safe.size) {
+        console.warn("[save] 项目重字段尚未加载，已跳过保存以避免覆盖云端数据:", project.id);
+        dirtyFields.delete(project.id);
+        return;
+      }
+      effectiveFields = safe;
+    }
+    const payload = effectiveFields && effectiveFields.size ? projectPartialPayload(project, effectiveFields) : projectPayload(project);
     try {
       await backend.updateProject(project.id, payload, project.version);
       project.version += 1;
@@ -699,11 +725,70 @@ export function useToolbox() {
     }
   }
 
-  /** 复制项目：深拷贝当前项目全部数据（工具清单/工作准备单/工卡分配清单），默认命名“原名+副本”，云端创建并插入列表首位。 */  function openProject(id: string): void {
+  /** 正在拉取详情的项目（按 id 去重，避免同一项目并发重复请求）。 */
+  const loadingProjects = new Map<string, Promise<void>>();
+  /** 当前打开项目的重字段加载状态，供详情页显示加载中/失败重试。 */
+  const projectLoadState = ref<"idle" | "loading" | "error">("idle");
+
+  /** 按需拉取某项目的重字段（列表响应只含轻量元数据，不含清单与准备单）。
+   *
+   *  - 已加载 → 直接返回，不发请求；
+   *  - 并发调用同一项目 → 复用同一个 promise；
+   *  - 详情是权威内容，但本地**正在编辑**（脏）的字段仍以本地为准，避免打断输入。
+   *
+   *  @returns 该项目；项目不存在返回 null；请求失败会抛错（由调用方提示）。
+   */
+  async function ensureProjectLoaded(id: string): Promise<Project | null> {
+    const found = app.value.projects.find((p) => p.id === id);
+    if (!found) return null;
+    if (found.loaded === true) return found;
+    let pending = loadingProjects.get(id);
+    if (!pending) {
+      pending = (async () => {
+        const result = await backend.getProject(id);
+        const detail = projectFromDocument(result.data, { loaded: true });
+        const index = app.value.projects.findIndex((p) => p.id === id);
+        if (index >= 0) {
+          app.value.projects[index] = mergeProjectFields(app.value.projects[index], detail, dirtyFields.get(id));
+          // 载入后物品编号空间变化 → 重算，避免新增行与既有行编号冲突。
+          computeNextId();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+        }
+      })().finally(() => { loadingProjects.delete(id); });
+      loadingProjects.set(id, pending);
+    }
+    await pending;
+    return app.value.projects.find((p) => p.id === id) || null;
+  }
+
+  /** 进入详情后按需加载当前项目的重字段，并维护加载状态供 UI 展示。 */
+  async function loadProjectDetail(id: string): Promise<void> {
+    projectLoadState.value = "loading";
+    try {
+      await ensureProjectLoaded(id);
+      if (currentProjectId.value === id) projectLoadState.value = "idle";
+    } catch (error) {
+      if (currentProjectId.value === id) projectLoadState.value = "error";
+      notify(errorMessage(error, "项目数据加载失败，请重试"));
+    }
+  }
+
+  /** 详情页「重试」按钮：重新拉取当前项目的重字段。 */
+  function retryProjectDetail(): void {
+    const id = currentProjectId.value;
+    if (id) void loadProjectDetail(id);
+  }
+
+  /** 打开项目详情。列表响应已不含重字段，故进入后按需拉取该项目的清单/准备单。
+   *  有意不 await：先切页再后台加载，详情视图用 `currentProject.loaded` 显示加载态。 */
+  function openProject(id: string): void {
     currentProjectId.value = id;
     editingLibrary.value = null;
     detailTab.value = "display";
     screen.value = "detail";
+    const project = app.value.projects.find((p) => p.id === id);
+    if (project && project.loaded !== true) void loadProjectDetail(id);
+    else projectLoadState.value = "idle";
   }
 
   function openLibrary(type: AircraftType): void {
@@ -842,6 +927,9 @@ export function useToolbox() {
       materialList: normalizeState(),
       ganttPrep: defaultGanttPrep(),
       version: 0,
+      // 本地新建的项目自带完整（空）重字段，其内容就是权威来源 → 标记已加载，
+      // 避免被详情页的"未加载"闸门拦下、也避免离线时误判为加载失败。
+      loaded: true,
     };
     if (cloud.available) {
       try {
@@ -866,17 +954,33 @@ export function useToolbox() {
 
   function updateProject(project: Project, changes: Partial<Project>): void {
     Object.assign(project, changes);
-    persistField("meta");
+    // ⚠️ 不能按「当前打开的项目」标脏：列表页的编辑弹窗里 currentProject 为 null，
+    // 旧实现会落到 screen==="cart" 分支 → 改动只写进本地 localStorage、永不同步云端，
+    // 刷新后被远端数据覆盖。这里显式以「被编辑的那个项目」为准。
+    persistProjectField(project.id, "meta");
   }
 
   /** 复制项目：深拷贝当前项目全部数据（工具清单/工作准备单/工卡分配清单），默认命名“原名+副本”，云端创建并插入列表首位。 */
   async function duplicateProject(project: Project): Promise<void> {
+    // 复制需要源项目的全部重字段；列表响应只有元数据 → 先按需拉取源项目，
+    // 否则会把空占位值复制成一份"空壳副本"。
+    let source = project;
+    if (source.loaded !== true) {
+      source = (await ensureProjectLoaded(project.id)) ?? project;
+      if (source.loaded !== true) {
+        notify("无法复制：项目数据尚未加载完成", "err");
+        return;
+      }
+    }
     const copy: Project = {
-      ...deepCopy(project),
+      ...deepCopy(source),
       id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name: `${project.name}副本`,
       createdAt: Date.now(),
       version: 0,
+      // 副本由源项目的完整内容深拷贝而来 → 重字段是权威的。
+      loaded: true,
+      maxItemId: undefined,
     };
     if (cloud.available) {
       try {
@@ -1911,6 +2015,22 @@ export function useToolbox() {
   /** 字段级合并单个项目：本地脏字段保留（data/materialList 脏时按内容键行合并），其余采用远端。 */
   function mergeProjectFields(local: Project, remote: Project, fields?: Set<ProjectField>): Project {
     const dirty = (f: ProjectField) => fields?.has(f) ?? false;
+    // ⚠️ 远端只带轻量元数据（列表响应，不含重字段）时，**绝不能**用它的空占位值
+    // 覆盖本地重字段，否则会把清单/准备单清空。这里只更新元数据与版本号。
+    if (remote.loaded !== true) {
+      const stillFresh = local.loaded === true && local.version === remote.version;
+      return {
+        ...local,
+        name: dirty("meta") ? local.name : remote.name,
+        aircraftType: dirty("meta") ? local.aircraftType : remote.aircraftType,
+        team: dirty("meta") ? local.team : remote.team,
+        type: dirty("meta") ? local.type : remote.type,
+        maxItemId: remote.maxItemId ?? local.maxItemId,
+        // 版本变了说明本地重字段已过期 → 标记未加载，等打开时按需重取。
+        loaded: stillFresh,
+        version: remote.version,
+      };
+    }
     return {
       ...local,
       name: dirty("meta") ? local.name : remote.name,
@@ -1924,7 +2044,31 @@ export function useToolbox() {
       materialList: dirty("materialList") ? mergeToolStateRows(local.materialList, remote.materialList) : remote.materialList,
       ganttPrep: mergeGanttPrep(local.ganttPrep, remote.ganttPrep, dirty("ganttPrep")),
       version: remote.version,
+      loaded: true,
+      maxItemId: remote.maxItemId ?? local.maxItemId,
     };
+  }
+
+  /** 把远端项目列表合并进本地：按 id 对齐、保留本地脏字段、删除远端已删除的项目。
+   *  ⚠️ 远端未加载重字段时（列表响应）保留本地重字段，只在版本变化时标记为待重取。
+   *  全量替换路径与增量合并路径共用此函数 —— 否则「全量刷新」会把已加载的重字段抹掉。 */
+  function mergeProjectList(localProjects: Project[], remoteProjects: Project[]): Project[] {
+    const localIds = new Set(localProjects.map((p) => p.id));
+    const merged: Project[] = [];
+    for (const local of localProjects) {
+      const remoteProject = remoteProjects.find((p) => p.id === local.id);
+      if (remoteProject) {
+        merged.push(mergeProjectFields(local, remoteProject, dirtyFields.get(local.id)));
+      } else if (dirtyFields.has(local.id)) {
+        merged.push(local); // 远端已删除但本地正在编辑：保留，等保存时以本地为准
+      }
+      // 否则：远端已删除且本地未编辑 → 丢弃
+    }
+    for (const remoteProject of remoteProjects) {
+      // 本地没有的新项目 → 追加
+      if (!localIds.has(remoteProject.id)) merged.push(remoteProject);
+    }
+    return merged;
   }
 
   /** 把远端数据合并进本地 app（非脏字段/实体才覆盖）。 */
@@ -1943,21 +2087,7 @@ export function useToolbox() {
     for (const type of AIRCRAFT_TYPES) {
       if (!dirtyMaterialTemplates.has(type)) nextMaterialLibraries[type] = remote.materialLibraries[type];
     }
-    const localIds = new Set(app.value.projects.map((p) => p.id));
-    const mergedProjects: Project[] = [];
-    for (const local of app.value.projects) {
-      const remoteProject = remote.projects.find((p) => p.id === local.id);
-      if (remoteProject) {
-        mergedProjects.push(mergeProjectFields(local, remoteProject, dirtyFields.get(local.id)));
-      } else if (dirtyFields.has(local.id)) {
-        mergedProjects.push(local); // 远端已删除但本地正在编辑：保留，等保存时以本地为准
-      }
-      // 否则：远端已删除且本地未编辑 → 丢弃
-    }
-    for (const remoteProject of remote.projects) {
-      // 本地没有的新项目 → 追加
-      if (!localIds.has(remoteProject.id)) mergedProjects.push(remoteProject);
-    }
+    const mergedProjects = mergeProjectList(app.value.projects, remote.projects);
     const nextStdLibs = { ...app.value.standardLibraries } as Record<StandardLibKey, StandardLib>;
     for (const key of STANDARD_LIB_KEYS) {
       if (!dirtyStdLibs.has(key)) nextStdLibs[key] = remote.standardLibraries[key];
@@ -2065,12 +2195,18 @@ export function useToolbox() {
         announcement.value = String(annDoc?.content || "");
         announcementDirty = false;
       }
-      // 未拉取 projects 域时沿用本地数组：既不清空，也让下游合并自然成为空操作。
-      const remoteProjects = projects ? listDocuments(projects).map(projectFromDocument) : app.value.projects;
+      // 列表响应只含轻量元数据 → 以 loaded:false 构建；重字段由合并逻辑保留本地值。
+      // 未拉取 projects 域时传本地数组（合并结果即为空操作）。
+      const remoteProjects = projects
+        ? listDocuments(projects).map((doc) => projectFromDocument(doc, { loaded: false }))
+        : app.value.projects;
+      // ⚠️ 两条分支都必须经 mergeProjectList：全量替换分支若直接用 remoteProjects，
+      // 会把已加载项目的重字段（工具/航材清单、准备单）整体抹成空值。
+      const mergedProjects = mergeProjectList(app.value.projects, remoteProjects);
       if (merge) {
         applyRemoteMerge({ libraries, materialLibraries, projects: remoteProjects, toolCart, standardLibraries: stdLibs });
       } else {
-        app.value = normalizeApp({ libraries, materialLibraries, projects: remoteProjects, toolCart, standardLibraries: stdLibs });
+        app.value = normalizeApp({ libraries, materialLibraries, projects: mergedProjects, toolCart, standardLibraries: stdLibs });
       }
       computeNextId();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
@@ -2415,6 +2551,7 @@ export function useToolbox() {
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
     dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toast, shared, imageExportBusy,
     notify, notifyOk, notifyErr, persist, queuePersist, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
+    ensureProjectLoaded, projectLoadState, retryProjectDetail,
     createProject, deleteProject, duplicateProject, updateProject, setAircraftType, saveStdLib,
     itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
