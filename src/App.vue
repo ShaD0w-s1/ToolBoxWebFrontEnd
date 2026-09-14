@@ -198,14 +198,32 @@ function baseUrl(): string {
   return location.origin + location.pathname.replace(/index\.html$/i, "");
 }
 
-/** 分享剪贴板格式：`链接` + 隔断 + `名称`。
- *  隔断取换行 —— 链接本体独占一行，任何聊天窗口都能整段识别为可点击链接，名称在下一行说明是哪个项目。 */
+/** 分享剪贴板格式：`链接` + 隔断 + `名称/内容说明`。
+ *  隔断取换行 —— 链接本体独占一行，任何聊天窗口都能整段识别为可点击链接；说明放下一行，不干扰链接。 */
 const SHARE_LABEL_SEP = "\n";
+/** 说明内部的条目分隔符（项目名称 / 准备单 / 各清单 之间）。 */
+const SHARE_ITEM_SEP = " · ";
+
 function shareText(url: string, label: string): string {
   const name = (label || "").trim();
   return name ? `${url}${SHARE_LABEL_SEP}${name}` : url;
 }
-/** 当前所处的分享语境名称：换发/APU 等二级页取项目名，标准库/工具车取各自标题。 */
+
+/** 二级页分享说明：`项目名称 + 准备单及各清单`。
+ *  清单集合按项目类型给出，与 ProjectDetail / GanttPrep 页签命名严格一致，
+ *  让接收方一眼看出这次分享的内容包含哪些准备单与清单。 */
+function projectShareLabel(project: Project): string {
+  const listsByType: Record<string, string[]> = {
+    "A检": ["工作准备单", "工卡分配清单", "航材清单", "工具清单"],
+    "单独项目": ["单项准备单", "航材清单", "工具清单"],
+    "换发/APU": ["换发/APU 准备单", "手册清单", "串件航材清单", "串件工具清单"],
+  };
+  // 零散 / 历史项目（无上述类型）二级页仅含工具清单。
+  const parts = listsByType[project.type] || ["工具清单"];
+  return [project.name, ...parts].filter(Boolean).join(SHARE_ITEM_SEP);
+}
+
+/** 标准库 / 工具车等内联分享的说明文字。 */
 function currentShareLabel(): string {
   if (store.editingLibrary.value) return `${store.editingLibrary.value} 工具标准库`;
   if (store.editingMaterialLibrary.value) return `${store.editingMaterialLibrary.value} 航材标准库`;
@@ -216,16 +234,19 @@ function currentShareLabel(): string {
 async function share(scope: SharePayload["scope"]): Promise<void> {
   try {
     if (scope === "app") {
-      // 一级页面：直接分享裸域名（列表数据由后端共享，接收方打开即见同一列表）
+      // 一级页面：分享的是「项目列表一级页」链接本身（不含任何项目，列表数据由后端共享）——
+      // 按需求保持裸域名，不追加项目名。
       await copyText(baseUrl());
       store.notify("一级页面链接已复制");
       return;
     }
     if (scope === "detail" && !store.editingLibrary.value && store.currentProject.value) {
-      // 二级页面（工作项目）：hash 路由直链（带项目 id），接收方打开后直达该项目的二级页（刷新保持）。
-      const url = `${baseUrl()}#/project/${encodeURIComponent(store.currentProject.value.id)}`;
-      await copyText(shareText(url, store.currentProject.value.name));
-      store.notify(`二级页面链接已复制（${store.currentProject.value.name}）`);
+      // 二级页面（工作项目）：hash 路由直链（带项目 id），接收方打开后直达该项目的二级页（刷新保持）；
+      // 复制内容 = 链接 + 隔断 + 项目名称 + 准备单及各清单。
+      const project = store.currentProject.value;
+      const url = `${baseUrl()}#/project/${encodeURIComponent(project.id)}`;
+      await copyText(shareText(url, projectShareLabel(project)));
+      store.notify(`二级页面链接已复制（${project.name}）`);
       return;
     }
     // 标准库 / 工具车：仍用内联 #s= 方式（自带数据，跨设备稳健），保持旧行为
@@ -240,8 +261,9 @@ async function share(scope: SharePayload["scope"]): Promise<void> {
         : store.currentProject.value,
     };
     const longUrl = await createShareUrl(payload);
-    await copyText(shareText(longUrl, currentShareLabel()));
-    store.notify("分享链接已复制");
+    const label = scope === "cart" ? "工具车数据库" : currentShareLabel();
+    await copyText(shareText(longUrl, label));
+    store.notify(scope === "cart" ? "工具车分享链接已复制" : "分享链接已复制");
   }
   catch { store.notify("复制失败，请检查浏览器权限"); }
 }
