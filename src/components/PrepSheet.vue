@@ -286,8 +286,6 @@ function exportTableXlsx(): void {
 .danger-cell { flex: 0 0 auto; padding: 6px 10px; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: var(--fs-12); cursor: pointer; }
 
 .prep-block-actions { margin-top: 10px; display: flex; gap: 8px; }
-.prep-text { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-.prep-text textarea { min-height: 56px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-14); resize: vertical; }
 
 /* 移动端/平板适配（≤1024px）：4 列行显示 2 列，6 列行显示 3 列；填字格宽度不超过网页一半（2列=半宽，3列=1/3） */
 @media (max-width: 1024px) {

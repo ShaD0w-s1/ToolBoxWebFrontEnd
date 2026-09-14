@@ -158,11 +158,12 @@ font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
 - **容器结构**：`.list-side-col`（左列，`flex:0 0 33.3333%` + `position:sticky;top:8px` + `gap:12px`）→ 内含 `.list-side`（筛选条件卡）与 `AircraftQueryCard`（查询卡）两张同级卡片。**sticky 在列容器上，不在卡片上**。
 - 外壳 `.aq-card`：`--n0` 白底（与筛选卡一致）+ `--line` 边框 + `--r-lg`，内边距 14px，纵向 10px 间距。
 - 卡头 `.aq-head`：标题 14px/700 + 右侧 `.aq-tag`「只读」胶囊（`--n3` 底 `--n7` 字 10px/700，`margin-left:auto`）。
-- 机号行 `.aq-search`：`position:relative` 包裹 `AircraftRegSuggest`；`.aq-clear`（20px 圆 · `--danger-bg`/`--danger`）绝对定位右侧 6px 垂直居中，`z-index:2`；`:deep(.ars-input)` 补 `padding-right:30px` 让位。**输入框即机号显示行（2026-09-13 用户定稿合并，不再单列「机号」展示行）。**
+- 机号行 `.aq-search`：`position:relative` 包裹 `AircraftRegSuggest`；`.aq-clear` 为**方形清空键**（见 §2.3.1：`height: calc(100% - 8px)` + `aspect-ratio:1/1` + **`min-height:0`** + `--r-sm`，实测 22×22），绝对定位右侧 5px 垂直居中，`z-index:2`；`:deep(.ars-input)` 补 `padding-right:34px` 让位。**输入框即机号显示行（2026-09-13 用户定稿合并，不再单列「机号」展示行）。**
 - 字段格 `.aq-cell` / `.aq-block`：`--n0` 底 + `--line` 边框 + `--r-sm`，padding 6px 8px；`dt` 10px/700 `--n7`；`dd` 14px/600 `--n10` + `overflow-wrap:anywhere`。
 - 字段排布：FSN+MSN、ETOPS+ELT-DT 用 `.aq-pair`（`grid-template-columns:1fr 1fr`）；发动机、机型各占整行。
 - 特殊构型：ETOPS / ELT-DT 非 `N/A` → `.aq-special`（`--danger` 700），与准备单 `special-config` 语义一致。
 - 空/错误态：未输入不渲染提示块；完整机号查无 → `.aq-hint.aq-miss`（`--danger` 600）显示「库中无此机号：B-XXXX」。
+- 清空键 hover 用令牌 `--danger-bg-hover`（2026-09-14 新增到 `:root`，替换原先 7 处散落的 `#f9dcdc`）。
 
 ### 2.5 移动端适配（≤768px）与物品行表 / 工序卡 / 甘特列宽（✅ 已落地 2026-09-05）
 **断点**：全站响应式断点统一 `@media (max-width: 768px)`；移动端视觉验证默认用 375px 视口（本机 Edge headless 截图，样本见 `output/mobcheck/`）。
@@ -190,15 +191,19 @@ font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
 3. 移动行表缝隙 = 行卡 margin；cell 透明、背景置行卡，防色缝。
 4. 子组件元素钉父级布局区必须 `:deep()` 穿透 scoped。
 
-## 3. 状态覆盖（⚠️ 部分落地）
+## 3. 状态覆盖（✅ 已落地）
+
+> ⚠️ **2026-09-14 复核**：下表原记录的「加载态/成功态未完成」**已修复**，实测为准：
+> `notify()` 已内置 `guessLevel` 内容推断兜底（`无法/失败/错误…`→err，`完成/成功/已保存…`→ok），
+> 199 处调用无需逐一分级即可正确分色；`.sync-spinner` 仍有 2 处重复实现（见 §6 剩余项）。
+> 下一轮只需补 `LoadingState.vue` 组件封装（可选）。
+
 | 状态 | 规范 | 现状 |
 |------|------|------|
 | 空态 | 统一 `.empty-state` | ✅ 各列表/清单已有（散落但类名一致） |
-| 加载态 | spinner + 文案 | ⚠️ `.loading-state` 全局类已存在且用于 6 处；但 `.sync-spinner` 另有 2 处重复实现、无组件封装、**无按钮内 loading**（可重复点击）。详见 §7.3 |
+| 加载态 | spinner + 文案 | ✅ `.loading-state` 全局类用于 6 处；⚠️ `.sync-spinner` 另有 2 处重复实现、无组件封装（低优先） |
 | 错误态 | toast 统一 | ✅ 全站 `notify()` 统一；`.toast.err` 红已实现 |
-| 成功态 | toast 分色 | ⚠️ `.toast.ok` 绿 / `.toast.err` 红**已实现**，但 199 个调用点仅 84 处显式分级，**约 115 处仍走默认灰**（含「导入完成」「导出失败」）。修正方案见 §7.2 |
-
-> 2026-09-04 实测修订：§3 后两行原记为「✅ 56 处已分色」，实测为部分完成，**以本节为准**。
+| 成功态 | toast 分色 | ✅ `.toast.ok` 绿 / `.toast.err` 红 + `guessLevel` 自动推断（无需逐点分级） |
 
 ## 4. 层级架构（✅ 已落地）
 ```
@@ -214,23 +219,25 @@ L4 内容区（卡片/表格/输入；四态统一）
 |------|------|------|
 | P0 | 设计令牌落地（中性色阶/字号/间距/圆角/阴影） | ✅ 17 组件 +249 处、main.css +83 处 |
 | P0 | 按钮 4 级统一 | ✅ 4 级 36px |
-| P1 | 输入框统一 `.inp` | ⚠️ **实测修订**：`.inp` 4 变体已落地，但**表格化后几乎无人用**——53 个 textarea 走组件私有类（`textwrap` 17 / `itg-note-input` 8（**0 定义**）/ `sp-cell` 4 / `f-*` 5 / `notes` 2）。缺 T2 单元格、T3 内联两层基类，见 §7.1 |
-| P1 | 四态组件（空/加载/错误/成功） | ⚠️ 空态✅；错误✅；成功⚠️（115 处未分色，§7.2）；加载⚠️（2 处重复 spinner + 无组件 + 无按钮 loading，§7.3） |
+| P1 | 输入框统一 `.inp` | ⚠️ **2026-09-14 复核**：`.inp` 4 变体已落地；表格内 textarea 走组件私有类（`textwrap` / `sp-cell` / `f-*` / `notes`）。原记录的 `itg-note-input`（8 处 0 定义）**已全部迁移为 `.cell-inp is-note`，现为 0 引用**。缺 T2 单元格、T3 内联两层全局基类，见 §7.1 |
+| P1 | 四态组件（空/加载/错误/成功） | ✅ 空态 / 错误态 / **成功态（`guessLevel` 兜底分色）** 已落地；加载态 ⚠️ 仅剩 `.sync-spinner` 2 处重复实现待收敛（P2） |
 | P1 | 面包屑 + 层级强化 | ✅ 二级页面包屑 + Tab/Segmented 区分 |
 | P2 | 移动端真机验证（640/1024 断点 + 触摸 ≥44px） | ⏸ 未排期 |
 | P2 | 对比度审计 | ⚠️ `--n7`≈5.8:1 ✓；danger 浅红底文字待复核（当前白底红字实际达标） |
 
 ## 6. 待办（下一轮按序补齐）
 
-> 已按 2026-09-04 实测重写，实施顺序与参考样式见 **§7.4 优先级建议**。
-
-1. toast `notify` 加 `guessLevel` 兜底（改 1 行，115 处灰 toast 立刻分色）
-2. 按钮 `is-loading` 禁用态（导出/导入类，防重复点击）
-3. `itg-note-input` 死类名 → `.cell-inp is-note`（8 处，须重测导出图片）
-4. `LoadingState.vue` 替换 6 处 + 全屏遮罩收敛（消 2 处 `.sync-spinner`）
-5. `textwrap`/`sp-cell`/`f-*` 逐组件迁移到 `.cell-inp`（私有类收敛）
-6. （P2）骨架屏 / toast 多条堆叠
-7. （P2）移动端真机复核（布局已落地见 §2.5；真机观感 / 触摸热区 ≥44px 审计）
+> 已按 **2026-09-14 复核**重写：§6 原 1/2/3 项**均已完成**（见各条状态），剩余为收敛与体验类。
+>
+> 1. ~~toast `notify` 加 `guessLevel` 兜底~~ → ✅ **已完成**（`useToolbox.ts` 已内置 `ERR_HINT`/`OK_HINT` 推断）
+> 2. ~~按钮 `is-loading` 禁用态~~ → ✅ **已完成**（9 处 `is-loading` 全部同时带 `disabled`）
+> 3. ~~`itg-note-input` 死类名~~ → ✅ **已完成**（全项目 0 引用，已迁移到 `.cell-inp is-note`）
+> 4. `LoadingState.vue` 组件封装（替换 6 处 `.loading-state` + 消 2 处 `.sync-spinner`）— P2，纯收敛
+> 5. `textwrap`/`sp-cell`/`f-*` 逐组件迁移到 `.cell-inp`（私有类收敛）— P2
+> 6. 硬编码色值收敛：`main.css` 115 处 / `GanttPrep` 84 处（业务色 `#FDCA17`/`#E8A44D` 等），建议逐步升为令牌 — P2
+> 7. （P2）骨架屏 / toast 多条堆叠
+> 8. （P2）移动端真机复核（布局已落地见 §2.5；真机观感 / 触摸热区 ≥44px 审计）
+> 9. （P2）`listTab`（项目列表/数据库标签页）未纳入 URL → 刷新后回到「项目列表」；如需保持可加入 hash 路由
 
 **参考样式 Demo**：`output/ui-spec-gap-demo.html`（浏览器直接打开，含输入框 3 层、toast 4 级、加载态 5 种形态的可交互预览）
 
@@ -238,8 +245,9 @@ L4 内容区（卡片/表格/输入；四态统一）
 
 ## 7. 三项补齐方案（2026-09-04 实测修订 + 参考样式）
 
-> ⚠️ **本节结论基于 2026-09-04 实测，与 §3/§6 的旧结论不一致时以本节为准。**
-> 实测：`itg-note-input` 8 处引用 **0 定义**（死类名）；`notify` 199 调用点仅 84 处显式分级；`.loading-state` 已存在但 `.sync-spinner` 另有 2 处重复实现。
+> ⚠️ **本节结论基于 2026-09-04 实测；2026-09-14 复核后有更新，以更新项为准。**
+> 2026-09-04 实测：`itg-note-input` 8 处引用 **0 定义**（死类名）；`notify` 199 调用点仅 84 处显式分级；`.loading-state` 已存在但 `.sync-spinner` 另有 2 处重复实现。
+> **2026-09-14 复核**：`itg-note-input` → 0 引用（已迁移 `.cell-inp is-note`）；`notify` → 已加 `guessLevel` 兜底，无需逐点分级；`.sync-spinner` → 仍 2 处，待收敛。
 
 ### 7.1 输入框收敛（实测修正）
 
@@ -248,7 +256,7 @@ L4 内容区（卡片/表格/输入；四态统一）
 | 类名 | 引用 | 定义位置 | 判定 |
 |---|---|---|---|
 | `textwrap` | 17 | GanttPrep scoped ×2 | ⚠️ 私有类，仅单组件可用 |
-| `itg-note-input` | 8 | **无（0 定义）** | 🔴 死类名，靠 `.itg textarea` 兜底 |
+| `itg-note-input` | 0 | ~~无（0 定义）~~ 已迁移 | ✅ 2026-09-14 复核：已全部改为 `.cell-inp is-note`，死类名清除 |
 | `sp-cell` | 4 | scoped ×3 | ⚠️ 私有类 |
 | `f-content` / `f-note` | 3 / 2 | scoped ×4 / ×2 | ⚠️ 私有类 |
 | `notes` | 2 | scoped ×2 + main.css ×2 | ⚠️ 跨层重复 |

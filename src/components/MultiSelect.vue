@@ -73,7 +73,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
   background: var(--danger-bg); color: var(--danger); font-size: var(--fs-13); line-height: 1;
   display: flex; align-items: center; justify-content: center;
 }
-.ms-clear:hover { background: #f9dcdc; }
+.ms-clear:hover { background: var(--danger-bg-hover); }
 .ms-menu {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60;
   max-height: 220px; overflow-y: auto; padding: 4px;

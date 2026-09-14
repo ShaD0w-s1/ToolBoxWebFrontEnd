@@ -170,7 +170,7 @@ function hasSpecialConfig(value: string): boolean {
   cursor: pointer; z-index: 2;
   display: flex; align-items: center; justify-content: center;
 }
-.aq-clear:hover { background: #f9dcdc; }
+.aq-clear:hover { background: var(--danger-bg-hover); }
 .aq-hint { margin: 0; font-size: var(--fs-12); color: var(--n6); }
 .aq-miss { color: var(--danger); font-weight: 600; }
 .aq-body { display: flex; flex-direction: column; gap: 8px; margin: 0; }
