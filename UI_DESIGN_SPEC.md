@@ -110,6 +110,22 @@
 - 已落地 3 个容器：`.gp-tpl-list`（换发/APU 调取·保存模板）、`.tpl-list`（单项 调取·保存模板）、`.eng-tpl-list`（模板库 ×2 共用）。
 - 新增类名而非改共享卡片类，避免波及同类弹窗（如「网站管理」）。
 
+### 2.3.3 协同编辑锁键（`v-lock`）必须是稳定键（✅ 已修复 2026-09-14）
+
+`v-lock` 的值即编辑会话键，**只能由不可变标识构成**（uuid、稳定 id、固定字段名）。键一旦内嵌「正在被编辑的字段」，打字就会让键逐键漂移，`focusout` 用漂移后的键去 `endEdit` 会因查不到会话而静默失败 → 旧键残留为**幽灵会话**：他人持续看到该格被占用，且直到 2 分钟空闲超时才被动保存脱离。
+
+| 安全（推荐） | 不安全（历史坑） |
+|---|---|
+| `lockKey('card', card.id, 'owner')` | `itemKey(it)` = `cat␁sub␁name␁partNo`（含名称/件号） |
+| `lockKey('partitem', it.id, 'qty')` | `rowKeyOf()` = `section:工卡号`（含工卡号） |
+| `lockKey('work', String(w.id), '工作内容')` | `lockKey('docwp', 'row' + i, …)`（含数组下标） |
+
+实现侧已加双保险（`utils/editLock.ts` + `composables/useToolbox.ts`）：
+1. `focusout` **用 focus 瞬间快照键** `state.__lockKey` 结束会话（禁止用当前 `binding.value`）；
+2. `updated()` 检测到键漂移时调 `store.migrateEditKey(old, new)` 原地迁移会话，使会话键始终与当前键一致。
+
+新增单元格绑定 `v-lock` 时，先自问：**这个键在我编辑本格内容的过程中会不会变？** 会变就换成稳定 id。
+
 ### 2.4 字体规范（✅ 已落地 2026-08-23，组件非令牌字号已清理 225 处）
 **字体族**（main.css `:root`，全局继承 `font: inherit`）：
 ```css
