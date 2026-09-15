@@ -4,6 +4,10 @@ import { createRouter, createWebHashHistory } from "vue-router";
  * 路由表（hash 模式，兼容 CloudBase 静态托管 + vite base:"./"）。
  * 说明：视图仍由 App.vue 顶层 v-if 按 store.screen 渲染（保留 emit 链），
  * 本 router 仅承担 URL 结构 + 深链恢复 + 前进/后退历史；component 字段为未来迁移 router-view 预留。
+ *
+ * ⚠️ hash 模式只操作 fragment：`router.replace()` 最终以 `replaceState(state, "", "#/…")`
+ *    落地，而「仅片段」的相对 URL 会**保留现有的查询串**。因此清掉 `?pid=`（分享深链参数）
+ *    必须由 App.vue 显式 `replaceState` 完成，不能指望路由代劳。
  */
 export const router = createRouter({
   history: createWebHashHistory(),

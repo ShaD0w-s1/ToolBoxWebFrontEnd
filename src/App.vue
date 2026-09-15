@@ -267,9 +267,36 @@ async function share(scope: SharePayload["scope"]): Promise<void> {
   catch { store.notify("复制失败，请检查浏览器权限"); }
 }
 
-/** 打开带 ?p=名称/日期 的分享链接：从已加载（后端/本地缓存）的项目中按名称+日期匹配并打开。 */
+/** 清掉地址栏上的深链参数（`?pid=` / `?p=`）。
+ *
+ *  ⚠️ 必须显式清理：vue-router 的 hash 模式只改 fragment，`router.replace()` 落地的
+ *  `replaceState(state,"","#/…")` 是「仅片段」相对 URL，会**保留现有查询串**。
+ *  只改 query、保留 fragment，与路由视图状态保持一致（不触发 popstate）。 */
+function stripDeepLinkQuery(): void {
+  if (!location.search) return;
+  history.replaceState(null, "", location.pathname + location.hash);
+}
+
+/** 打开分享链接：优先新格式 `?pid=<项目 id>`，回退旧格式 `?p=名称/日期`（仅兼容历史链接）。
+ *
+ *  ⚠️ 新格式必须走查询串：CloudBase 测试域名的「风险提醒」中间页会把 hash 换成 `#/`
+ *  但保留查询串，而首次点击分享链接必然经过该中间页 —— 用 hash 就会丢深链落到一级页。
+ *  详见 `services/sharing.ts` 的 `projectDeepLink`。 */
 function openFromQuery(): void {
-  const p = new URLSearchParams(location.search).get("p");
+  const params = new URLSearchParams(location.search);
+  // ① 新格式：按 id 精确定位（id 不可变，不受改名 / 同名同日影响）
+  const pid = (params.get("pid") || "").trim();
+  if (pid) {
+    if (store.app.value.projects.some((item) => item.id === pid)) {
+      store.openProject(pid);
+    } else {
+      store.notify("未找到该项目，可能已被删除或尚未同步");
+    }
+    stripDeepLinkQuery();
+    return;
+  }
+  // ② 旧格式：名称 + 创建日期匹配（历史链接）
+  const p = params.get("p");
   if (!p) return;
   const idx = p.lastIndexOf("/");
   if (idx <= 0) return;
@@ -280,10 +307,10 @@ function openFromQuery(): void {
   );
   if (project) {
     store.openProject(project.id);
-    history.replaceState(null, "", baseUrl());
   } else {
     store.notify("未找到该项目，可能已被删除或尚未同步");
   }
+  stripDeepLinkQuery();
 }
 
 // ===== SPA 路由桥接：store.screen 与 hash 路由双向同步（深链恢复 + 前进/后退 + 刷新保持） =====
@@ -340,12 +367,16 @@ let routeSyncing = false;
 let routeReady = false;
 /** 数据就绪前到达的 hash 路径：先挂起，等 loadRemote 完成后再统一应用，避免视图来回切换。 */
 let pendingRoutePath: string | null = null;
-watch(() => store.screen.value, () => {
-  if (routeSyncing || !routeReady) return;
+/** 把地址栏同步为当前视图对应的 URL（视图 → URL 的唯一出口）。 */
+function syncUrlFromScreen(): void {
   const target = screenPath();
   if (route.path === target) return;
   routeSyncing = true;
   router.replace(target).finally(() => { routeSyncing = false; });
+}
+watch(() => store.screen.value, () => {
+  if (routeSyncing || !routeReady) return;
+  syncUrlFromScreen();
 });
 watch(() => route.path, (path) => {
   if (routeSyncing) return;
@@ -409,13 +440,17 @@ onMounted(async () => {
     await router.isReady();
     // ② 再等远端数据到位，保证 #/project/:id 能解析出对应项目。
     await store.loadRemote();
-    // ③ 深链恢复：优先 hash 路由（新格式），无具体路径时退回旧 ?p= 分享格式。
+    // ③ 深链恢复：优先 hash 路由（应用内导航 / 已过中间页的链接），
+    //    无具体路径时解析查询串（`?pid=` 新分享格式 / `?p=` 历史格式）。
     const target = pendingRoutePath ?? route.path;
     if (target && target !== "/") applyRoutePath(target);
     else openFromQuery();
   }
   // ④ 数据与视图均就位后才放行「视图 → URL」回写。
   routeReady = true;
+  // ⑤ 收敛地址栏：用 `?pid=` 进入时此刻地址栏还停在「一级页」形态，
+  //    需要补写成 #/project/<id>，否则刷新会丢深链、再分享也会拿到错误地址。
+  syncUrlFromScreen();
   // 无密码身份标识：首次（或本设备无身份）时弹窗输入姓名
   if (!store.identityReady.value) showIdentityModal.value = true;
   // 启动每 2 秒自动同步（推送本地变更到云端，不覆盖本地编辑）
