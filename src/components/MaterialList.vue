@@ -240,7 +240,8 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
     if (d?.material_deleted) parts.push(`航材删除 ${d.material_deleted} 个`);
     if (d?.material_added) parts.push(`航材补充 ${d.material_added} 个`);
     props.store.notify(parts.length ? `已按卡筛选：${parts.join("、")}` : "航材清单无需变更");
-    await props.store.loadRemote();
+    // 后端已重写该项目的 material_list/sections 并 version+1 → 强制重取详情（理由见 ProjectDetail 同处注释）。
+    await props.store.refreshProjectDetail(project.id);
   } catch (error) {
     props.store.notify(error instanceof Error ? error.message : "按卡筛选失败", "err");
   }

@@ -738,23 +738,26 @@ export function useToolbox() {
    *
    *  @returns 该项目；项目不存在返回 null；请求失败会抛错（由调用方提示）。
    */
+  /** 拉取某项目详情并合并进本地（`ensureProjectLoaded` 与 `refreshProjectDetail` 共用）。 */
+  async function fetchProjectDetail(id: string): Promise<void> {
+    const result = await backend.getProject(id);
+    const detail = projectFromDocument(result.data, { loaded: true });
+    const index = app.value.projects.findIndex((p) => p.id === id);
+    if (index >= 0) {
+      app.value.projects[index] = mergeProjectFields(app.value.projects[index], detail, dirtyFields.get(id));
+      // 载入后物品编号空间变化 → 重算，避免新增行与既有行编号冲突。
+      computeNextId();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
+    }
+  }
+
   async function ensureProjectLoaded(id: string): Promise<Project | null> {
     const found = app.value.projects.find((p) => p.id === id);
     if (!found) return null;
     if (found.loaded === true) return found;
     let pending = loadingProjects.get(id);
     if (!pending) {
-      pending = (async () => {
-        const result = await backend.getProject(id);
-        const detail = projectFromDocument(result.data, { loaded: true });
-        const index = app.value.projects.findIndex((p) => p.id === id);
-        if (index >= 0) {
-          app.value.projects[index] = mergeProjectFields(app.value.projects[index], detail, dirtyFields.get(id));
-          // 载入后物品编号空间变化 → 重算，避免新增行与既有行编号冲突。
-          computeNextId();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(app.value));
-        }
-      })().finally(() => { loadingProjects.delete(id); });
+      pending = fetchProjectDetail(id).finally(() => { loadingProjects.delete(id); });
       loadingProjects.set(id, pending);
     }
     await pending;
@@ -778,6 +781,50 @@ export function useToolbox() {
     const id = currentProjectId.value;
     if (id) void loadProjectDetail(id);
   }
+
+  /** 强制重取某项目详情 —— 用于**服务端已改写该项目内容**的写路径（如「应用工卡」）。
+   *
+   *  与 `ensureProjectLoaded` 的差别：
+   *  - 不吃「已加载」短路（内容已变，本地那份就是陈旧的）；
+   *  - 新数据到位前**不改 `loaded`**，避免详情页闪一下加载闸门；
+   *  - 失败时把项目标回「待重取」，让闸门自愈（带重试按钮）而不是静默保留陈旧数据。
+   */
+  async function refreshProjectDetail(id: string): Promise<void> {
+    if (!app.value.projects.some((p) => p.id === id)) return;
+    try {
+      await fetchProjectDetail(id);
+    } catch (error) {
+      const index = app.value.projects.findIndex((p) => p.id === id);
+      if (index >= 0) app.value.projects[index].loaded = false;
+      notify(errorMessage(error, "项目数据刷新失败，请重试"));
+    }
+  }
+
+  /** ⚠️ 加载闸门必须始终有请求在飞 —— 否则会永久停在「正在加载项目数据…」。
+   *
+   *  `loaded` 被置为 false 不止发生在 `openProject`：**任何一次 projects 域拉取发现版本漂移**
+   *  都会把已打开的项目标记为「重字段过期」，典型来源有两个：
+   *    ① 服务端侧写入（`apply-workcard` 会重写 sections/material_list/prep_sheet 并把 version+1）；
+   *    ② 其他人修改了该项目（轮询拉到新版本号）。
+   *  此时若用户已经停在详情页，没有任何路径会重新发起请求 —— `needsProjectLoad` 的闸门照常显示，
+   *  但 `projectLoadState` 仍是 idle（既没有请求、也不显示「重试」），页面就永久卡住了。
+   *  这里保证「当前打开的项目变为未加载」时立即补发请求。 */
+  watch(
+    () => {
+      const project = currentProject.value;
+      return project ? `${project.id}:${project.loaded === true}` : "";
+    },
+    () => {
+      const project = currentProject.value;
+      if (!project || project.loaded === true) return;
+      // 机型库 / 航材库视图不参与项目闸门（与 ProjectDetail 的 needsProjectLoad 判定一致）。
+      if (editingLibrary.value || editingMaterialLibrary.value) return;
+      // 已有请求在飞 → 等它；失败态 → 交给「重试」按钮，避免自动重试风暴。
+      if (loadingProjects.has(project.id) || projectLoadState.value === "error") return;
+      void loadProjectDetail(project.id);
+    },
+    { immediate: true },
+  );
 
   /** 打开项目详情。列表响应已不含重字段，故进入后按需拉取该项目的清单/准备单。
    *  有意不 await：先切页再后台加载，详情视图用 `currentProject.loaded` 显示加载态。 */
@@ -2551,7 +2598,7 @@ export function useToolbox() {
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
     dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toast, shared, imageExportBusy,
     notify, notifyOk, notifyErr, persist, queuePersist, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
-    ensureProjectLoaded, projectLoadState, retryProjectDetail,
+    ensureProjectLoaded, projectLoadState, retryProjectDetail, refreshProjectDetail,
     createProject, deleteProject, duplicateProject, updateProject, setAircraftType, saveStdLib,
     itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,

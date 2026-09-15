@@ -343,8 +343,11 @@ async function applyWorkCardListFile(event: Event): Promise<void> {
     if (parts.length) msg += `；${parts.join("、")}`;
     subPage.value = "tools";
     props.store.notify(msg);
-    // 后端已写入云端并 _bump_revision，拉取权威结果（其它端由轮询/watch 同步）。
-    await props.store.loadRemote();
+    // 后端已重写该项目的 sections/material_list/prep_sheet/workcard_assignment 并把 version +1，
+    // 必须**强制重取详情**：不能只 loadRemote 后靠「版本漂移」间接触发，也不能本地 version+1
+    // （那会把陈旧的本地清单当成权威内容，反而可能回写覆盖云端的筛选结果）。
+    // 只拉这一个项目（1 个请求），其余端点与本端同步由 revision/轮询负责。
+    await props.store.refreshProjectDetail(project.id);
   } catch (error) {
     props.store.notify(error instanceof Error ? error.message : "解析表格失败", "err");
   }
@@ -364,7 +367,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
     if (d?.material_deleted) parts.push(`航材删除 ${d.material_deleted} 个`);
     if (d?.material_added) parts.push(`航材补充 ${d.material_added} 个`);
     props.store.notify(parts.length ? `已按卡筛选：${parts.join("、")}` : "清单无需变更");
-    await props.store.loadRemote();
+    await props.store.refreshProjectDetail(project.id);
   } catch (error) {
     props.store.notify(error instanceof Error ? error.message : "按卡筛选失败", "err");
   }
