@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/check-build-meta.mjs",
+    "build:only": "vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
-    "check": "npm run type-check && vite build"
+    "check": "npm run type-check && npm run build",
+    "prune:hosting": "node scripts/prune-hosting.mjs"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^3.7.1",
