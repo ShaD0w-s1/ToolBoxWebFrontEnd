@@ -28,4 +28,6 @@ Thumbs.db
 
 # Stray artifacts
 dist_old_*
+dist.bak
 compare_report.html
+output/
