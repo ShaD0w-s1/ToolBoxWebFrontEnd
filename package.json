@@ -10,7 +10,10 @@
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
     "check": "npm run type-check && npm run build",
-    "prune:hosting": "node scripts/prune-hosting.mjs"
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:dry": "node scripts/deploy.mjs --dry-run",
+    "prune:hosting": "node scripts/prune-hosting.mjs",
+    "prune:snapshots": "node scripts/prune-snapshots.mjs"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^3.7.1",
@@ -23,6 +26,7 @@
   "devDependencies": {
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
+    "cos-nodejs-sdk-v5": "^3.0.0",
     "typescript": "^5.9.3",
     "vite": "^7.0.0",
     "vue-tsc": "^3.3.9"
