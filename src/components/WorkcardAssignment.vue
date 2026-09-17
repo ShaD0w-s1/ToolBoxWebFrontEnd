@@ -495,7 +495,7 @@ onBeforeUnmount(() => {
 
 /* 人员安排布局 */
 .wa-personnel { margin-bottom: 10px; }
-.wa-person { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-13); color: #000; }
+.wa-person { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-13); color: var(--text-strong); }
 .wa-person span { font-size: var(--fs-12); color: var(--n7); }
 .wa-person input { padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .wa-person-top { margin-bottom: 8px; }
@@ -527,7 +527,7 @@ onBeforeUnmount(() => {
   min-width: 520px;
 }
 .wa-cell { background: var(--n0); padding: 4px 6px; display: flex; align-items: stretch; }
-.wa-head { background: var(--n1); font-weight: 600; font-size: var(--fs-13); color: #000; align-items: center; }
+.wa-head { background: var(--n1); font-weight: 600; font-size: var(--fs-13); color: var(--text-strong); align-items: center; }
 .wa-ops { justify-content: center; }
 .wa-cell input,
 .wa-cell select {
@@ -561,7 +561,7 @@ onBeforeUnmount(() => {
   border-color: #f2cdcd;
 }
 .wa-level-select option {
-  color: #000;
+  color: var(--text-strong);
   background: var(--n0);
 }
 /* 未分配部位表格的"部位"select 字体放大到与工卡名称一致（13px） */

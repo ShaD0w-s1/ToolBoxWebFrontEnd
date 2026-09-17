@@ -5,6 +5,7 @@ import type { GanttPrepState, GanttChart, GanttCard, GanttPartList, GanttPartLis
 import { backend } from "../api";
 import NameSuggest from "./NameSuggest.vue";
 import AircraftRegSuggest from "./AircraftRegSuggest.vue";
+import LoadingState from "./LoadingState.vue";
 import AttachmentSection from "./AttachmentSection.vue";
 import { createEditLockDirective } from "../utils/editLock";
 
@@ -2708,7 +2709,7 @@ async function importAllXlsx(event: Event): Promise<void> {
             <input v-model="tplQuery" class="inp" placeholder="模糊搜索模板名称…" aria-label="模糊搜索模板" />
             <button v-if="tplQuery" class="clear-btn" type="button" title="清空搜索" @click="tplQuery = ''">×</button>
           </div>
-          <p v-if="templatesLoading" class="loading-state">加载中…</p>
+          <LoadingState v-if="templatesLoading" />
           <div v-else-if="filteredTemplates.length" class="gp-tpl-list">
             <div v-for="t in filteredTemplates" :key="t._id" class="gp-tpl-row">
               <div class="gp-tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>{{ t.state.charts.length }} DAY · {{ t.state.charts.reduce((n, c) => n + c.cards.length, 0) }} 工序</span></div>
@@ -2795,13 +2796,13 @@ async function importAllXlsx(event: Event): Promise<void> {
 .gp-card { border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
 /* DAY 卡片：浅蓝底黑字；填空栏/选择框保持白底黑字 */
 .gp-card.day-card { background: var(--day-bg); }
-.gp-card.day-card .day-label { color: #222; }
-.gp-card.day-card .chart-title-input { color: #222; }
+.gp-card.day-card .day-label { color: var(--text); }
+.gp-card.day-card .chart-title-input { color: var(--text); }
 .gp-card.day-card .chart-title-input:hover { background: rgba(255, 255, 255, .6); border-radius: var(--r-xs); }
-.gp-card.day-card .chart-title-input:focus-visible { background: var(--n0); color: #222; box-shadow: none; }
-.gp-card.day-card .gp-sec-title { color: #222; border-left-color: var(--blue); }
-.gp-card.day-card .date-input { background: var(--n0); color: #222; }
-.gp-card.day-card .day-input { background: var(--n0); color: #222; }
+.gp-card.day-card .chart-title-input:focus-visible { background: var(--n0); color: var(--text); box-shadow: none; }
+.gp-card.day-card .gp-sec-title { color: var(--text); border-left-color: var(--blue); }
+.gp-card.day-card .date-input { background: var(--n0); color: var(--text); }
+.gp-card.day-card .day-input { background: var(--n0); color: var(--text); }
 .gp-sec-title { font-size: var(--fs-14); font-weight: 700; color: var(--blue-dark); margin: 10px 0 8px; border-left: 3px solid var(--blue); padding-left: 8px; }
 .gp-add { margin-top: 10px; }
 /* .icon-btn 已上移 main.css 共享卡壳基元（fs-16 统一版） */
@@ -2945,7 +2946,7 @@ async function importAllXlsx(event: Event): Promise<void> {
   position: absolute; top: 2px; right: 5px; z-index: 6;
   height: var(--gp-card-head); aspect-ratio: 1 / 1; width: auto; min-width: 16px;
   min-height: 0; padding: 0; border: none; border-radius: var(--r-sm);
-  background: rgba(255,255,255,.72); color: #000; cursor: pointer;
+  background: rgba(255,255,255,.72); color: var(--text-strong); cursor: pointer;
   font-size: var(--fs-12); line-height: 1; display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity .15s, background .15s, color .15s;
 }
@@ -3038,12 +3039,12 @@ textarea.textwrap {
 .form-card-row:not(.part-form-row) .form-card-title textarea {
   flex: none; width: 20em; min-width: 20em; max-width: 100%;
   background: transparent; border: none; box-shadow: none;
-  color: #000; font-weight: 600;
+  color: var(--text-strong); font-weight: 600;
   padding: 3px 4px;
 }
 /* 表单工序行输入框定宽：负责人 8 字加粗黑字 / 参与人自适应 / 备注 15 字红字 */
 .form-card-row .ns-owner { flex: none; width: 8em; min-width: 0; }
-.form-card-row .ns-owner .ns-input { font-weight: 600; color: #000; }
+.form-card-row .ns-owner .ns-input { font-weight: 600; color: var(--text-strong); }
 .form-card-row:not(.part-form-row) > textarea:last-of-type {
   flex: none; width: 15em; min-width: 15em;
   color: var(--danger);
@@ -3076,7 +3077,7 @@ textarea.textwrap {
   resize: none; overflow: hidden; line-height: 1.4; word-break: break-word; overflow-wrap: break-word; font-family: inherit;
   box-sizing: border-box; background: var(--n0); min-height: 26px;
 }
-.sp-name { min-height: 26px; color: var(--text, #222); }
+.sp-name { min-height: 26px; color: var(--text); }
 .sp-table select { width: 100%; height: 28px; border: 1px solid var(--n4); border-radius: var(--r-sm); padding: 0 4px; font-size: var(--fs-12); background: var(--n0); }
 /* 串件安排表：拆/装标签 + 只读展示 */
 .sp-tag { color: #b45309; font-weight: 700; font-size: var(--fs-12); margin-right: 2px; white-space: nowrap; }
@@ -3102,7 +3103,7 @@ textarea.textwrap {
 .part-suggest { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; max-height: 260px; overflow-y: auto; background: var(--n0); border: 1px solid var(--n4); border-radius: var(--r-lg); box-shadow: 0 8px 24px rgba(0, 0, 0, .12); padding: 4px; }
 .part-suggest-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: none; background: transparent; border-radius: var(--r-sm); cursor: pointer; text-align: left; }
 .part-suggest-item:hover { background: var(--blue-light, #eaf1fa); }
-.psi-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-13); color: var(--text, #222); }
+.psi-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-13); color: var(--text); }
 .psi-kind { flex-shrink: 0; font-size: var(--fs-11); padding: 1px 7px; border-radius: var(--r-pill); background: #eef2f8; color: var(--n7); }
 .psi-kind.card { background: #e3edfb; color: var(--blue-dark); }
 .psi-kind.pn { background: #fdecec; color: #b53a3a; }
@@ -3110,7 +3111,7 @@ textarea.textwrap {
 /* 卡片折叠按钮（.pt-collapse 已上移 main.css 共享卡壳基元） */
 
 /* ===== 重复梳理（航材按件号 / 工具按名称 卡片聚拢）——UI 对齐 A检 PartNoGroupCard ===== */
-.dedupe-toggle { display: flex; align-items: center; gap: 4px; font-size: var(--fs-13); color: var(--text, #222); }
+.dedupe-toggle { display: flex; align-items: center; gap: 4px; font-size: var(--fs-13); color: var(--text); }
 .dedupe-toggle input { width: 15px; height: 15px; accent-color: var(--blue); }
 .pnc-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .pnc-title { margin: 0; font-size: var(--fs-14); color: var(--n8); }
@@ -3166,7 +3167,7 @@ textarea.textwrap {
 .gp-tpl-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .gp-tpl-info.clickable { cursor: pointer; }
 .gp-tpl-info.clickable:hover strong { color: var(--blue); }
-.gp-tpl-info strong { font-size: var(--fs-14); color: var(--text, #222); }
+.gp-tpl-info strong { font-size: var(--fs-14); color: var(--text); }
 .gp-tpl-info span { font-size: var(--fs-12); color: var(--n7); }
 .gp-tpl-actions { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 .gp-empty { color: var(--n7); text-align: center; padding: 20px 0; }

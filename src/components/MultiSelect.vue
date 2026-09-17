@@ -1,17 +1,27 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, useId } from "vue";
 
-/** 下拉多选组件：含「全部」选项（选中全部=清空筛选）；右侧红色 × 清空；外部点击关闭。 */
+/** 下拉多选组件：含「全部」选项（选中全部=清空筛选）；右侧红色 × 清空；外部点击关闭。
+ *  无障碍：触发器为 disclosure（aria-expanded + aria-controls），浮层为 role=group、
+ *  各选项为原生 button + aria-pressed（多选筛选的准确语义：N 个独立开关，
+ *  键盘原生可用，无需自造 listbox/option 的 tabindex 管理）。 */
 const props = defineProps<{
   options: string[];
   modelValue: string[];
   placeholder?: string;
+  /** 浮层分组无障碍名（同页多个 MultiSelect 时用于区分）。 */
+  label?: string;
 }>();
 const emit = defineEmits<{ "update:modelValue": [v: string[]] }>();
 
 const open = ref(false);
 const sel = computed(() => props.modelValue);
 const isAll = computed(() => sel.value.length === 0);
+
+const uid = useId();
+const triggerId = `${uid}-trigger`;
+const menuId = `${uid}-menu`;
+const groupLabel = computed(() => props.label || "筛选项");
 
 function toggle(opt: string): void {
   if (opt === "__ALL__") { emit("update:modelValue", []); return; }
@@ -33,18 +43,26 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
 
 <template>
   <div class="ms" @click.stop>
-    <button type="button" class="ms-trigger" :class="{ on: !isAll }" @click="open = !open">
+    <button
+      :id="triggerId"
+      type="button"
+      class="ms-trigger"
+      :class="{ on: !isAll }"
+      :aria-expanded="open"
+      :aria-controls="menuId"
+      @click="open = !open"
+    >
       <span class="ms-label">{{ label() }}</span>
       <span v-if="!isAll" class="ms-count">{{ sel.length }}</span>
-      <span class="ms-arrow" :class="{ up: open }">▾</span>
+      <span class="ms-arrow" :class="{ up: open }" aria-hidden="true">▾</span>
     </button>
-    <button v-if="!isAll" type="button" class="ms-clear" title="清空选择" @click="clearAll">×</button>
-    <div v-if="open" class="ms-menu">
-      <button type="button" class="ms-opt" :class="{ on: isAll }" @click="toggle('__ALL__')">
-        <span>全部</span><span v-if="isAll" class="ms-check">✓</span>
+    <button v-if="!isAll" type="button" class="ms-clear" title="清空选择" aria-label="清空选择" @click="clearAll">×</button>
+    <div v-if="open" :id="menuId" class="ms-menu" role="group" :aria-label="groupLabel">
+      <button type="button" class="ms-opt" :class="{ on: isAll }" :aria-pressed="isAll" @click="toggle('__ALL__')">
+        <span>全部</span><span v-if="isAll" class="ms-check" aria-hidden="true">✓</span>
       </button>
-      <button v-for="o in options" :key="o" type="button" class="ms-opt" :class="{ on: sel.includes(o) }" @click="toggle(o)">
-        <span>{{ o }}</span><span v-if="sel.includes(o)" class="ms-check">✓</span>
+      <button v-for="o in options" :key="o" type="button" class="ms-opt" :class="{ on: sel.includes(o) }" :aria-pressed="sel.includes(o)" @click="toggle(o)">
+        <span>{{ o }}</span><span v-if="sel.includes(o)" class="ms-check" aria-hidden="true">✓</span>
       </button>
     </div>
   </div>

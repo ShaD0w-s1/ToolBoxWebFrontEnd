@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, FLAT_TOOL_CAT, type Project, type ToolItem } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import CategorySection from "./CategorySection.vue";
+import LoadingState from "./LoadingState.vue";
 import FlatTypeList from "./FlatTypeList.vue";
 import PrepSheet from "./PrepSheet.vue";
 import WorkcardAssignment from "./WorkcardAssignment.vue";
@@ -380,7 +381,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
        ② 在未加载状态下误编辑/误保存，把云端清单与准备单清空。 -->
   <section v-if="needsProjectLoad" class="detail-loading">
     <div class="sync-spinner" aria-hidden="true"></div>
-    <p class="loading-state">{{ store.projectLoadState.value === "error" ? "项目数据加载失败" : "正在加载项目数据…" }}</p>
+    <LoadingState :text="store.projectLoadState.value === 'error' ? '项目数据加载失败' : '正在加载项目数据…'" />
     <div class="load-actions">
       <button v-if="store.projectLoadState.value === 'error'" class="ghost" @click="store.retryProjectDetail()">重试</button>
       <button class="ghost" @click="store.backToList">← 返回列表</button>
@@ -564,7 +565,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
   </section>
   <section v-else class="detail-loading">
     <div class="sync-spinner" aria-hidden="true"></div>
-    <p class="loading-state">数据加载中…</p>
+    <LoadingState text="数据加载中…" />
     <button class="ghost" @click="store.backToList">← 返回列表</button>
   </section>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, useId } from "vue";
 
 const props = defineProps<{
   modelValue: string;
@@ -23,6 +23,13 @@ const matched = computed<string[]>(() => {
     .slice(0, 8);
 });
 
+const uid = useId();
+const listId = `${uid}-list`;
+/** 浮层是否可见：v-if 与 aria-expanded 共用同一判据，避免二者漂移。 */
+const listOpen = computed(() => show.value && matched.value.length > 0);
+/** 键盘高亮的候选下标（-1 = 无）。 */
+const active = ref(-1);
+
 function updateWord(val: string): void {
   const el = ta.value;
   if (!el) return;
@@ -30,6 +37,7 @@ function updateWord(val: string): void {
   const before = val.slice(0, pos);
   const m = before.match(/[^\s,、，/]+$/);
   cur.value = m ? m[0] : "";
+  active.value = -1;
   show.value = matched.value.length > 0;
 }
 
@@ -56,6 +64,7 @@ function pick(name: string): void {
   emit("update:modelValue", next);
   cur.value = "";
   show.value = false;
+  active.value = -1;
   nextTick(() => {
     el.focus();
     const p = before.slice(0, start).length + name.length;
@@ -64,12 +73,21 @@ function pick(name: string): void {
 }
 
 function onKeydown(e: KeyboardEvent): void {
-  if (e.key === "Escape") show.value = false;
+  if (e.key === "Escape") { show.value = false; active.value = -1; return; }
+  if (!listOpen.value) return;
+  const n = matched.value.length;
+  if (e.key === "ArrowDown") { e.preventDefault(); active.value = (active.value + 1) % n; }
+  else if (e.key === "ArrowUp") { e.preventDefault(); active.value = active.value <= 0 ? n - 1 : active.value - 1; }
+  // 仅在存在高亮项时接管 Enter；否则保持 textarea 的原生换行行为
+  else if (e.key === "Enter" && !e.shiftKey && active.value >= 0) {
+    e.preventDefault();
+    pick(matched.value[active.value]);
+  }
 }
 
 function blurHide(): void {
   // 延迟隐藏，让点击下拉项先触发
-  setTimeout(() => { show.value = false; }, 180);
+  setTimeout(() => { show.value = false; active.value = -1; }, 180);
 }
 </script>
 
@@ -80,6 +98,11 @@ function blurHide(): void {
       class="ns-input textwrap"
       :class="textareaClass"
       rows="1"
+      role="combobox"
+      aria-autocomplete="list"
+      :aria-expanded="listOpen"
+      :aria-controls="listId"
+      :aria-activedescendant="active >= 0 ? `${listId}-opt-${active}` : undefined"
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
@@ -88,8 +111,15 @@ function blurHide(): void {
       @keydown="onKeydown"
       @blur="blurHide"
     ></textarea>
-    <ul v-if="show && matched.length" class="ns-list">
-      <li v-for="s in matched" :key="s" @mousedown.prevent="pick(s)">{{ s }}</li>
+    <ul v-if="listOpen" :id="listId" class="ns-list" role="listbox">
+      <li
+        v-for="(s, i) in matched"
+        :id="`${listId}-opt-${i}`"
+        :key="s"
+        role="option"
+        :aria-selected="i === active"
+        @mousedown.prevent="pick(s)"
+      >{{ s }}</li>
     </ul>
   </div>
 </template>

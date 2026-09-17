@@ -534,7 +534,9 @@ async function exportCurrentState(displayCats?: string[]): Promise<void> {
     <button class="primary" @click="saveShared">保存到本地</button>
     <button @click="cancelShared">取消</button>
   </aside>
-  <div class="toast" :class="[store.toast.visible ? 'show' : '', store.toast.level]">{{ store.toast.message }}</div>
+  <TransitionGroup name="toast" tag="div" class="toast-stack" role="status" aria-live="polite">
+    <div v-for="t in store.toasts" :key="t.id" class="toast" :class="t.level">{{ t.message }}</div>
+  </TransitionGroup>
 
   <AircraftUpdateModal :store="store" />
 

@@ -248,7 +248,7 @@ function exportTableXlsx(): void {
 .prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: var(--n0); padding: 8px 12px; border-radius: var(--r-md); }
 
 /* 需求 1：固定命名字体颜色为黑色 */
-.field-label { font-size: var(--fs-13); color: #000; font-weight: 500; }
+.field-label { font-size: var(--fs-13); color: var(--text-strong); font-weight: 500; }
 
 .prep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 14px; margin-bottom: 8px; }
 .prep-grid-6 { grid-template-columns: repeat(6, 1fr); }

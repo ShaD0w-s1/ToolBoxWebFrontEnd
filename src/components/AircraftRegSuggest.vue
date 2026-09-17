@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, useId } from "vue";
 
 const props = defineProps<{
   modelValue: string;
@@ -31,6 +31,11 @@ const matched = computed<string[]>(() => {
   const top = Math.max(1, props.maxMatch ?? 6);
   return hit.slice(0, top);
 });
+
+const uid = useId();
+const listId = `${uid}-list`;
+/** 浮层是否可见：v-if 与 aria-expanded 共用同一判据，避免二者漂移。 */
+const listOpen = computed(() => show.value && matched.value.length > 0);
 
 function onInput(): void {
   emit("update:modelValue", inp.value?.value ?? "");
@@ -72,6 +77,11 @@ function blurHide(): void {
       class="ars-input"
       type="text"
       autocomplete="off"
+      role="combobox"
+      aria-autocomplete="list"
+      :aria-expanded="listOpen"
+      :aria-controls="listId"
+      :aria-activedescendant="active >= 0 ? `${listId}-opt-${active}` : undefined"
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
@@ -81,10 +91,13 @@ function blurHide(): void {
       @change="onNativeChange"
       @blur="blurHide"
     />
-    <ul v-if="show && matched.length" class="ars-list">
+    <ul v-if="listOpen" :id="listId" class="ars-list" role="listbox">
       <li
         v-for="(s, i) in matched"
+        :id="`${listId}-opt-${i}`"
         :key="s"
+        role="option"
+        :aria-selected="i === active"
         :class="{ active: i === active }"
         @mousedown.prevent="pick(s)"
       >{{ s }}</li>

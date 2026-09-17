@@ -148,7 +148,7 @@ function fmtDate(iso: string): string {
 .att-section { margin-top: 4px; }
 .att-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .att-head h4 {
-  margin: 0; font-size: var(--fs-14, 14px); background: var(--blue, #2f5597); color: #fff;
+  margin: 0; font-size: var(--fs-14, 14px); background: var(--blue, #2f5597); color: var(--n0);
   padding: 8px 12px; border-radius: var(--r-md, 8px);
 }
 .att-empty { color: var(--n7, #889); font-size: var(--fs-13, 13px); margin: 0; padding: 6px 0; }

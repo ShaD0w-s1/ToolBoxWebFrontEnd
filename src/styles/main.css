@@ -1,6 +1,15 @@
 :root {
-  color: #222;
-  background: #f4f6fb;
+  /* 正文文字色（唯一真源）：此前被 5 处 var(--text, <兜底>) 引用却「从未定义」→
+     看似可主题化实则永不生效，且 GanttPrep(×4) 与 ProjectList(×1) 落到了两种不同颜色。
+     现正式定义；ProjectList 那处语义上属次要文字，已改用 --n8。 */
+  --text: #222;
+  color: var(--text);
+  /* 强调文字（表头 / 字段标签 / 卡片标题）：最高对比度，可用于有色底。
+     原为 14 处直接写死的 #000。 */
+  --text-strong: #000000;
+  /* 页面底色（非卡片）：原为 3 处直接写死的 #f4f6fb。 */
+  --bg-app: #f4f6fb;
+  background: var(--bg-app);
   font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
   /* 品牌主色（保留） */
@@ -56,7 +65,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   align-items: center;
   gap: 24px;
   padding: 16px max(24px, calc((100vw - 1100px) / 2));
-  color: #fff;
+  color: var(--n0);
   background: linear-gradient(100deg, var(--blue), var(--blue-dark));
 }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -68,17 +77,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: var(--r-pill); font-size: var(--fs-12); font-weight: 700; transition: background .25s; }
 .status-badge .badge-icon { width: 13px; height: 13px; }
 .status-badge.ok, .status-badge.on { background: rgb(46 204 113 / 42%); color: #eafff2; }
-.status-badge.warn { background: rgb(241 196 15 / 35%); color: #fff; }
-.status-badge.err { background: rgb(231 76 60 / 42%); color: #fff; }
+.status-badge.warn { background: rgb(241 196 15 / 35%); color: var(--n0); }
+.status-badge.err { background: rgb(231 76 60 / 42%); color: var(--n0); }
 .status-badge.off { background: rgb(255 255 255 / 18%); color: rgb(255 255 255 / 55%); }
-.identity-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: var(--r-pill); font-size: var(--fs-12); font-weight: 700; color: #fff; background: rgb(255 255 255 / 20%); border: 1px solid rgb(255 255 255 / 38%); cursor: pointer; transition: background .25s; }
+.identity-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: var(--r-pill); font-size: var(--fs-12); font-weight: 700; color: var(--n0); background: rgb(255 255 255 / 20%); border: 1px solid rgb(255 255 255 / 38%); cursor: pointer; transition: background .25s; }
 .identity-badge:hover { background: rgb(255 255 255 / 32%); }
 .identity-badge .badge-icon { width: 13px; height: 13px; }
 /* 账号胶囊在线人数徽标：纯黄底黑字（1~99，超 99 显示 99+） */
 .online-badge {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
-  background: var(--proc-yellow); color: #000;
+  background: var(--proc-yellow); color: var(--text-strong);
   border-radius: var(--r-pill); font-size: var(--fs-10); font-weight: 700; line-height: 1;
 }
 
@@ -91,13 +100,13 @@ button, .button, .field, .check, .toolbar select {
   border-radius: var(--r-md);
   padding: 7px 13px;
   color: var(--blue-dark);
-  background: #fff;
+  background: var(--n0);
   font-size: var(--fs-13);
   font-weight: 650;
   transition: background-color var(--t-fast) ease, border-color var(--t-fast) ease, color var(--t-fast) ease, box-shadow var(--t-fast) ease, transform .12s ease;
 }
 button:hover, .button:hover { background: var(--blue-light); }
-button.primary, .primary { color: #fff; border-color: var(--blue); background: var(--blue); }
+button.primary, .primary { color: var(--n0); border-color: var(--blue); background: var(--blue); }
 button.primary:hover { background: var(--blue-dark); }
 button.danger, .danger { color: var(--danger); border-color: #e6a0a0; }
 button.danger:hover { background: var(--danger-bg); }
@@ -108,7 +117,7 @@ button:active:not(:disabled), .button:active:not(:disabled) { transform: transla
 .inp {
   min-height: 36px; padding: 6px 12px; border: 1px solid var(--n4);
   border-radius: var(--r-md); font-size: var(--fs-13); color: var(--n9);
-  background: #fff; font-family: inherit; box-sizing: border-box;
+  background: var(--n0); font-family: inherit; box-sizing: border-box;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 .inp:hover { border-color: var(--n5); }
@@ -144,7 +153,7 @@ input:where([type="date"]) { min-height: 32px; padding: 0 8px; border: 1px solid
 }
 .cell-inp:hover { background: var(--n1); border-color: var(--n3); }
 .cell-inp:focus-visible {
-  outline: none; background: #fff;
+  outline: none; background: var(--n0);
   border-color: var(--blue);
   box-shadow: 0 0 0 2px rgba(68, 114, 196, .14);   /* 比 .inp 的 3px 收窄，适应密集表格 */
 }
@@ -170,7 +179,7 @@ button:active:not(:disabled), .button:active:not(:disabled) { transform: transla
 /* 次要/导出类功能按钮：统一白底蓝字样式（覆盖全局 button 的蓝色边框/底色，三页一致） */
 button.ghost, .ghost {
   min-height: 0; padding: 6px 12px; border: 1px solid var(--blue);
-  border-radius: var(--r-md); background: #fff; color: var(--blue-dark);
+  border-radius: var(--r-md); background: var(--n0); color: var(--blue-dark);
   font-size: var(--fs-13); font-weight: 600; cursor: pointer;
 }
 button.ghost:hover, .ghost:hover { background: var(--blue-light); }
@@ -189,14 +198,14 @@ button.is-loading::after, label.button.is-loading::after {
   animation: loading-spin .8s linear infinite;
 }
 /* 蓝底主按钮：spinner 用白（默认按钮/ghost 白底则上方蓝 spinner 规则生效） */
-button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); border-top-color: #fff; }
+button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); border-top-color: var(--n0); }
 
 /* 项目类型选择框（A检/零散/换发/换APU/单独项目）：统一白底蓝字 */
 .type-select {
-  background: #fff; color: var(--blue-dark); border: 1px solid var(--blue);
+  background: var(--n0); color: var(--blue-dark); border: 1px solid var(--blue);
   border-radius: var(--r-md); padding: 4px 8px; font-weight: 600; font-size: var(--fs-13); cursor: pointer;
 }
-.type-select option { background: #fff; color: #000; }
+.type-select option { background: var(--n0); color: var(--text-strong); }
 
 .tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--n4); }
 .tab { border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--n7); background: transparent; }
@@ -204,11 +213,11 @@ button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); borde
 .tab.active { color: var(--blue-dark); border-bottom-color: var(--blue); }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
 .toolbar select, .toolbar input { border: 0; outline: 0; color: var(--blue-dark); background: transparent; }
-.list-toolbar > select { min-height: 36px; padding: 7px 10px; border: 1px solid var(--line-accent); border-radius: var(--r-md); background: #fff; }
+.list-toolbar > select { min-height: 36px; padding: 7px 10px; border: 1px solid var(--line-accent); border-radius: var(--r-md); background: var(--n0); }
 /* 注意：.toolbar input 会把输入框底色置为透明且优先级更高，这里用 .toolbar .xxx 提升优先级，
    给日期框明显的浅蓝底色（修复此前“看起来没底色”的问题），并保留项目名输入框白底 */
 .toolbar .date-search { min-width: 225px; min-height: 36px; padding: 7px 10px; border: 1px solid var(--line-accent); border-radius: var(--r-md); background: var(--blue-bg); }
-.toolbar .project-name-input { min-width: 190px; min-height: 36px; padding: 7px 10px; border: 1px solid var(--line-accent); border-radius: var(--r-md); background: #fff; }
+.toolbar .project-name-input { min-width: 190px; min-height: 36px; padding: 7px 10px; border: 1px solid var(--line-accent); border-radius: var(--r-md); background: var(--n0); }
 .date-search { min-width: 225px; }
 .field, .check { display: inline-flex; align-items: center; gap: 7px; }
 .check input { width: 16px; height: 16px; accent-color: var(--blue); }
@@ -222,28 +231,28 @@ button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); borde
 }
 .toolbar > .field > select, .toolbar > .check { padding: 0 13px; }
 
-.list-status { padding: 7px 10px; color: var(--n7); border: 1px solid var(--n4); border-radius: var(--r-md); background: #fff; font-size: var(--fs-12); }
-.project-card { display: flex; align-items: center; gap: 12px; margin-bottom: 11px; padding: 13px 15px; border: 1px solid var(--n4); border-radius: var(--r-lg); background: #fff; box-shadow: var(--sh-1); }
+.list-status { padding: 7px 10px; color: var(--n7); border: 1px solid var(--n4); border-radius: var(--r-md); background: var(--n0); font-size: var(--fs-12); }
+.project-card { display: flex; align-items: center; gap: 12px; margin-bottom: 11px; padding: 13px 15px; border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); box-shadow: var(--sh-1); }
 .project-card:hover { border-color: var(--line-accent); }
-.project-main { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; border: 0; padding: 0; color: #222; background: transparent; text-align: left; }
+.project-main { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; border: 0; padding: 0; color: var(--text); background: transparent; text-align: left; }
 .project-main:hover { background: transparent; }
 .project-main strong { font-size: var(--fs-16); }
 .project-main span, .library-card span, .detail-head > div span { color: var(--n7); font-size: var(--fs-12); }
-.project-card > select { min-height: 34px; border: 1px solid var(--line-accent); border-radius: var(--r-md); padding: 5px 8px; background: #fff; }
+.project-card > select { min-height: 34px; border: 1px solid var(--line-accent); border-radius: var(--r-md); padding: 5px 8px; background: var(--n0); }
 /* 项目卡片/二级页抬头：仅展示的 班组/类型 标签（不可编辑，圆角方形蓝边白底加粗蓝字，最小容纳 4 个中文字符） */
-.card-meta { flex: 0 0 auto; min-width: 4em; text-align: center; padding: 5px 11px; border: 1px solid var(--blue); border-radius: var(--r-md); background: #fff; color: var(--blue-dark); font-size: var(--fs-12); font-weight: 650; white-space: nowrap; }
+.card-meta { flex: 0 0 auto; min-width: 4em; text-align: center; padding: 5px 11px; border: 1px solid var(--blue); border-radius: var(--r-md); background: var(--n0); color: var(--blue-dark); font-size: var(--fs-12); font-weight: 650; white-space: nowrap; }
 .actions { display: flex; gap: 7px; }
 .database-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 .library-card { display: flex; align-items: center; gap: 12px; padding: 18px; border: 1px solid #b6d7a8; border-radius: var(--r-lg); background: #e2efda; }
 .library-card.cart-card { border-color: #f0b27a; background: #fce4d6; }
 .library-card > div { display: flex; flex: 1; flex-direction: column; }
-.empty-state { padding: 34px; border: 1px dashed var(--n5); border-radius: var(--r-lg); color: var(--n7); background: #fff; text-align: center; }
+.empty-state { padding: 34px; border: 1px dashed var(--n5); border-radius: var(--r-lg); color: var(--n7); background: var(--n0); text-align: center; }
 /* 加载态统一组件（规范 §3 P1）：spinner + 文案，替代各弹窗/列表的纯文字"加载中…" */
 .loading-state { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 18px 0; color: var(--n7); font-size: var(--fs-13); }
 .loading-state::before { content: ""; width: 15px; height: 15px; border: 2px solid var(--n4); border-top-color: var(--blue); border-radius: 50%; animation: loading-spin .8s linear infinite; flex: 0 0 auto; }
 @keyframes loading-spin { to { transform: rotate(360deg); } }
 
-.detail-head { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; padding: 13px 16px; border: 1px solid var(--n4); border-radius: var(--r-lg); background: #fff; box-shadow: var(--sh-1); }
+.detail-head { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; padding: 13px 16px; border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); box-shadow: var(--sh-1); }
 .detail-head > div:not(.summary) { display: flex; flex-direction: column; }
 .detail-head strong { font-size: var(--fs-17); }
 /* 面包屑（UI/UX 审计规范新增）：项目列表 / 项目名 / 子页 */
@@ -251,19 +260,19 @@ button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); borde
 .breadcrumb .sep { color: var(--n5); }
 .breadcrumb .cur { color: var(--n9); font-weight: 600; }
 /* “添加部位”下拉：保持蓝色主按钮外观（覆盖 .toolbar select 的透明背景规则） */
-.toolbar select.add-cat { background: var(--blue); color: #fff; border-color: var(--blue); }
+.toolbar select.add-cat { background: var(--blue); color: var(--n0); border-color: var(--blue); }
 .toolbar select.add-cat:hover { background: var(--blue-dark); }
 /* 返回按钮行 + 功能按钮行固定在屏幕顶端：滚动时跟随视口吸附，背景盖住下方内容 */
-.detail-sticky { position: sticky; top: 0; z-index: 30; background: #f4f6fb; padding: 2px 0 6px; box-shadow: var(--sh-2); }
+.detail-sticky { position: sticky; top: 0; z-index: 30; background: var(--bg-app); padding: 2px 0 6px; box-shadow: var(--sh-2); }
 /* 导出图片时脱离 sticky，稳定停在长图最上方，避免被吸顶/重叠干扰渲染 */
 .exporting .detail-sticky { position: static; box-shadow: none; }
 .summary { flex: 0 0 auto; color: var(--n7); white-space: nowrap; align-self: center; }
-.summary b { color: #222; font-size: var(--fs-18); }
+.summary b { color: var(--text); font-size: var(--fs-18); }
 .category-list { display: grid; gap: 14px; }
-.category-card { position: relative; overflow: visible; border: 1px solid var(--n4); border-radius: var(--r-lg); background: #fff; box-shadow: var(--sh-1); }
+.category-card { position: relative; overflow: visible; border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); box-shadow: var(--sh-1); }
 /* 聚焦（打开下拉）时抬高本卡片，确保溢出的下拉菜单盖住后续卡片 */
 .category-card:focus-within { z-index: 40; }
-.category-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: linear-gradient(90deg, #edf2fc, #fff); border-radius: 12px 12px 0 0; }
+.category-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: linear-gradient(90deg, #edf2fc, var(--n0)); border-radius: 12px 12px 0 0; }
 .category-head strong { font-size: var(--fs-17); }
 .category-head > span, .sub-head > span { color: var(--blue-dark); font-size: var(--fs-13); font-weight: 650; }
 .category-head button { min-height: 30px; padding: 4px 9px; font-size: var(--fs-12); }
@@ -271,22 +280,22 @@ button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); borde
 .category-body { padding: 0 14px 15px; }
 .notes { width: 100%; margin: 10px 0; border: 1px solid var(--n4); border-radius: var(--r-md); padding: 8px 10px; resize: vertical; box-sizing: border-box; }
 .sub-grid { display: grid; gap: 11px; grid-auto-flow: dense; }
-.sub-card { min-width: 0; padding: 10px; border: 1.5px solid var(--line-accent); border-radius: var(--r-lg); background: #fff; }
+.sub-card { min-width: 0; padding: 10px; border: 1.5px solid var(--line-accent); border-radius: var(--r-lg); background: var(--n0); }
 .sub-head { display: flex; align-items: center; gap: 7px; }
 .sub-head input { width: 145px; min-width: 0; padding: 5px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; }
-.sub-head input:hover, .sub-head input:focus-visible { border-color: var(--line-accent); background: #fff; }
+.sub-head input:hover, .sub-head input:focus-visible { border-color: var(--line-accent); background: var(--n0); }
 .sub-head button { min-height: 28px; padding: 3px 7px; font-size: var(--fs-12); }
-.standard-picker { width: 100%; margin: 7px 0 1px; padding: 6px; border: 1px solid var(--n4); border-radius: var(--r-sm); background: #fff; color: var(--blue-dark); }
+.standard-picker { width: 100%; margin: 7px 0 1px; padding: 6px; border: 1px solid var(--n4); border-radius: var(--r-sm); background: var(--n0); color: var(--blue-dark); }
 /* “从标准库替换此工作”改为可模糊搜索的组合框：输入过滤，无输入显示全部 */
 .standard-combo { position: relative; width: 100%; margin: 7px 0 1px; }
-.standard-input { width: 100%; margin: 0; padding: 6px; border: 1px solid var(--n4); border-radius: var(--r-sm); background: #fff; color: var(--blue-dark); font-size: var(--fs-13); }
+.standard-input { width: 100%; margin: 0; padding: 6px; border: 1px solid var(--n4); border-radius: var(--r-sm); background: var(--n0); color: var(--blue-dark); font-size: var(--fs-13); }
 .standard-input::placeholder { color: var(--n6); }
-.standard-menu { position: absolute; z-index: 25; top: calc(100% + 3px); left: 0; right: 0; max-height: 240px; overflow-y: auto; border: 1px solid var(--line-accent); border-radius: var(--r-md); background: #fff; box-shadow: var(--sh-3); padding: 4px; }
+.standard-menu { position: absolute; z-index: 25; top: calc(100% + 3px); left: 0; right: 0; max-height: 240px; overflow-y: auto; border: 1px solid var(--line-accent); border-radius: var(--r-md); background: var(--n0); box-shadow: var(--sh-3); padding: 4px; }
 .standard-option { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 8px; border-radius: var(--r-sm); color: var(--blue-dark); font-size: var(--fs-13); }
 .standard-option.active, .standard-option:hover { background: var(--blue-light); }
 .standard-empty { padding: 8px; color: var(--n7); font-size: var(--fs-12); text-align: center; }
 .item-grid { display: grid; gap: 7px; margin-top: 7px; }
-.item-row { position: relative; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 7px; border: 1px solid var(--n4); border-radius: var(--r-md); background: #fff; }
+.item-row { position: relative; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 7px; border: 1px solid var(--n4); border-radius: var(--r-md); background: var(--n0); }
 .item-row.duplicate, tr.duplicate { background: #fff8bd; }
 .item-row.has-same { padding-left: 20px; }
 .item-row textarea { flex: 1; min-width: 0; padding: 5px 7px; border: 1px solid var(--n4); border-radius: var(--r-sm); resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
@@ -298,16 +307,21 @@ button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); borde
 .quantity input { width: 48px; border: 1px solid var(--line-accent); border-right: 0; border-left: 0; text-align: center; }
 .icon-danger { width: 29px; min-height: 29px; padding: 0; color: var(--danger); border-color: #e6a0a0; }
 
-.table-wrap { overflow-x: auto; border: 1px solid var(--n4); border-radius: var(--r-lg); background: #fff; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 8px 10px; border-bottom: 1px solid var(--n4); font-size: var(--fs-13); text-align: left; }
-th { color: #fff; background: var(--blue); }
+th { color: var(--n0); background: var(--blue); }
 tbody tr:nth-child(even) { background: var(--n1); }
 td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var(--n4); border-radius: var(--r-sm); }
 
 .share-banner { position: fixed; top: 0; right: 0; left: 0; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 9px 18px; color: #725600; border-bottom: 1px solid #f1c40f; background: #fff8e1; box-shadow: 0 2px 7px rgb(0 0 0 / 10%); font-size: var(--fs-13); }
-.toast { position: fixed; bottom: 28px; left: 50%; z-index: 30; padding: 10px 18px; color: #fff; border-radius: var(--r-md); background: #323232; opacity: 0; pointer-events: none; transform: translateX(-50%); transition: opacity .2s; }
-.toast.show { opacity: 1; }
+/* 提示堆叠（UI_DESIGN_SPEC §8.3 ⑤）：固定容器负责定位与居中，.toast 自身在容器内静态排布。
+   此前单条 .toast 自带 fixed 定位 + 单一 visible 开关，连发会互相覆盖（后一条直接顶掉前一条）。 */
+.toast-stack { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.toast { padding: 10px 18px; color: var(--n0); border-radius: var(--r-md); background: #323232; }
+/* 进退场：保持原有 .2s 淡入淡出，另加 6px 位移 */
+.toast-enter-active, .toast-leave-active { transition: opacity .2s, transform .2s; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(6px); }
 /* P1 四态 toast 分色（UI_DESIGN_SPEC §3）：ok 成功 / err 失败 */
 .toast.ok { background: var(--ok, #2e7d32); }
 .toast.err { background: var(--danger, #c0392b); }
@@ -315,8 +329,8 @@ td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var
 /* 导出图片预览层：手机端可长按图片保存，电脑端也可直接下载 */
 .img-preview { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(0 0 0 / 70%); }
 .img-preview-inner { max-width: 100%; max-height: 100%; display: flex; flex-direction: column; gap: 10px; }
-.img-preview-inner img { max-width: 100%; max-height: 76vh; object-fit: contain; border-radius: var(--r-md); background: #fff; }
-.img-hint { margin: 0; color: #fff; font-size: var(--fs-13); text-align: center; }
+.img-preview-inner img { max-width: 100%; max-height: 76vh; object-fit: contain; border-radius: var(--r-md); background: var(--n0); }
+.img-hint { margin: 0; color: var(--n0); font-size: var(--fs-13); text-align: center; }
 .img-actions { display: flex; gap: 8px; justify-content: center; }
 
 @media (max-width: 768px) {
@@ -327,7 +341,7 @@ td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var
   .status-group { max-width: 52%; flex-wrap: wrap; justify-content: flex-end; }
   .status-badge { white-space: normal; text-align: right; }
   main { width: calc(100% - 22px); padding-top: 12px; }
-  .list-toolbar { position: sticky; top: 0; z-index: 10; padding: 4px 0; background: #f4f6fb; }
+  .list-toolbar { position: sticky; top: 0; z-index: 10; padding: 4px 0; background: var(--bg-app); }
   .list-toolbar .spacer { display: none; }
   .date-search, .project-name-input { flex: 1 1 100%; min-width: 0; }
   .project-card { align-items: stretch; flex-direction: column; }
@@ -373,7 +387,7 @@ td input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var
 textarea.remote-locked,
 input.remote-locked {
   background-color: #FFF176 !important;
-  color: #000 !important;
+  color: var(--text-strong) !important;
 }
 
 /* ===== 物品清单表格化（航材/工具清单物品行 + 重复梳理行通用）=====

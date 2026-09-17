@@ -21,6 +21,7 @@ import NameCompare from "./NameCompare.vue";
 import ControlDocMaintain from "./ControlDocMaintain.vue";
 import ProjectFormModal from "./ProjectFormModal.vue";
 import MultiSelect from "./MultiSelect.vue";
+import LoadingState from "./LoadingState.vue";
 import DateRangePicker from "./DateRangePicker.vue";
 import AircraftQueryCard from "./AircraftQueryCard.vue";
 
@@ -424,12 +425,12 @@ async function batchDeleteNoDate(): Promise<void> {
 
             <div class="side-field">
               <span class="side-label">项目类型</span>
-              <MultiSelect :options="[...PROJECT_TYPES]" v-model="store.typeFilter.value" placeholder="类型：全部" />
+              <MultiSelect :options="[...PROJECT_TYPES]" v-model="store.typeFilter.value" placeholder="类型：全部" label="项目类型" />
             </div>
 
             <div class="side-field">
               <span class="side-label">执行班组</span>
-              <MultiSelect :options="[...TEAMS]" v-model="store.teamFilters.value" placeholder="班组：全部" />
+              <MultiSelect :options="[...TEAMS]" v-model="store.teamFilters.value" placeholder="班组：全部" label="班组" />
             </div>
           </aside>
           <!-- 飞机查询卡片：筛选条件卡片下方独立卡片，复用二级页「飞机信息」字段的只读查询，数据取本地常驻的飞机信息标准库 -->
@@ -610,7 +611,7 @@ async function batchDeleteNoDate(): Promise<void> {
           </div>
         </div>
         <div class="admin-sec-title">登录账号目录</div>
-        <p v-if="accountsLoading" class="loading-state">加载中…</p>
+        <LoadingState v-if="accountsLoading" />
         <table v-else-if="accounts.length" class="site-admin-table">
           <thead>
             <tr><th>姓名</th><th>登录次数</th><th>首次登录</th><th>最近登录</th></tr>
@@ -641,7 +642,7 @@ async function batchDeleteNoDate(): Promise<void> {
             <button v-if="engTplQuery" class="clear-btn" type="button" @click="engTplQuery = ''" aria-label="清空搜索">×</button>
           </label>
         </div>
-        <p v-if="engTemplatesLoading" class="loading-state">加载中…</p>
+        <LoadingState v-if="engTemplatesLoading" />
         <div v-else-if="filteredEngTemplates.length" class="eng-tpl-list">
           <div v-for="t in filteredEngTemplates" :key="t._id" class="eng-tpl-row">
             <div class="eng-tpl-info">
@@ -674,7 +675,7 @@ async function batchDeleteNoDate(): Promise<void> {
             <button v-if="standaloneTplQuery" class="clear-btn" type="button" @click="standaloneTplQuery = ''" aria-label="清空搜索">×</button>
           </label>
         </div>
-        <p v-if="standaloneTemplatesLoading" class="loading-state">加载中…</p>
+        <LoadingState v-if="standaloneTemplatesLoading" />
         <div v-else-if="filteredStandaloneTemplates.length" class="eng-tpl-list">
           <div v-for="t in filteredStandaloneTemplates" :key="t._id" class="eng-tpl-row">
             <div class="eng-tpl-info">
@@ -857,7 +858,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .settings-card { display: block; padding: 18px; }
 .settings-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
 .settings-field { display: flex; flex-direction: column; gap: 6px; }
-.settings-field > label { font-weight: 600; font-size: var(--fs-13, 13px); color: var(--text, var(--n8)); }
+.settings-field > label { font-weight: 600; font-size: var(--fs-13, 13px); color: var(--n8); }
 .settings-field select {
   padding: 7px 10px; border: 1px solid var(--n4); border-radius: var(--r-md, 8px);
   font-size: var(--fs-13, 13px); background: var(--n0, #fff); font-family: inherit;
@@ -880,7 +881,7 @@ async function batchDeleteNoDate(): Promise<void> {
   content: attr(data-tip);
   position: absolute; z-index: 40; bottom: calc(100% + 8px); left: 0;
   width: 250px; max-width: 80vw; padding: 7px 10px;
-  background: #243447; color: #fff; font-size: var(--fs-12, 12px); line-height: 1.5;
+  background: #243447; color: var(--n0); font-size: var(--fs-12, 12px); line-height: 1.5;
   border-radius: var(--r-sm, 6px); box-shadow: var(--sh-2); white-space: normal; text-align: left;
   pointer-events: none;
 }

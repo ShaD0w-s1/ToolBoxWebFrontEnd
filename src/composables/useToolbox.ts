@@ -54,6 +54,32 @@ const STORAGE_KEY = "categoryItemManager.v2";
 
 type Screen = "list" | "detail" | "cart" | "stdlib";
 type ListTab = "tools" | "db";
+/** 一条提示。连发时**堆叠**而非互相覆盖（UI_DESIGN_SPEC §8.3 ⑤）。 */
+interface ToastItem {
+  id: number;
+  message: string;
+  level: "info" | "ok" | "err";
+}
+
+/** 列表页页签的持久化键。
+ *
+ *  ⚠️ §8.3 原文写的是「listTab 入 URL」，但落地时会撞两条既有约束：
+ *    ① §9.3 把「一级页 = 裸路径（无 #、无查询串）」定为**对外契约**，带 `?tab=` 就破了它；
+ *    ② hash 模式下 `router.replace()` 发的是「仅片段」相对 URL，改不了查询串
+ *       （见 `App.vue` 的 `stripDeepLinkQuery` 注释），想改 query 只能额外 `history.replaceState`，
+ *       又会与 vue-router 的 hash 回收敛竞争、互相覆盖。
+ *  而「页签能跨刷新保持」这个实际收益，用持久化就能拿到 —— 且**零契约风险、地址栏零可见变化**。
+ *  页签在 SPA 会话内本就是响应式状态，前进/后退已天然保持，所以 URL 化并无额外收益。 */
+const LIST_TAB_KEY = "toolbox.listTab";
+function readStoredListTab(): ListTab {
+  try {
+    const v = localStorage.getItem(LIST_TAB_KEY);
+    if (v === "db" || v === "tools") return v;
+  } catch {
+    /* 隐私模式 / 禁用存储：忽略，回落默认 */
+  }
+  return "tools";
+}
 type DetailTab = "display" | "database";
 type CloudState = "ok" | "warn" | "err";
 
@@ -110,7 +136,11 @@ const PULLABLE_DOMAINS: SyncDomain[] = (
 export function useToolbox() {
   const app = ref(loadCache());
   const screen = ref<Screen>("list");
-  const listTab = ref<ListTab>("tools");
+  const listTab = ref<ListTab>(readStoredListTab());
+  // 页签变化即落库，刷新后回到同一页签
+  watch(listTab, (v) => {
+    try { localStorage.setItem(LIST_TAB_KEY, v); } catch { /* 存储不可用：忽略 */ }
+  });
   const detailTab = ref<DetailTab>("display");
   /** 换发/APU 甘特准备单当前子页（form/gantt/docs/airparts/tools），供 App.vue 判断是否甘特图全宽。 */
   const ganttTab = ref<"form" | "gantt" | "docs" | "airparts" | "tools">("form");
@@ -138,7 +168,9 @@ export function useToolbox() {
   // 一级页面按项目名称搜索（模糊、忽略大小写）。
   const nameQuery = ref("");
   const cloud = reactive<{ text: string; state: CloudState; available: boolean }>({ text: "连接中…", state: "warn", available: false });
-  const toast = reactive({ message: "", visible: false, level: "info" as "info" | "ok" | "err" });
+  /** 提示堆叠队列：每条独立计时，最多同时显示 4 条（超出丢最旧），避免刷屏。 */
+  const toasts = reactive<ToastItem[]>([]);
+  let toastSeq = 0;
   const shared = ref(false);
   /** 导出图片时临时强制展开所有部位卡片，保证长图完整。 */
   const forceExpandAll = ref(false);
@@ -148,7 +180,6 @@ export function useToolbox() {
   /** 一级页面公告栏内容（云端共享）。 */
   const announcement = ref("");
   let announcementDirty = false;
-  let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   const remoteSaving = ref(false);
   let remotePending = false;
@@ -519,12 +550,18 @@ export function useToolbox() {
     return "info";
   }
 
+  /** 单条提示停留时长 / 同时显示上限。 */
+  const TOAST_MS = 2200;
+  const TOAST_MAX = 4;
   function notify(message: string, level?: "info" | "ok" | "err"): void {
-    toast.message = message;
-    toast.level = level ?? guessLevel(message);
-    toast.visible = true;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { toast.visible = false; }, 2200);
+    const item: ToastItem = { id: ++toastSeq, message, level: level ?? guessLevel(message) };
+    toasts.push(item);
+    // 超出上限丢最旧的一条：连发（如批量校验逐条报错）时不会无限堆叠刷屏
+    while (toasts.length > TOAST_MAX) toasts.shift();
+    setTimeout(() => {
+      const i = toasts.findIndex((t) => t.id === item.id);
+      if (i >= 0) toasts.splice(i, 1);
+    }, TOAST_MS);
   }
   const notifyOk = (m: string): void => notify(m, "ok");
   const notifyErr = (m: string): void => notify(m, "err");
@@ -2596,7 +2633,7 @@ export function useToolbox() {
     app, screen, listTab, detailTab, ganttTab, currentProject, editingLibrary, editingStdLib, editingMaterialLibrary,
     active, materialActive, materialCategories, standardMaterialCategories,
     detailTitle, stdLibActive, stdLibTitle, aircraftNumbers, aircraftTypeFromPrep, effectiveAircraftType,
-    dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toast, shared, imageExportBusy,
+    dateFrom, dateTo, typeFilter, teamFilters, nameQuery, filteredProjects, cloud, toasts, shared, imageExportBusy,
     notify, notifyOk, notifyErr, persist, queuePersist, openProject, openLibrary, openCart, openMaterialLibrary, openStdLib, backToList,
     ensureProjectLoaded, projectLoadState, retryProjectDetail, refreshProjectDetail,
     createProject, deleteProject, duplicateProject, updateProject, setAircraftType, saveStdLib,

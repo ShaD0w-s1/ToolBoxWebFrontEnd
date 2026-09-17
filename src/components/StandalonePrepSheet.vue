@@ -12,6 +12,7 @@ import { growTextarea, growAllTextareas } from "../utils/dom";
 import AttachmentSection from "./AttachmentSection.vue";
 import NameSuggest from "./NameSuggest.vue";
 import AircraftRegSuggest from "./AircraftRegSuggest.vue";
+import LoadingState from "./LoadingState.vue";
 import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
@@ -427,7 +428,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
           <input v-model="tplQuery" class="inp" placeholder="模糊搜索模板名称…" aria-label="模糊搜索模板" />
           <button v-if="tplQuery" class="clear-btn" type="button" title="清空搜索" @click="tplQuery = ''">×</button>
         </div>
-        <p v-if="templatesLoading" class="loading-state">加载中…</p>
+        <LoadingState v-if="templatesLoading" />
         <div v-else-if="filteredTemplates.length" class="tpl-list">
           <div v-for="t in filteredTemplates" :key="t._id" class="tpl-row">
             <div class="tpl-info" :class="{ clickable: tplMode === 'load' }" @click="tplMode === 'load' && applyTemplate(t)"><strong>{{ t.name }}</strong><span>工序 {{ (t.state.prep.processGroups || []).length }} 组 · 签署 {{ (t.state.prep.signingRows || []).length }} 行{{ t.state.material || t.state.tools ? ' · 带清单' : '' }}</span></div>
@@ -454,7 +455,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-title:hover { background: #eef2fa; }
 .prep-block { margin-bottom: 18px; background: var(--n0); border: 1px solid var(--n3); border-radius: var(--r-lg); padding: 12px 14px; }
 .prep-block h4 { margin: 0 0 10px; font-size: var(--fs-14); background: var(--blue); color: var(--n0); padding: 8px 12px; border-radius: var(--r-md); }
-.field-label { font-size: var(--fs-13); color: #000; font-weight: 500; }
+.field-label { font-size: var(--fs-13); color: var(--text-strong); font-weight: 500; }
 .prep-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 14px; margin-bottom: 8px; }
 .prep-field { display: flex; flex-direction: column; gap: 4px; }
 .prep-field input, .prep-field textarea { padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
@@ -494,11 +495,11 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
   flex: none; max-width: 100%; min-width: 0;
   padding: 2px 4px 2px 2px;
 }
-.sp-process-card .sp-card-title .sp-card-drag { cursor: grab; color: #000; font-size: var(--fs-13); flex: 0 0 auto; user-select: none; touch-action: none; }
+.sp-process-card .sp-card-title .sp-card-drag { cursor: grab; color: var(--text-strong); font-size: var(--fs-13); flex: 0 0 auto; user-select: none; touch-action: none; }
 .sp-process-card .sp-card-title .sp-card-drag:active { cursor: grabbing; }
 .sp-process-card .sp-card-title textarea {
   flex: 1; min-width: 27em; max-width: 54em; border: none; background: transparent;
-  font-size: var(--fs-13); font-weight: 600; color: #000; padding: 2px 4px;
+  font-size: var(--fs-13); font-weight: 600; color: var(--text-strong); padding: 2px 4px;
 }
 .sp-process-card .sp-card-title textarea:focus-visible { background: var(--n0); border-radius: var(--r-xs); outline: none; box-shadow: 0 0 0 2px var(--focus); color: var(--blue-dark); }
 .sp-process-card .sp-cell { flex: 1; min-width: 90px; }
@@ -528,7 +529,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .table-wrap { overflow-x: auto; }
 .sp-table { width: 100%; border-collapse: collapse; min-width: 520px; }
 .sp-table th, .sp-table td { border: 1px solid var(--n3); padding: 4px; text-align: left; font-size: var(--fs-13); vertical-align: top; }
-.sp-table th { background: var(--n1); font-weight: 600; color: #000; }
+.sp-table th { background: var(--n1); font-weight: 600; color: var(--text-strong); }
 .sp-cell { width: 100%; box-sizing: border-box; padding: 5px 6px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; line-height: 1.5; font-family: inherit; }
 .sp-cell:focus-visible { border-color: var(--focus); background: var(--n0); }
 .sp-group-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: #4a5160; }
@@ -539,7 +540,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .tpl-modal { position: fixed; inset: 0; z-index: 300; background: rgba(15, 23, 42, .45); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px 20px; }
 .tpl-modal-card { background: var(--n0); border-radius: var(--r-lg); padding: 18px 20px; width: 520px; max-width: 100%; margin: 0 auto; box-shadow: 0 8px 30px rgba(0, 0, 0, .18); }
 .tpl-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.tpl-modal-head h3 { font-size: var(--fs-16); margin: 0; color: #222; }
+.tpl-modal-head h3 { font-size: var(--fs-16); margin: 0; color: var(--text); }
 .tpl-save-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .tpl-save-row input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-13); }
 .tpl-empty { color: var(--n7); font-size: var(--fs-13); text-align: center; padding: 14px 0; }
@@ -555,7 +556,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .tpl-info { flex: 1; min-width: 0; }
 .tpl-info.clickable { cursor: pointer; }
 .tpl-info.clickable:hover strong { color: var(--blue); }
-.tpl-info strong { display: block; font-size: var(--fs-14); color: #222; }
+.tpl-info strong { display: block; font-size: var(--fs-14); color: var(--text); }
 .tpl-info span { font-size: var(--fs-12); color: var(--n7); }
 .tpl-actions { display: flex; gap: 6px; flex-shrink: 0; }
 @media (max-width: 768px) {
