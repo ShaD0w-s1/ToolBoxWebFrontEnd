@@ -31,6 +31,20 @@
   /* 语义色（补充） */
   --ok: #2e7d32;
   --ok-bg: #e8f5e9;
+  /* —— 早期直接写死、重复 ≥3 处的语义色补全（2026-09-17 §8.3 ③ 收尾）——
+     命名依据是「实际用途」而非色值本身；取值与替换前**完全一致**，零视觉变更。
+     ⚠️ 这些是主题化的抓手：日后要统一色系，改这里一处即可（勿再回到组件里写死）。 */
+  --danger-line: #f2cdcd;      /* 危险软边框：.danger-cell / .wa-arrange-del */
+  --danger-fg: #b53a3a;        /* 危险软底上的文字 */
+  --danger-strong: #d92020;    /* 强烈警示文字：自动筛选警告 / 清除按钮 hover */
+  --text-sub: #4a5160;         /* 次要正文：摘要行 / 部位组名 / 部件名 */
+  --text-label: #5f6b7a;       /* 字段标签与表头 */
+  --text-hint: #98a2b3;        /* 提示 / 空态 / 禁用文字 */
+  --bg-tint: #edf2fc;          /* 卡片头渐变起点 / 分组标题底色 */
+  --tag-fg: #b45309;           /* 琥珀标签文字 */
+  --on-proc-yellow: #6d4c00;   /* 黄底上的深色文字（对比度用） */
+  --blue-strong: #185fa5;      /* 分类标题 / 次级按钮文字 */
+  --blue-mark: #378add;        /* 强调竖条 / 对比卡边框 */
   /* 中性色阶（UI/UX 审计规范新增） */
   --n0: #ffffff; --n1: #f7f9fc; --n2: #f0f3f8; --n3: #e6eaf2; --n4: #dde2ec;
   --n5: #b9c1cf; --n6: #6a758c; --n7: #697386; --n8: #3d4657; --n9: #1f2a44; --n10: #141b2e;
@@ -272,7 +286,7 @@ button.is-loading.primary::after { border-color: rgba(255, 255, 255, .45); borde
 .category-card { position: relative; overflow: visible; border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); box-shadow: var(--sh-1); }
 /* 聚焦（打开下拉）时抬高本卡片，确保溢出的下拉菜单盖住后续卡片 */
 .category-card:focus-within { z-index: 40; }
-.category-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: linear-gradient(90deg, #edf2fc, var(--n0)); border-radius: 12px 12px 0 0; }
+.category-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: linear-gradient(90deg, var(--bg-tint), var(--n0)); border-radius: 12px 12px 0 0; }
 .category-head strong { font-size: var(--fs-17); }
 .category-head > span, .sub-head > span { color: var(--blue-dark); font-size: var(--fs-13); font-weight: 650; }
 .category-head button { min-height: 30px; padding: 4px 9px; font-size: var(--fs-12); }
@@ -461,7 +475,7 @@ input.remote-locked {
   line-height: 1; padding: 4px 0; color: var(--n7); font-size: var(--fs-13, 13px);
 }
 .itg .itg-ops button:hover { background: var(--blue-light, #eaf1fa); }
-.itg .itg-ops button.del { border-color: #f2cdcd; background: #fdecec; color: var(--danger); }
+.itg .itg-ops button.del { border-color: var(--danger-line); background: var(--danger-bg); color: var(--danger); }
 .itg .itg-ops button.del:hover { background: var(--danger-bg-hover); }
 @media (max-width: 768px) {
   /* —— 工具/航材行表移动端重排（A检工具 item-grid 卡式除外，其余 .itg 行表共用） ——
@@ -508,10 +522,10 @@ input.remote-locked {
 .pt-empty-all { text-align: center; color: var(--n7); padding: 40px 0; font-size: var(--fs-13); }
 /* 件号重复/单件卡（pnc）：GanttPrep 重复梳理与航材清单重复梳理共用 */
 .pnc-card { border: 1px solid var(--n4); border-radius: var(--r-lg); background: var(--n0); margin-bottom: 10px; overflow: hidden; }
-.pnc-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #edf2fc; }
+.pnc-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-tint); }
 .pnc-partno { font-size: var(--fs-14); color: var(--blue-dark); font-weight: 700; }
-.pnc-name { font-size: var(--fs-13); color: #4a5160; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pnc-count { margin-left: auto; font-size: var(--fs-12); color: #98a2b3; flex: 0 0 auto; }
+.pnc-name { font-size: var(--fs-13); color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pnc-count { margin-left: auto; font-size: var(--fs-12); color: var(--text-hint); flex: 0 0 auto; }
 .pnc-body { padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
 /* 部位卡头「部位名」行内输入（CategorySection / MaterialCategorySection 共用） */
 .cat-name { flex: 0 1 auto; min-width: 90px; max-width: 220px; padding: 4px 7px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 700; font-size: var(--fs-16); color: inherit; }

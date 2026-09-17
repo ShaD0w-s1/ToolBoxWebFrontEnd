@@ -283,7 +283,7 @@ function exportTableXlsx(): void {
 .prep-extra-item { display: flex; gap: 6px; align-items: stretch; }
 .extra-title { flex: 0 0 14%; min-width: 70px; max-width: 120px; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .extra-value { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
-.danger-cell { flex: 0 0 auto; padding: 6px 10px; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: var(--fs-12); cursor: pointer; }
+.danger-cell { flex: 0 0 auto; padding: 6px 10px; border: 1px solid var(--danger-line); background: var(--danger-bg); color: var(--danger-fg); border-radius: var(--r-sm); font-size: var(--fs-12); cursor: pointer; }
 
 .prep-block-actions { margin-top: 10px; display: flex; gap: 8px; }
 

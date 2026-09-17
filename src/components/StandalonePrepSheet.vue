@@ -469,7 +469,7 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .prep-extra-item { display: flex; gap: 6px; align-items: stretch; }
 .extra-title { flex: 0 0 18%; min-width: 80px; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .extra-value { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
-.danger-cell { padding: 6px 10px; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: var(--fs-12); cursor: pointer; }
+.danger-cell { padding: 6px 10px; border: 1px solid var(--danger-line); background: var(--danger-bg); color: var(--danger-fg); border-radius: var(--r-sm); font-size: var(--fs-12); cursor: pointer; }
 .prep-block-actions { margin-top: 10px; display: flex; gap: 8px; }
 .sp-works { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .sp-work-row { display: flex; gap: 6px; align-items: stretch; }
@@ -480,10 +480,10 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 /* 工序组卡列表：与部件信息 sp-parts 一致的纵向等距排列 */
 .sp-groups { display: flex; flex-direction: column; gap: 10px; }
 .sp-part-card { border: 1px solid var(--n3); border-radius: var(--r-md); padding: 10px 12px; background: var(--n1); }
-.sp-part-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-weight: 600; color: #4a5160; }
+.sp-part-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-weight: 600; color: var(--text-sub); }
 .sp-part-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sp-subcard { display: flex; flex-direction: column; gap: 6px; }
-.sp-sub-title { font-size: var(--fs-13); font-weight: 600; color: #185FA5; }
+.sp-sub-title { font-size: var(--fs-13); font-weight: 600; color: var(--blue-strong); }
 .sp-group-card { border: 1px solid var(--n3); border-radius: var(--r-md); padding: 10px 12px; background: var(--n1); }
 /* 工序卡片列表（UI 参照换发二级页表单工序卡：黄底标题区 + 白底内容区 + ⠿ 拖拽调序） */
 .sp-process-list { display: flex; flex-direction: column; gap: 6px; }
@@ -515,8 +515,8 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 /* 删除 ×（紧凑红底圆角小按钮） */
 .sp-del-x {
   flex: 0 0 auto; width: 26px; height: 26px; padding: 0;
-  border: 1px solid #f2cdcd; border-radius: var(--r-sm);
-  background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1;
+  border: 1px solid var(--danger-line); border-radius: var(--r-sm);
+  background: var(--danger-bg); color: var(--danger-fg); font-size: var(--fs-16); line-height: 1;
   cursor: pointer;
 }
 .sp-del-x:hover { background: var(--danger-bg-hover); }
@@ -532,9 +532,9 @@ watch(sheet, () => { nextTick(autoSizeAll); }, { deep: true });
 .sp-table th { background: var(--n1); font-weight: 600; color: var(--text-strong); }
 .sp-cell { width: 100%; box-sizing: border-box; padding: 5px 6px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: var(--fs-13); min-width: 0; resize: none; overflow: hidden; white-space: pre-wrap; word-break: break-word; line-height: 1.5; font-family: inherit; }
 .sp-cell:focus-visible { border-color: var(--focus); background: var(--n0); }
-.sp-group-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: #4a5160; }
+.sp-group-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: var(--text-sub); }
 .sp-group-name:hover, .sp-group-name:focus-visible { border-color: var(--focus); background: var(--n0); }
-.sp-part-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: #4a5160; }
+.sp-part-name { flex: 1 1 0; min-width: 0; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; font-weight: 600; font-size: var(--fs-14); color: var(--text-sub); }
 .sp-part-name:hover, .sp-part-name:focus-visible { border-color: var(--focus); background: var(--n0); }
 /* 单项工作模板弹窗 */
 .tpl-modal { position: fixed; inset: 0; z-index: 300; background: rgba(15, 23, 42, .45); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px 20px; }

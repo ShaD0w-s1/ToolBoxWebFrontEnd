@@ -173,7 +173,7 @@ function autoGrow(event: Event): void {
 /* 卡片容器（对齐换发 .gp-card + pt-card：白底 padding、色条与底色由内联 style 提供） */
 .ft-card { border: 1px solid var(--n4); border-radius: var(--r-lg); padding: 12px 14px; margin-bottom: 0; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
 /* 卡片头（对齐 .pt-card-head 渐变 + 蓝色描边可编辑名） */
-.ft-card-head { display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; background: linear-gradient(90deg, #edf2fc, transparent); border-radius: 12px 12px 0 0; border-bottom: 1px solid var(--n4); margin: -2px -4px 8px; }
+.ft-card-head { display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; background: linear-gradient(90deg, var(--bg-tint), transparent); border-radius: 12px 12px 0 0; border-bottom: 1px solid var(--n4); margin: -2px -4px 8px; }
 .ft-card-name { flex: 1; min-width: 120px; height: 32px; padding: 0 8px; border: 1.5px solid var(--blue); border-radius: var(--r-sm); font-size: var(--fs-14); font-weight: 700; color: var(--blue-dark); background: var(--n0); }
 .ft-card-name:focus-visible { outline: none; border-color: var(--focus); }
 .ft-card-name.dim { font-weight: 400; color: var(--n6); }

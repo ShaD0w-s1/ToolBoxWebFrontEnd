@@ -576,7 +576,7 @@ async function exportCurrentState(displayCats?: string[]): Promise<void> {
 }
 .sync-overlay-card p {
   margin: 0;
-  color: #333;
+  color: var(--text);
   font-size: 15px;
 }
 .sync-spinner {
@@ -610,7 +610,7 @@ async function exportCurrentState(displayCats?: string[]): Promise<void> {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
   width: min(360px, calc(100% - 48px));
 }
-.identity-modal-card h3 { margin: 0; color: #333; font-size: 17px; }
+.identity-modal-card h3 { margin: 0; color: var(--text); font-size: 17px; }
 .identity-hint { margin: 0; color: #888; font-size: 13px; line-height: 1.5; }
 .identity-modal-card input { padding: 8px 12px; border: 1px solid #d7dbe4; border-radius: var(--r-sm); font-size: 15px; }
 .identity-actions { display: flex; justify-content: flex-end; gap: 8px; }

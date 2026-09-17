@@ -509,7 +509,7 @@ onBeforeUnmount(() => {
 .wa-arrange-row { display: flex; gap: 6px; align-items: center; max-width: calc(var(--wa-col) * 1.7); margin-bottom: 6px; }
 .wa-arrange-name { flex: 0.7 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
 .wa-arrange-person { flex: 1 1 0; min-width: 0; padding: 6px 8px; border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-14); }
-.wa-arrange-del { flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border: 1px solid #f2cdcd; background: #fdecec; color: #b53a3a; border-radius: var(--r-sm); font-size: var(--fs-16); cursor: pointer; }
+.wa-arrange-del { flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border: 1px solid var(--danger-line); background: var(--danger-bg); color: var(--danger-fg); border-radius: var(--r-sm); font-size: var(--fs-16); cursor: pointer; }
 
 /* 工卡安排表格（比例列宽 + 宽列换行显示） */
 .table-wrap { overflow-x: auto; }
@@ -556,9 +556,9 @@ onBeforeUnmount(() => {
   padding-right: 16px;
 }
 .wa-level-select.wa-level-empty {
-  background-color: #fdecec;
-  color: #b53a3a;
-  border-color: #f2cdcd;
+  background-color: var(--danger-bg);
+  color: var(--danger-fg);
+  border-color: var(--danger-line);
 }
 .wa-level-select option {
   color: var(--text-strong);
@@ -568,7 +568,7 @@ onBeforeUnmount(() => {
 .wa-grid-unassigned .wa-cell select {
   padding: 5px 6px; font-size: var(--fs-13);
 }
-.wa-cell input:disabled { background: #f2f4f7; color: #98a2b3; }
+.wa-cell input:disabled { background: #f2f4f7; color: var(--text-hint); }
 .wa-cell.wa-wrap textarea {
   width: 100%; box-sizing: border-box; padding: 5px 6px;
   border: 1px solid var(--n4); border-radius: var(--r-sm); font-size: var(--fs-13);
@@ -577,7 +577,7 @@ onBeforeUnmount(() => {
 }
 /* 需求 1：操作列 × 按钮缩小到可见即可 */
 .wa-x { width: 18px; height: 18px; line-height: 1; padding: 0; font-size: var(--fs-11); }
-.wa-empty { grid-column: 1 / -1; background: var(--n0); padding: 12px; color: #98a2b3; font-size: var(--fs-13); text-align: center; }
+.wa-empty { grid-column: 1 / -1; background: var(--n0); padding: 12px; color: var(--text-hint); font-size: var(--fs-13); text-align: center; }
 .add-card { margin-top: 8px; }
 
 /* 移动端：第二行 4 格 → 2 列；新增安排行满宽；工卡安排字体减小、工卡分级可见 */
@@ -612,7 +612,7 @@ onBeforeUnmount(() => {
 .wa-sec-name:hover { border-color: #e3cf96; background: #fffdf4; }
 .wa-sec-name:focus-visible { outline: none; border-color: var(--focus); background: var(--n0); color: var(--n8); }
 .wa-sec-suffix { margin-left: 2px; }
-.wa-del-group { color: var(--danger, #b53a3a); border-color: #f2cdcd; background: #fdecec; }
+.wa-del-group { color: var(--danger, #b53a3a); border-color: var(--danger-line); background: var(--danger-bg); }
 .wa-del-group:hover { background: var(--danger-bg-hover); }
 .wa-segment { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; }
 @media (max-width: 768px) { .wa-seg-btn { padding: 6px 12px; } }

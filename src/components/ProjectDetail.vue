@@ -572,7 +572,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
 
 <style scoped>
 /* 项目类型选择框：白底蓝字（全局 .type-select 已定义，此处仅保留 option 兜底） */
-.type-select option { background: var(--n0); color: #333; }
+.type-select option { background: var(--n0); color: var(--text); }
 /* 深链直开/数据未就绪时的加载空态 */
 .detail-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -589,13 +589,13 @@ async function runToolFilterByWorkcard(): Promise<void> {
 
 /* 工具清单子页：红色提醒（标题后内联） */
 .auto-filter-warning {
-  color: #d92020;
+  color: var(--danger-strong);
   font-weight: 700;
   font-size: var(--fs-13);
   margin-left: 4px;
 }
 .clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: var(--fs-16); line-height: 1; padding: 0 2px; margin-left: 2px; }
-.clear-btn:hover { color: #d92020; }
+.clear-btn:hover { color: var(--danger-strong); }
 /* 重复工具梳理：按名称分组聚拢，数量/备注可编辑、可删除 */
 .dedupe-toggle { display: flex; align-items: center; gap: 4px; font-size: var(--fs-13); color: var(--n8); cursor: pointer; user-select: none; white-space: nowrap; }
 .dedupe-toggle input { width: 15px; height: 15px; accent-color: var(--blue); }
@@ -605,5 +605,5 @@ async function runToolFilterByWorkcard(): Promise<void> {
 .tool-dedupe-card { border: 1px solid #f0d9b8; background: #fff6e8; border-radius: var(--r-lg); overflow: hidden; }
 .tool-dedupe-head { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: #fbead2; }
 .tool-dedupe-head strong { font-size: var(--fs-14); color: var(--blue-dark); }
-.tool-dedupe-count { font-size: var(--fs-12); font-weight: 700; color: #b45309; }
+.tool-dedupe-count { font-size: var(--fs-12); font-weight: 700; color: var(--tag-fg); }
 </style>

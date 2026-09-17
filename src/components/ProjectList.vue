@@ -737,9 +737,9 @@ async function batchDeleteNoDate(): Promise<void> {
 .library-actions { display: flex; gap: 6px; }
 .library-actions button { min-height: 28px; padding: 3px 7px; font-size: var(--fs-12); }
 .db-group { margin-bottom: 20px; }
-.db-group-title { font-size: var(--fs-14); font-weight: 700; color: var(--n8); margin: 0 0 8px; padding-left: 4px; border-left: 4px solid #378add; }
+.db-group-title { font-size: var(--fs-14); font-weight: 700; color: var(--n8); margin: 0 0 8px; padding-left: 4px; border-left: 4px solid var(--blue-mark); }
 .db-group-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.compare-card { border-color: #378add; }
+.compare-card { border-color: var(--blue-mark); }
 .site-admin-modal { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; background: rgba(17, 24, 39, 0.45); }
 .site-admin-card { width: min(560px, calc(100% - 48px)); max-height: none; margin: 24px auto; padding: 20px 24px; background: var(--n0); border-radius: var(--r-lg); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
 .site-admin-newtpl { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -757,7 +757,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .site-admin-head h3 { margin: 0; font-size: var(--fs-16); color: var(--n8); }
 .site-admin-table { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
 .site-admin-table th, .site-admin-table td { padding: 7px 10px; border-bottom: 1px solid #eef1f5; text-align: left; }
-.site-admin-table th { color: #5f6b7a; font-weight: 600; background: #f6f8fb; }
+.site-admin-table th { color: var(--text-label); font-weight: 600; background: #f6f8fb; }
 .site-admin-empty { color: #8a94a3; text-align: center; padding: 20px 0; margin: 0; }
 /* 模板列表滚动区（换发/APU 模板库 + 单项工作模板库共用）：最多显示 8 条模板，超出纵向滚动下移。
    --tpl-row-h = 内容两行 33px + 上下 padding 20px + 边框 2px，与真实行高对齐。 */
@@ -872,7 +872,7 @@ async function batchDeleteNoDate(): Promise<void> {
 .settings-dir-row .settings-dir-sep { font-size: var(--fs-13, 13px); color: var(--n7, #888); flex: 0 0 auto; }
 .settings-dir-row button { min-height: 34px; padding: 5px 12px; }
 /* 网站管理弹窗：分节标题（同 db-group-title 小号风格） */
-.admin-sec-title { font-size: var(--fs-13); font-weight: 700; color: var(--n8); margin: 14px 0 8px; padding-left: 4px; border-left: 4px solid #378add; }
+.admin-sec-title { font-size: var(--fs-13); font-weight: 700; color: var(--n8); margin: 14px 0 8px; padding-left: 4px; border-left: 4px solid var(--blue-mark); }
 .site-admin-card .admin-settings { margin-bottom: 4px; }
 /* 选框 Tooltip：hover 选框控件显示说明（注释不再常显） */
 .tip-el { position: relative; display: block; }

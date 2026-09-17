@@ -100,7 +100,7 @@ async function submit(): Promise<void> {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 .pfm-card h3 { margin: 0 0 4px; font-size: var(--fs-18); color: var(--n8); }
-.pfm-field { display: flex; flex-direction: column; gap: 5px; font-size: var(--fs-13); color: #5f6b7a; }
+.pfm-field { display: flex; flex-direction: column; gap: 5px; font-size: var(--fs-13); color: var(--text-label); }
 .pfm-field input, .pfm-field select {
   min-height: 36px;
   padding: 7px 11px;

@@ -2788,7 +2788,7 @@ async function importAllXlsx(event: Event): Promise<void> {
 .split-menu button { display: block; width: 100%; padding: 7px 10px; border: none; background: transparent; border-radius: var(--r-sm); font-size: var(--fs-13); text-align: left; cursor: pointer; }
 .split-menu button:hover { background: var(--blue-bg); }
 .split-menu button.danger { color: var(--danger); }
-.split-menu button.danger:hover { background: #fdecec; }
+.split-menu button.danger:hover { background: var(--danger-bg); }
 .split-menu label { display: block; width: 100%; padding: 7px 10px; border: none; background: transparent; border-radius: var(--r-sm); font-size: var(--fs-13); text-align: left; cursor: pointer; white-space: nowrap; box-sizing: border-box; }
 .split-menu label:hover { background: var(--blue-bg); }
 
@@ -2821,7 +2821,7 @@ async function importAllXlsx(event: Event): Promise<void> {
 
 /* ===== 顶部责任 ===== */
 .resp-banner {
-  background: linear-gradient(180deg, #edf2fc, var(--n0));
+  background: linear-gradient(180deg, var(--bg-tint), var(--n0));
   border: 1px solid var(--n4); border-radius: var(--r-lg);
   padding: 10px 14px; margin: 0 0 12px;
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 16px;
@@ -2977,8 +2977,8 @@ async function importAllXlsx(event: Event): Promise<void> {
 .meta-type-row input { flex: 1; min-width: 0; }
 .meta-x {
   flex: 0 0 auto; min-height: 24px; min-width: 26px; padding: 0;
-  border: 1px solid #f2cdcd; border-radius: var(--r-sm);
-  background: #fdecec; color: #b53a3a; font-size: var(--fs-16); line-height: 1;
+  border: 1px solid var(--danger-line); border-radius: var(--r-sm);
+  background: var(--danger-bg); color: var(--danger-fg); font-size: var(--fs-16); line-height: 1;
 }
 .meta-x:hover { background: var(--danger-bg-hover); }
 .meta-divider { border: none; border-top: 1px solid var(--n4); margin: 14px 0 12px; }
@@ -2997,7 +2997,7 @@ async function importAllXlsx(event: Event): Promise<void> {
 .component-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .component-col { display: flex; flex-direction: column; gap: 6px; }
 .component-tag { align-self: flex-start; font-size: var(--fs-12); font-weight: 700; padding: 2px 10px; border-radius: var(--r-sm); }
-.component-tag.off { background: #ffe0b3; color: #b45309; }
+.component-tag.off { background: #ffe0b3; color: var(--tag-fg); }
 .component-tag.on { background: #d5ecdc; color: #1e6b3a; }
 
 /* ===== 字段标签外置（空名称放填报栏外）+ 自动换行文本域 ===== */
@@ -3054,7 +3054,7 @@ textarea.textwrap {
 .form-card-row.part-form-row textarea:first-of-type { flex: 1.5; }
 .form-card-row input:focus-visible, .form-card-row textarea:focus-visible { border-color: var(--focus); outline: none; }
 .part-form-row { border-color: #f0d9b8; background: #fff6e8; }
-.part-form-tag { flex-shrink: 0; font-size: var(--fs-11); font-weight: 700; color: #b45309; background: #ffe0b3; padding: 2px 6px; border-radius: var(--r-xs); }
+.part-form-tag { flex-shrink: 0; font-size: var(--fs-11); font-weight: 700; color: var(--tag-fg); background: #ffe0b3; padding: 2px 6px; border-radius: var(--r-xs); }
 .stage-empty { color: var(--n7); font-size: var(--fs-12); text-align: center; padding: 10px 0; }
 .add-form-card-btn { margin-top: 6px; font-size: var(--fs-12); height: 26px; padding: 0 10px; }
 
@@ -3080,21 +3080,21 @@ textarea.textwrap {
 .sp-name { min-height: 26px; color: var(--text); }
 .sp-table select { width: 100%; height: 28px; border: 1px solid var(--n4); border-radius: var(--r-sm); padding: 0 4px; font-size: var(--fs-12); background: var(--n0); }
 /* 串件安排表：拆/装标签 + 只读展示 */
-.sp-tag { color: #b45309; font-weight: 700; font-size: var(--fs-12); margin-right: 2px; white-space: nowrap; }
+.sp-tag { color: var(--tag-fg); font-weight: 700; font-size: var(--fs-12); margin-right: 2px; white-space: nowrap; }
 .sp-view-content { flex: 1.5; min-width: 90px; padding: 3px 6px; font-size: var(--fs-12); line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 .sp-view-note { flex: 1; min-width: 70px; padding: 3px 6px; font-size: var(--fs-12); color: var(--danger); word-break: break-word; }
 .gantt-card > .card-body > .sp-view-content, .gantt-card > .card-body > .sp-view-note { flex: none; width: 100%; padding: 0 2px; }
 .sp-arr-table td { vertical-align: top; }
 /* 串件安排表：未填写栏浅红底色 */
-.sp-arr-table textarea.sp-empty { background: #fdeaea; border-color: #f0b9b9; }
-.sp-arr-table td.sp-empty-cell { background: #fdeaea; }
+.sp-arr-table textarea.sp-empty { background: var(--danger-bg); border-color: #f0b9b9; }
+.sp-arr-table td.sp-empty-cell { background: var(--danger-bg); }
 .sp-arr-table td.sp-empty-cell input,
 .sp-arr-table td.sp-empty-cell textarea,
-.sp-arr-table td.sp-empty-cell .ns-input { background: #fdeaea; border-color: #f0b9b9; }
+.sp-arr-table td.sp-empty-cell .ns-input { background: var(--danger-bg); border-color: #f0b9b9; }
 
 /* ===== 串件航材/工具清单（pt-card） ===== */
 /* .pt-card-head/.pt-card-name/.pt-collapse/.pt-count/.pt-empty*/ /* 已上移 main.css 共享卡壳基元；此处保留 GanttPrep 特有的卡头负外边距变体 */
-.pt-card-head { padding: 10px 14px; background: linear-gradient(90deg, #edf2fc, var(--n0)); border-radius: 12px 12px 0 0; border-bottom: 1px solid var(--n4); margin: -14px -16px 6px; }
+.pt-card-head { padding: 10px 14px; background: linear-gradient(90deg, var(--bg-tint), var(--n0)); border-radius: 12px 12px 0 0; border-bottom: 1px solid var(--n4); margin: -14px -16px 6px; }
 /* 卡片搜索栏：AutoComplete 输入 + 下拉候选 */
 .part-search-bar { margin: 0 0 12px; padding: 10px 12px; background: var(--n0); border: 1px solid var(--n4); border-radius: var(--r-lg); }
 .part-search-wrap { position: relative; }
@@ -3106,7 +3106,7 @@ textarea.textwrap {
 .psi-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-13); color: var(--text); }
 .psi-kind { flex-shrink: 0; font-size: var(--fs-11); padding: 1px 7px; border-radius: var(--r-pill); background: #eef2f8; color: var(--n7); }
 .psi-kind.card { background: #e3edfb; color: var(--blue-dark); }
-.psi-kind.pn { background: #fdecec; color: #b53a3a; }
+.psi-kind.pn { background: var(--danger-bg); color: var(--danger-fg); }
 .psi-kind.name { background: var(--ok-bg); color: var(--ok); }
 /* 卡片折叠按钮（.pt-collapse 已上移 main.css 共享卡壳基元） */
 
@@ -3238,14 +3238,14 @@ input.remote-locked {
   border-color: #F9A825 !important;
   box-shadow: inset 0 0 0 1.5px #FBC02D !important;
   cursor: not-allowed !important;
-  color: #6d4c00 !important;
+  color: var(--on-proc-yellow) !important;
 }
 .remote-locked[title]:not([title=""]) { position: relative; }
 .remote-locked textarea:disabled,
 .remote-locked input:disabled,
 textarea.remote-locked:disabled,
 input.remote-locked:disabled {
-  opacity: 0.85; color: #6d4c00 !important; -webkit-text-fill-color: #6d4c00;
+  opacity: 0.85; color: var(--on-proc-yellow) !important; -webkit-text-fill-color: var(--on-proc-yellow);
 }
 
 /* 模板弹窗模糊搜索行 */

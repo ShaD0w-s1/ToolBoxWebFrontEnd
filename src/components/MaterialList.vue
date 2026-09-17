@@ -318,11 +318,11 @@ async function runMaterialFilterByWorkcard(): Promise<void> {
 .field { display: flex; align-items: center; gap: 6px; font-size: var(--fs-13); }
 .dedupe-toggle { cursor: pointer; user-select: none; white-space: nowrap; }
 .dedupe-toggle input { accent-color: var(--blue); cursor: pointer; }
-.summary { font-size: var(--fs-13); color: #4a5160; }
-.empty-state { padding: 24px; color: #98a2b3; text-align: center; }
-.auto-filter-warning { color: #d92020; font-weight: 700; font-size: var(--fs-13); margin-left: 4px; }
+.summary { font-size: var(--fs-13); color: var(--text-sub); }
+.empty-state { padding: 24px; color: var(--text-hint); text-align: center; }
+.auto-filter-warning { color: var(--danger-strong); font-weight: 700; font-size: var(--fs-13); margin-left: 4px; }
 .clear-btn { border: 0; background: transparent; color: var(--n6); cursor: pointer; font-size: var(--fs-16); line-height: 1; padding: 0 2px; margin-left: 2px; }
-.clear-btn:hover { color: #d92020; }
+.clear-btn:hover { color: var(--danger-strong); }
 .dedupe-view { display: flex; flex-direction: column; gap: 18px; }
 .dedupe-group { display: flex; flex-direction: column; gap: 8px; }
 .dedupe-title { margin: 0 0 4px; font-size: var(--fs-16); color: var(--n8); }

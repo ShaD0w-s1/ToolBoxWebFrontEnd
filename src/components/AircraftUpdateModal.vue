@@ -84,9 +84,9 @@ async function save(): Promise<void> {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 .aum-card h3 { margin: 0; font-size: var(--fs-18); color: var(--n8); }
-.aum-tip { margin: 0; font-size: var(--fs-12); color: #98a2b3; }
+.aum-tip { margin: 0; font-size: var(--fs-12); color: var(--text-hint); }
 .aum-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.aum-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-12); color: #5f6b7a; }
+.aum-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-12); color: var(--text-label); }
 .aum-field input {
   min-height: 36px; padding: 7px 11px; border: 1px solid var(--focus); border-radius: var(--r-md);
   font-size: var(--fs-14); color: var(--blue-dark); background: var(--n0); box-sizing: border-box; width: 100%;
