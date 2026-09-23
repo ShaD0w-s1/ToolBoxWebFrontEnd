@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { AIRCRAFT_TYPES, DEFAULT_CATEGORIES, FLAT_TOOL_CAT, type Project, type ToolItem } from "../domain/toolbox";
 import type { ToolboxStore } from "../composables/useToolbox";
 import CategorySection from "./CategorySection.vue";
@@ -51,6 +51,39 @@ const needsProjectLoad = computed(() => {
   const project = props.store.currentProject.value;
   return Boolean(project) && project!.loaded !== true;
 });
+
+/** 加载闸门把详情内容**整块卸载**时（v-if → 矮小的加载态），文档高度骤降，
+ *  原滚动位置超出新的可滚动范围 → 浏览器把它 clamp 回顶部；内容随后虽会回来，
+ *  位置却回不来了 —— 用户感知就是「保存/自动保存后页面跳到最上方」。
+ *  这里在「有内容 → 加载态」的瞬间记下位置，等内容渲染回来再还原。
+ *  ⚠️ 只处理**同一项目内**的加载态往返：换项目 / 首次进入回到顶部是预期行为，不参与还原。 */
+let keepScrollY: number | null = null;
+watch(
+  [() => props.store.currentProject.value?.id ?? "", needsProjectLoad],
+  ([pid, need], [prevPid, prevNeed]) => {
+    if (prevPid !== pid) { keepScrollY = null; return; }
+    if (need === prevNeed) return;
+    if (need) { keepScrollY = window.scrollY; return; }   // 即将被卸载：先记下会被 clamp 掉的位置
+    const y = keepScrollY;
+    keepScrollY = null;
+    if (y === null || y <= 0) return;
+    // 必须等内容渲染出足够高度再还原，否则 scrollTo 会被再次 clamp → 不足则退避重试
+    const restore = (tries: number): void => {
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          if (Math.abs(window.scrollY - y) <= 1) return;
+          if (document.documentElement.scrollHeight < y + window.innerHeight && tries > 0) {
+            setTimeout(() => restore(tries - 1), 40);
+            return;
+          }
+          window.scrollTo(0, y);
+        });
+      });
+    };
+    restore(3);
+  },
+);
+
 watch(() => props.store.currentProject.value?.id, () => {
   subPage.value = props.store.currentProject.value?.type === "换发/APU" ? "gantt" : "prep";
 }, { immediate: true });

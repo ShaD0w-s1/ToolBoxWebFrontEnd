@@ -2102,7 +2102,14 @@ export function useToolbox() {
     // ⚠️ 远端只带轻量元数据（列表响应，不含重字段）时，**绝不能**用它的空占位值
     // 覆盖本地重字段，否则会把清单/准备单清空。这里只更新元数据与版本号。
     if (remote.loaded !== true) {
-      const stillFresh = local.loaded === true && local.version === remote.version;
+      // ⚠️ 「远端 version 落后于本地」≠「本地已过期」——列表响应可能来自**陈旧快照**：
+      //  2s 轮询与 450ms 自动保存并发时，列表响应完全可能在 PATCH 落库**之前**就已生成。
+      //  旧判据要求两边**严格相等**，于是本地刚写入的新版本被误判为过期 → loaded=false →
+      //  详情内容被 v-if 整块卸载 → 文档高度塌陷（实测 3348→749px）→ 浏览器把滚动位置
+      //  clamp 回 0，正是用户报的「保存/自动保存后跳到页面最上方」（塌陷仅约 120ms，
+      //  用户看不到加载态，只感知到跳顶）。
+      //  正确判据：只有远端**严格超前**才说明本地重字段确实过期（确有其他写入者）。
+      const stillFresh = local.loaded === true && remote.version <= local.version;
       return {
         ...local,
         name: dirty("meta") ? local.name : remote.name,
@@ -2110,9 +2117,10 @@ export function useToolbox() {
         team: dirty("meta") ? local.team : remote.team,
         type: dirty("meta") ? local.type : remote.type,
         maxItemId: remote.maxItemId ?? local.maxItemId,
-        // 版本变了说明本地重字段已过期 → 标记未加载，等打开时按需重取。
+        // 取较大者：陈旧快照不得把本地版本拉低，否则下一次保存会带着旧 version 撞 409。
+        version: Math.max(local.version, remote.version),
+        // 远端确实超前 → 本地重字段已过期，标记未加载，等按需重取。
         loaded: stillFresh,
-        version: remote.version,
       };
     }
     return {
