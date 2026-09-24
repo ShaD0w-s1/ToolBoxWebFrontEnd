@@ -87,6 +87,22 @@ watch(
 watch(() => props.store.currentProject.value?.id, () => {
   subPage.value = props.store.currentProject.value?.type === "换发/APU" ? "gantt" : "prep";
 }, { immediate: true });
+/** 顶部「保存」：模板编辑页里保存的目标是**模板本身** → 先确保模板编辑子页可见，
+ *  再交给 store 打开「保存模板」弹窗。非模板编辑态维持原行为（强制推送后台）。
+ *  ⚠️ 必须先切子页：模板编辑入口在「单项准备单」/「甘特」子页里，若用户正停在
+ *  航材/工具清单等子页，那些组件没挂载，弹窗请求会无人响应。 */
+function onSaveClick(): void {
+  if (props.store.isEditingTemplateProject.value) {
+    const target = isEngApu.value ? "gantt" : "prep";
+    if (subPage.value !== target) {
+      subPage.value = target;
+      nextTick(() => props.store.requestSaveTemplate());
+      return;
+    }
+  }
+  props.store.saveNow();
+}
+
 /** 面包屑：当前子页标签（UI/UX 审计规范新增）。 */
 const subPageLabel = computed(() => {
   if (props.store.editingLibrary.value || props.store.editingMaterialLibrary.value) return "机型标准数据库";
@@ -448,7 +464,7 @@ async function runToolFilterByWorkcard(): Promise<void> {
       <div v-if="store.currentProject.value && !store.editingLibrary.value && !isEngApu" class="toolbar top-row">
         <label v-if="!isStandalone && !isEngApu" class="button primary" title="导入 AMES线控平台-打印其他 中的《例行工卡清单》（八大件的工卡清单），网页会根据表单自动导入工卡并关联工具、航材">依据工卡清单<input hidden type="file" accept=".xlsx,.xls" @change="applyWorkCardListFile" /></label>
         <button @click="emit('share')">分享本页</button>
-        <button title="强制推送后台" @click="store.saveNow()">保存</button>
+        <button :title="store.isEditingTemplateProject.value ? '模板编辑中：保存即写回模板' : '强制推送后台'" @click="onSaveClick">保存</button>
         <button title="强制同步数据" @click="store.refresh()">刷新</button>
         <span v-if="!isEngApu" class="spacer" />
         <span v-if="!isEngApu && !isStandalone" class="hint">导入 AMES线控平台-打印其他 中的《例行工卡清单》</span>

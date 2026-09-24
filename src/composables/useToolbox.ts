@@ -147,6 +147,20 @@ export function useToolbox() {
   const currentProjectId = ref<string | null>(null);
   /** 模板编辑模式（mode="edit"）创建的临时项目 id：关闭子页回列表时自动删除记录、不保存。 */
   const editingTemplateProjectId = ref<string | null>(null);
+  /** 是否正停在「模板编辑页」。
+   *  ⚠️ 这是一条**临时项目**：关闭子页即删除、不保存。对它执行「保存」（推送后台）没有意义 ——
+   *  推上去的记录很快会被删掉，更糟的是会让用户误以为改动已保存，而**模板其实没更新**。
+   *  因此 saveNow() 在此状态下改为请求打开「保存模板」弹窗（见 requestSaveTemplate）。 */
+  const isEditingTemplateProject = computed(
+    () => Boolean(editingTemplateProjectId.value) && currentProjectId.value === editingTemplateProjectId.value,
+  );
+  /** 请求打开「保存模板」弹窗的计数器（每次 +1 = 一次请求）。
+   *  由当前挂载的模板编辑器（GanttPrep / StandalonePrepSheet）监听并真正弹窗 ——
+   *  composable 不该直接持有组件的弹窗状态。 */
+  const tplSaveRequest = ref(0);
+  function requestSaveTemplate(): void {
+    tplSaveRequest.value += 1;
+  }
   const editingLibrary = ref<AircraftType | null>(null);
   const editingStdLib = ref<StandardLibKey | null>(null);
   /** 正在编辑的航材标准库机型（A320/B787）；与 editingLibrary 互斥。 */
@@ -2328,6 +2342,9 @@ export function useToolbox() {
 
   /** 立即保存：无视 autoSync 防抖间隔，把本地编辑过的内容立刻推送云端（不拉取）。 */
   async function saveNow(): Promise<void> {
+    // ⚠️ 模板编辑页：保存的目标是**模板**本身，而不是那条会被删掉的临时项目
+    //    → 转交「保存模板」弹窗（见 isEditingTemplateProject）。
+    if (isEditingTemplateProject.value) { requestSaveTemplate(); return; }
     if (!hasDirtyData()) {
       notify("没有需要保存的改动");
       return;
@@ -2648,6 +2665,7 @@ export function useToolbox() {
     itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
     importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearProjectAllData, clearToolListNow, clearMaterialListNow, setToolCart, loadRemote, refresh, saveNow,
+    isEditingTemplateProject, tplSaveRequest, requestSaveTemplate,
     syncSubToLibrary,
     mSubsOf, mItemsOf, mCatTotal, mAllTotal, mCategoryList,
     mAddCategory, mAddCategoryFromStandard, mReplaceCategoryFromStandard, mAddNewCategory, mRenameCategory, mDeleteCategory, mAddSub, mRenameSub, mDeleteSub, mAddItem, mDeleteItem,

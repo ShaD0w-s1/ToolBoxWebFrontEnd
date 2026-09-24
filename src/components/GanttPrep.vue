@@ -773,6 +773,10 @@ const partDuplicates = computed(() => partDedupeGroups.value.filter((g) => g.row
 const partSingles = computed(() => partDedupeGroups.value.filter((g) => g.rows.length === 1));
 
 // —— 模板加载 ——
+/** 模板编辑页点「保存」→ store 发出信号，这里打开「保存模板」弹窗
+ *  （此时保存的目标是**模板**本身，而不是那条关闭即删的临时项目）。 */
+watch(() => props.store.tplSaveRequest.value, () => { void openTplModal("save"); });
+
 const showTplModal = ref(false);
 const tplMode = ref<"load" | "save">("load");
 const templates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: GanttPrepState }>>([]);
@@ -2158,7 +2162,7 @@ async function importAllXlsx(event: Event): Promise<void> {
         <span class="toolbar-sep" />
         <div class="subpage-actions top-actions">
           <button class="ghost" @click="emit('share')">分享本页</button>
-          <button class="ghost" title="强制推送后台" @click="props.store.saveNow()">保存</button>
+          <button class="ghost" :title="props.store.isEditingTemplateProject.value ? '模板编辑中：保存即写回模板' : '强制推送后台'" @click="props.store.saveNow()">保存</button>
           <button class="ghost" title="强制同步数据" @click="props.store.refresh()">刷新</button>
           <button class="danger" @click="clearGanttAll">清空数据</button>
         </div>

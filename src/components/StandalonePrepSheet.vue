@@ -125,6 +125,10 @@ async function importSigningXlsxLocal(event: Event): Promise<void> {
 }
 
 // ===== 单项工作模板（调取/保存双模式，与换发/APU 二级页一致：调取仅加载；保存=新模板+覆盖/改名/删除） =====
+/** 模板编辑页点「保存」→ store 发出信号，这里打开「保存模板」弹窗
+ *  （此时保存的目标是**模板**本身，而不是那条关闭即删的临时项目）。 */
+watch(() => props.store.tplSaveRequest.value, () => { void openTplModal("save"); });
+
 const showTplModal = ref(false);
 const tplMode = ref<"load" | "save">("load");
 const templates = ref<Array<{ _id: string; id: string; name: string; savedAt: string; state: StandaloneTemplateState }>>([]);
