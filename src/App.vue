@@ -445,6 +445,12 @@ onMounted(async () => {
     const target = pendingRoutePath ?? route.path;
     if (target && target !== "/") applyRoutePath(target);
     else openFromQuery();
+    // ③′ 清理上次会话遗留的模板临时项目（本地台账 + 启动清理，见
+    //     useToolbox.sweepOrphanTemplateProjects）。刻意放在深链恢复**之后**：
+    //     此刻 currentProjectId 已确定，若用户正是通过深链打开这条临时项目，
+    //     清理会被其安全守卫跳过（绝不删掉正在查看的项目）。
+    //     fire-and-forget：台账为空时立即返回，不阻塞启动关键路径。
+    void store.sweepOrphanTemplateProjects();
   }
   // ④ 数据与视图均就位后才放行「视图 → URL」回写。
   routeReady = true;

@@ -80,6 +80,61 @@ function readStoredListTab(): ListTab {
   }
   return "tools";
 }
+/* ——— 模板临时项目台账（本地台账 + 启动清理） ———
+ *
+ *  背景：模板库「编辑 / 新增模板」会 `createProject()` 建一条**真落库**的临时项目来承载内容，
+ *  而唯一的回收路径是 `backToList()`。用户刷新 / 关标签页 / 编辑中途跳走时都不会走它 →
+ *  云端留下一条不属于任何模板的孤儿记录（刷新后还被当成普通项目拉回列表）。
+ *
+ *  做法：把「我创建过、尚未回收」的 id 记进 localStorage，下次启动逐条删除。
+ *
+ *  ⚠️⚠️ 安全边界（这是本机制唯一可能造成破坏的地方，必须守住）：
+ *     只删台账里**精确记录过的 id** —— 不做任何特征猜测（不按名字、不按类型、不按时间），
+ *     所以**不可能误删用户的真实项目**：台账只在模板编辑入口写入，写进去的是刚由服务端
+ *     返回的 id，且 id 为服务端 `uuid4().hex` 生成，不会与既有项目撞车。
+ *  ⚠️ 必须用**数组**而非单值：两个标签页同时编辑模板时，单值会互相覆盖、必留一个孤儿。
+ *  ⚠️ 台账读写全部 try/catch：隐私模式 / 存储配额异常时静默退化为「不清理」，绝不影响主流程。
+ */
+const TPL_ORPHAN_KEY = "toolbox.tplOrphans";
+/** 台账上限：超出则丢最旧（防脏数据无限增长）。 */
+const TPL_ORPHAN_MAX = 10;
+
+/** 读取待清理的模板临时项目 id。
+ *  任何异常（无此项 / 非 JSON / 非数组 / 混入非字符串）都降级为空台账 —— 宁可不清理，也不猜。 */
+function readTplOrphanIds(): string[] {
+  try {
+    const raw = localStorage.getItem(TPL_ORPHAN_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((x): x is string => typeof x === "string" && x.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function writeTplOrphanIds(ids: string[]): void {
+  try {
+    localStorage.setItem(TPL_ORPHAN_KEY, JSON.stringify(ids.slice(-TPL_ORPHAN_MAX)));
+  } catch {
+    /* 存储不可用：忽略（退化为不清理） */
+  }
+}
+
+/** 登记：模板编辑页创建临时项目后调用。幂等，重复登记不会产生重复项。 */
+function addTplOrphan(id: string): void {
+  const ids = readTplOrphanIds();
+  if (ids.includes(id)) return;
+  writeTplOrphanIds([...ids, id]);
+}
+
+/** 注销：正常回收（backToList）或已清理成功时调用。 */
+function removeTplOrphan(id: string): void {
+  const ids = readTplOrphanIds();
+  if (!ids.includes(id)) return;
+  writeTplOrphanIds(ids.filter((x) => x !== id));
+}
+
 type DetailTab = "display" | "database";
 type CloudState = "ok" | "warn" | "err";
 
@@ -923,8 +978,11 @@ export function useToolbox() {
         if (cloud.available) {
           backend.deleteProject(tplId).catch(() => { /* best-effort */ });
         }
+        // 已走上正常回收路径 → 从台账注销，无需下次启动再清一遍
+        removeTplOrphan(tplId);
         persist();
       }
+      // p 不存在（本地已无此记录，云端却可能仍有）→ **保留台账**，交给下次启动的清理兜底
     }
     screen.value = "list";
     editingLibrary.value = null;
@@ -1048,6 +1106,60 @@ export function useToolbox() {
     }
     app.value.projects = app.value.projects.filter((item) => item.id !== project.id);
     persist();
+  }
+
+  /** 启动清理：把上次会话遗留的模板临时项目从云端与本地列表一并清掉（本地台账方案）。
+   *
+   *  调用时机：`App.vue` 的深链恢复**之后**、地址栏收敛之后（见 App.vue 的注释）——
+   *  此时 `currentProjectId` 已确定，若用户正是通过深链打开这条临时项目，会被下面的
+   *  安全守卫跳过（绝不删掉正在查看的项目）；无深链时也不阻塞启动关键路径。
+   *
+   *  ⚠️ 这里**不能用 `persist()`**：它会调用 `markCurrentDirty()`，而启动时停在列表页且
+   *     无当前项目，会命中该函数的兜底分支把**全部项目**标脏 → 触发全量回推云端，
+   *     正好会「影响正常项目」。清理只需一次本地落盘，所以用 `persistNow()`。
+   *
+   *  ⚠️ 整个函数包 try/catch：它以 fire-and-forget 方式调用，不允许抛出未处理的 rejection。 */
+  async function sweepOrphanTemplateProjects(): Promise<void> {
+    const ids = readTplOrphanIds();
+    if (!ids.length) return;
+    // 离线整轮跳过并**保留台账**，等下次在线再清 —— 避免本地删掉又被远端合并拉回来。
+    if (!cloud.available) return;
+
+    let cleaned = 0;
+    let leftOpenProject = false;
+    try {
+      for (const id of ids) {
+        // 安全守卫：绝不清理**本会话正在编辑**的模板临时项目
+        // （启动时该值为 null，纯属兜底；防将来在会话中途调用时误删正在编辑的记录）
+        if (id === editingTemplateProjectId.value) continue;
+        try {
+          await backend.deleteProject(id);
+        } catch (error) {
+          // 404 = 云端已无此记录（用户手动删过 / 上次已删净）→ 视为成功，继续走注销
+          const alreadyGone = error instanceof ApiError && error.status === 404;
+          if (!alreadyGone) {
+            // 网络 / 服务异常：保留台账待下次启动重试，且**不动本地列表**（避免删了又被拉回）
+            console.warn("[tpl-sweep] 模板临时项目清理失败，保留台账待下次启动重试:", id, error);
+            continue;
+          }
+        }
+        app.value.projects = app.value.projects.filter((p) => p.id !== id);
+        removeTplOrphan(id);
+        cleaned += 1;
+        // ⚠️ 「编辑中刷新」这一最常见场景下，地址栏正停在 `#/project/<临时项目>`，
+        //    深链恢复会把它设成**当前打开的项目**（`editingTemplateProjectId` 只在内存，
+        //    所以它此时以普通项目形态呈现 —— 正是本机制要修的那个 bug）。
+        //    删掉它之后视图会指向一个已不存在的项目 → 一并退回列表，避免详情页悬空。
+        if (currentProjectId.value === id) leftOpenProject = true;
+      }
+      if (cleaned) {
+        if (leftOpenProject) backToList(); // 只重置视图，内部不落盘；落盘由下面统一做
+        persistNow(); // 只落本地：不标脏、不调度回推
+        console.info(`[tpl-sweep] 已清理 ${cleaned} 条遗留的模板临时项目`);
+      }
+    } catch (error) {
+      console.warn("[tpl-sweep] 启动清理过程异常（已忽略，不影响主流程）:", error);
+    }
   }
 
   function updateProject(project: Project, changes: Partial<Project>): void {
@@ -2565,6 +2677,9 @@ export function useToolbox() {
     if (!project) return;
     // mode="edit"：临时项目记录，关闭子页（backToList）自动删除、不保存
     editingTemplateProjectId.value = mode === "edit" ? project.id : null;
+    // 登记台账：刷新 / 关页 / 中途跳走都不会走 backToList，靠下次启动的清理兜底回收。
+    // 必须在 await createProject 之后登记 —— 云端可用时 id 由服务端 POST 返回，创建前还不知道。
+    if (mode === "edit") addTplOrphan(project.id);
     project.ganttPrep = deepCopy(state);
     project.ganttPrep.currentTemplateName = mode === "edit" ? name : "";
     markField("ganttPrep");
@@ -2582,6 +2697,8 @@ export function useToolbox() {
     if (!project) return;
     // mode="edit"：临时项目记录，关闭子页（backToList）自动删除、不保存
     editingTemplateProjectId.value = mode === "edit" ? project.id : null;
+    // 登记台账：刷新 / 关页 / 中途跳走都不会走 backToList，靠下次启动的清理兜底回收。
+    if (mode === "edit") addTplOrphan(project.id);
     const prep = deepCopy(state.prep) as StandalonePrepSheet;
     prep.title = name; // 模板编辑/引用：标题直接用模板名称
     project.standalonePrepSheet = prep;
@@ -2665,6 +2782,7 @@ export function useToolbox() {
     itemsOf, subsOf, catTotal, allTotal, isCartDuplicate,
     addNewCategory, addCategoryFromStandard, standardCategories, renameCategory, replaceCategoryFromStandard, deleteCategory, addSub, renameSub, deleteSub, forceExpandAll,
     importStandardSub, addItem, deleteItem, mergeImportedSections, replaceActive, clearProjectAllData, clearToolListNow, clearMaterialListNow, setToolCart, loadRemote, refresh, saveNow,
+    sweepOrphanTemplateProjects,
     isEditingTemplateProject, tplSaveRequest, requestSaveTemplate,
     syncSubToLibrary,
     mSubsOf, mItemsOf, mCatTotal, mAllTotal, mCategoryList,
