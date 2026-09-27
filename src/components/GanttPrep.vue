@@ -7,6 +7,13 @@ import NameSuggest from "./NameSuggest.vue";
 import AircraftRegSuggest from "./AircraftRegSuggest.vue";
 import LoadingState from "./LoadingState.vue";
 import AttachmentSection from "./AttachmentSection.vue";
+import {
+  buildSheetMatrix,
+  checkWorkCardListShape,
+  WORKCARD_LIST_HINT,
+  WORKCARD_LIST_HINT_MS,
+  WorkCardListFormatError,
+} from "../services/workcard";
 import { createEditLockDirective } from "../utils/editLock";
 
 const props = defineProps<{ store: ToolboxStore }>();
@@ -573,15 +580,24 @@ async function importWorkDocList(event: Event): Promise<void> {
   input.value = "";
   if (!file) return;
   try {
-    const XLSX = await import("xlsx");
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: "array" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as unknown[][];
+    // ⚠️ 必须用 buildSheetMatrix 而不是 sheet_to_json(ws)：
+    //   `!ref` 常被导出工具限制成打印区（实测《例行工卡清单》!ref=A1:N20，真实数据到第 98 行），
+    //   sheet_to_json 只遍历 !ref 范围 → **表尾工卡被整体丢弃**。buildSheetMatrix 自行遍历
+    //   全部真实单元格地址，彻底摆脱该限制（与二级页 applyWorkCardListFile 行为一致）。
+    const rows = await buildSheetMatrix(file);
+    // 结构校验：只接受 AMES 工包八大件里的《例行工卡清单》，否则中止并提示重新下载
+    const missing = checkWorkCardListShape(rows);
+    if (missing.length) throw new WorkCardListFormatError(missing);
     const wp = parseWorkDocRows(rows);
     save();
     props.store.notify(`工卡清单导入完成：工包 ${wp} 条`, "ok");
   } catch (err) {
+    if (err instanceof WorkCardListFormatError) {
+      // 缺失细节只进控制台（提示条要短、可读），用户看到的是可照做的指令
+      console.warn("[依据工卡清单] 结构校验未通过，缺少：", err.missing);
+      props.store.notify(WORKCARD_LIST_HINT, "err", WORKCARD_LIST_HINT_MS);
+      return;
+    }
     props.store.notify(err instanceof Error ? err.message : "解析失败", "err");
   }
 }

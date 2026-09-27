@@ -11,7 +11,7 @@ import StandalonePrepSheet from "./StandalonePrepSheet.vue";
 import MaterialList from "./MaterialList.vue";
 import GanttPrep from "./GanttPrep.vue";
 import ProjectFormModal from "./ProjectFormModal.vue";
-import { parseWorkCardList } from "../services/workcard";
+import { parseWorkCardList, WORKCARD_LIST_HINT, WORKCARD_LIST_HINT_MS, WorkCardListFormatError } from "../services/workcard";
 import { backend } from "../api";
 import { growTextarea } from "../utils/dom";
 
@@ -399,6 +399,13 @@ async function applyWorkCardListFile(event: Event): Promise<void> {
     // 只拉这一个项目（1 个请求），其余端点与本端同步由 revision/轮询负责。
     await props.store.refreshProjectDetail(project.id);
   } catch (error) {
+    // 拿错文件（不是 AMES 工包八大件里的《例行工卡清单》）：中止导入 + 提示重新下载。
+    // 缺失细节只进控制台（提示条要短、可读），用户看到的是可以照着做的指令。
+    if (error instanceof WorkCardListFormatError) {
+      console.warn("[依据工卡清单] 结构校验未通过，缺少：", error.missing);
+      props.store.notify(WORKCARD_LIST_HINT, "err", WORKCARD_LIST_HINT_MS);
+      return;
+    }
     props.store.notify(error instanceof Error ? error.message : "解析表格失败", "err");
   }
 }

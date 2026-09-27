@@ -622,7 +622,9 @@ export function useToolbox() {
   /** 单条提示停留时长 / 同时显示上限。 */
   const TOAST_MS = 2200;
   const TOAST_MAX = 4;
-  function notify(message: string, level?: "info" | "ok" | "err"): void {
+  /** `durationMs`：供「需要用户离开页面去照做」的提示加长停留（默认 TOAST_MS）。
+   *  例：「依据工卡清单」上传件格式不符 → 要用户回 AMES 重新下载，2.2s 读不完。 */
+  function notify(message: string, level?: "info" | "ok" | "err", durationMs = TOAST_MS): void {
     const item: ToastItem = { id: ++toastSeq, message, level: level ?? guessLevel(message) };
     toasts.push(item);
     // 超出上限丢最旧的一条：连发（如批量校验逐条报错）时不会无限堆叠刷屏
@@ -630,7 +632,7 @@ export function useToolbox() {
     setTimeout(() => {
       const i = toasts.findIndex((t) => t.id === item.id);
       if (i >= 0) toasts.splice(i, 1);
-    }, TOAST_MS);
+    }, durationMs);
   }
   const notifyOk = (m: string): void => notify(m, "ok");
   const notifyErr = (m: string): void => notify(m, "err");
